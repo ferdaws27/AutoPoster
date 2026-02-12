@@ -55,7 +55,7 @@ const [content, setContent] = useState("");
   return (
     <div className="gradient-bg min-h-screen text-white">
 
-      {/* ================= SIDEBAR ================= */}
+      {/* ================= SIDEBAR =================
       <aside className="fixed left-0 top-0 h-full w-72 sidebar-glass z-40 p-6">
         <Brand />
         <nav className="space-y-2">
@@ -66,7 +66,7 @@ const [content, setContent] = useState("");
           <NavItem icon="fa-chart-bar" label="Analytics" />
           <NavItem icon="fa-cog" label="Settings" />
         </nav>
-      </aside>
+      </aside> */}
 
       {/* ================= MAIN ================= */}
       <main className="ml-72 p-8">
