@@ -7,6 +7,15 @@ import VoiceTrainer from "./pages/voicetrainer";
 import MediaCompanionPage from "./pages/MediaCompanionPage";
 import VoiceCloner from "./pages/clone";
 import Layout from "./components/Layout";
+import SchedulingPage from "./SchedulingPage";
+import CreatePostPage from "./CreatePostPage";
+import PostsLibrary from  "./PostsLibrary";
+import HookGenerator from "./HookGenerator";
+import PerformanceOptimizer from "./PerformanceOptimizer";
+
+
+
+
 
 export default function App() {
   return (
@@ -24,6 +33,15 @@ export default function App() {
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
           <Route path="voicecloner" element={<VoiceCloner />} />
+          <Route path="/Scheduling" element={<SchedulingPage />} />
+           {/* Create Post */}
+        <Route path="/create-post" element={<CreatePostPage />} />
+        <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
+        <Route path="/hook-generator" element={<HookGenerator />} />
+
+        {/* Posts Library */}
+        <Route path="/posts-library" element={<PostsLibrary />} />
+
           
           
         </Route>
