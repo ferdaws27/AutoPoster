@@ -1,68 +1,268 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
+/* ================= FONT ================= */
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* ================= SCROLLBAR ================= */
+::-webkit-scrollbar {
+  display: none;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+/* ================= BACKGROUNDS ================= */
+.gradient-bg {
+  background: linear-gradient(135deg, #0E1116 0%, #1A1F26 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, #00C2FF 0%, #7B61FF 100%);
+}
+
+/* ================= GLASS ================= */
+.glass-effect {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(14, 17, 22, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ================= GLOW ================= */
+.glow-border {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#0E1116, #0E1116) padding-box,
+    linear-gradient(135deg, #00C2FF, #7B61FF) border-box;
+}
+
+/* ================= FLOAT ================= */
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* ================= TOGGLE ================= */
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background: #374151;
+  border-radius: 12px;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: all 0.3s;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.toggle-switch.active {
+  background: linear-gradient(135deg, #00C2FF 0%, #7B61FF 100%);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.toggle-switch.active .toggle-knob {
+  transform: translateX(24px);
+}
+
+/* ================= STATUS ================= */
+.status-connected {
+  background: rgba(0, 224, 157, 0.2);
+  color: #00E09D;
+}
+
+.status-disconnected {
+  background: rgba(255, 77, 77, 0.2);
+  color: #FF4D4D;
+}
+
+/* ================= SLIDER ================= */
+.slider-track {
+  background: #374151;
+  height: 8px;
+  border-radius: 4px;
+  position: relative;
+}
+
+.slider-thumb {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #00C2FF 0%, #7B61FF 100%);
+  border-radius: 50%;
+  position: absolute;
+  top: -6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+/* ================= ANIMATIONS ================= */
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
   }
-  a:hover {
-    color: #747bff;
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+/* ================= SETTINGS CARDS ================= */
+.setting-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.setting-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 194, 255, 0.3);
+}
+
+/* ================= DANGER ================= */
+.danger-zone {
+  background: rgba(255, 77, 77, 0.05);
+  border: 1px solid rgba(255, 77, 77, 0.2);
+}
+
+/* ================= UPLOAD ZONE ================= */
+.upload-zone {
+  border: 2px dashed rgba(0, 194, 255, 0.4);
+  transition: all 0.3s ease;
+}
+
+.upload-zone:hover {
+  background: rgba(0, 194, 255, 0.08);
+}
+
+/* ================= PROGRESS ================= */
+.progress-bar {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #00C2FF 0%, #7B61FF 100%);
+  transition: width 0.3s ease;
+}
+
+/* ================= FLOAT (ALIAS) ================= */
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* ================= PULSE ================= */
+.pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 194, 255, 0.6);
   }
+  70% {
+    box-shadow: 0 0 0 18px rgba(0, 194, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 194, 255, 0);
+  }
+}
+
+/* ================= ANALYZING DOTS ================= */
+.analyzing-dots::after {
+  content: "";
+  animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+  0% { content: ""; }
+  33% { content: "."; }
+  66% { content: ".."; }
+  100% { content: "..."; }
+}
+/* ================= VOICE CLONER ================= */
+
+/* Card Style utilisé dans VoiceCloner */
+.neo-card {
+  background: rgba(14, 17, 22, 0.75);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.neo-card:hover {
+  border-color: rgba(0, 194, 255, 0.4);
+}
+
+/* Tabs */
+.tab-active {
+  background: linear-gradient(135deg, #00C2FF 0%, #7B61FF 100%);
+  color: white;
+  box-shadow: 0 5px 20px rgba(0, 194, 255, 0.3);
+}
+
+.tab-inactive {
+  color: #9CA3AF;
+  transition: all 0.3s ease;
+}
+
+.tab-inactive:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Badge tone */
+.tone-badge {
+  background: rgba(0, 194, 255, 0.15);
+  color: #00C2FF;
+  border: 1px solid rgba(0, 194, 255, 0.3);
+}
+
+/* Fade animation */
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Analyzing pulse */
+.analyzing-animation {
+  animation: analyzingPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes analyzingPulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
