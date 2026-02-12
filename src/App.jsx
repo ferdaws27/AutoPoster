@@ -7,11 +7,11 @@ import VoiceTrainer from "./pages/voicetrainer";
 import MediaCompanionPage from "./pages/MediaCompanionPage";
 import VoiceCloner from "./pages/clone";
 import Layout from "./components/Layout";
-import SchedulingPage from "./SchedulingPage";
-import CreatePostPage from "./CreatePostPage";
-import PostsLibrary from  "./PostsLibrary";
-import HookGenerator from "./HookGenerator";
-import PerformanceOptimizer from "./PerformanceOptimizer";
+import SchedulingPage from "./pages/SchedulingPage";
+import CreatePostPage from "./pages/CreatePostPage";
+import PostsLibrary from  "./pages/PostsLibrary";
+import HookGenerator from "./pages/HookGenerator";
+import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 
 
 
