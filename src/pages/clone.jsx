@@ -46,13 +46,8 @@ export default function VoiceCloner() {
 
   return (
     <div className="min-h-screen gradient-bg text-white flex">
-
-      
-
-      {/* ================= MAIN ================= */}
       <main className="flex-1 p-6 md:p-12">
         <div className="max-w-7xl mx-auto">
-
           {/* HEADER */}
           <div className="text-center mb-12">
             <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center shadow-lg">
@@ -66,7 +61,7 @@ export default function VoiceCloner() {
             </p>
           </div>
 
-          {/* ================= TABS ================= */}
+          {/* TABS */}
           <div className="flex justify-center mb-12">
             <div className="flex bg-black/20 p-2 rounded-3xl border border-gray-700/30">
               <button
@@ -91,10 +86,9 @@ export default function VoiceCloner() {
             </div>
           </div>
 
-          {/* ================= MY VOICE ================= */}
+          {/* MY VOICE */}
           {activeTab === "my" && (
             <div className="grid lg:grid-cols-2 gap-8 mb-12">
-
               {/* LEFT CARD */}
               <div className="neo-card rounded-3xl p-8">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
@@ -149,7 +143,7 @@ export default function VoiceCloner() {
             </div>
           )}
 
-          {/* ================= CLONE PROFILE ================= */}
+          {/* CLONE PROFILE */}
           {activeTab === "clone" && (
             <>
               <div className="neo-card rounded-3xl p-8 mb-8 slide-up">
@@ -227,16 +221,69 @@ export default function VoiceCloner() {
               )}
             </>
           )}
+
+          {/* ================= SAVED VOICES ================= */}
+          <div className="neo-card rounded-3xl p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-white flex items-center">
+                <i className="fa-solid fa-bookmark text-yellow-400 mr-3"></i>
+                Saved Voice Presets
+              </h2>
+              <button className="px-4 py-2 gradient-accent rounded-2xl text-white text-sm font-medium hover:opacity-90 transition-opacity">
+                <i className="fa-solid fa-plus mr-2"></i>
+                Import Voice
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* My Voice */}
+              <VoiceCard
+                icon={<i className="fa-solid fa-user text-cyan-400"></i>}
+                bg="bg-cyan-400/20"
+                title="My Voice"
+                subtitle="Personal"
+                description="Insightful & Professional tone with clear structure"
+                status={<span className="text-xs text-green-400 font-medium">● Active</span>}
+                actions={["edit","copy"]}
+              />
+
+              {/* Justin Welsh */}
+              <VoiceCard
+                image="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg"
+                title="Justin Welsh"
+                subtitle="Cloned"
+                description="Confident thought-leader with story-driven content"
+                status={<span className="text-xs text-gray-400">Saved 2 days ago</span>}
+                actions={["copy","edit","trash"]}
+              />
+
+              {/* Naval */}
+              <VoiceCard
+                image="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg"
+                title="Naval"
+                subtitle="Cloned"
+                description="Philosophical wisdom with concise clarity"
+                status={<span className="text-xs text-gray-400">Saved 1 week ago</span>}
+                actions={["copy","edit","trash"]}
+              />
+
+              {/* AI Coach */}
+              <VoiceCard
+                icon={<i className="fa-solid fa-robot text-violet-400"></i>}
+                bg="bg-violet-400/20"
+                title="AI Coach"
+                subtitle="Template"
+                description="Supportive mentor with actionable advice"
+                status={<span className="text-xs text-gray-400">Built-in template</span>}
+                actions={["copy","edit"]}
+              />
+            </div>
+          </div>
         </div>
       </main>
 
       {/* ================= MODALS ================= */}
-      {saveModal && (
-        <Modal onClose={() => setSaveModal(false)}>
-          Voice Saved Successfully!
-        </Modal>
-      )}
-
+      {saveModal && <Modal onClose={() => setSaveModal(false)}>Voice Saved Successfully!</Modal>}
       {applyModal && (
         <Modal
           onClose={() => setApplyModal(false)}
@@ -275,7 +322,6 @@ function Stat({ icon, color, label, value }) {
   );
 }
 
-/* Modal Component */
 function Modal({ children, onClose, confirmAction, confirmText }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -296,6 +342,48 @@ function Modal({ children, onClose, confirmAction, confirmText }) {
               className="px-5 py-2 gradient-accent rounded-xl"
             >
               {confirmText}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================= Voice Card ================= */
+function VoiceCard({ icon, bg, image, title, subtitle, description, status, actions }) {
+  return (
+    <div className="voice-card neo-card rounded-2xl p-6 cursor-pointer">
+      <div className="flex items-center space-x-3 mb-4">
+        {icon ? (
+          <div className={`w-12 h-12 rounded-2xl ${bg} flex items-center justify-center`}>
+            {icon}
+          </div>
+        ) : (
+          <img src={image} alt={title} className="w-12 h-12 rounded-2xl" />
+        )}
+        <div>
+          <h3 className="text-white font-semibold">{title}</h3>
+          <p className="text-gray-400 text-sm">{subtitle}</p>
+        </div>
+      </div>
+      <p className="text-gray-300 text-sm mb-4">{description}</p>
+      <div className="flex justify-between items-center">
+        {status}
+        <div className="flex space-x-2">
+          {actions.includes("edit") && (
+            <button className="w-8 h-8 bg-black/30 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <i className="fa-solid fa-edit text-xs"></i>
+            </button>
+          )}
+          {actions.includes("copy") && (
+            <button className="w-8 h-8 bg-black/30 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <i className="fa-solid fa-copy text-xs"></i>
+            </button>
+          )}
+          {actions.includes("trash") && (
+            <button className="w-8 h-8 bg-black/30 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors">
+              <i className="fa-solid fa-trash text-xs"></i>
             </button>
           )}
         </div>
