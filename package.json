@@ -22,9 +22,13 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@headlessui/react": "^2.2.9",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "axios": "^1.13.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.5.0",
     "react-router-dom": "^7.13.0",
     "recharts": "^3.7.0",
     "zustand": "^5.0.10"

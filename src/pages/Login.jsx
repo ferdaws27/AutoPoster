@@ -10,11 +10,7 @@ import OnboardingModal from "../components/OnboardingModal";
 import SuccessModal from "../components/SuccessModal";
 
 import { faRobot, faShareNodes } from "@fortawesome/free-solid-svg-icons";
-import {
-  faXTwitter,
-  faLinkedinIn,
-  faMedium,
-} from "@fortawesome/free-brands-svg-icons";
+import { faXTwitter, faLinkedinIn, faMedium } from "@fortawesome/free-brands-svg-icons";
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -32,18 +28,44 @@ export default function Login() {
   return (
     <div className="min-h-screen relative text-white overflow-hidden">
       <Background />
-
-      {/* FEATURE CAROUSEL */}
       <FeatureCarousel />
 
-      {/* MAIN CONTAINER */}
+      {/* ================= SECTION: Animated Background ================= */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full blur-3xl animate-pulse-slow"></div>
+        <div
+          className="absolute top-40 right-32 w-80 h-80 bg-gradient-to-br from-violet-400/10 to-transparent rounded-full blur-3xl animate-pulse-slow"
+          style={{ animationDelay: "1.5s" }}
+        ></div>
+        <div
+          className="absolute bottom-32 left-1/3 w-72 h-72 bg-gradient-to-br from-cyan-400/5 to-violet-400/5 rounded-full blur-3xl animate-pulse-slow"
+          style={{ animationDelay: "3s" }}
+        ></div>
+        <div className="mesh-gradient absolute inset-0 opacity-5"></div>
+
+        {/* Floating particles */}
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-cyan-400 rounded-full animate-float opacity-30"></div>
+        <div
+          className="absolute top-3/4 right-1/4 w-1 h-1 bg-violet-400 rounded-full animate-float opacity-40"
+          style={{ animationDelay: "2s" }}
+        ></div>
+        <div
+          className="absolute top-1/2 left-3/4 w-1.5 h-1.5 bg-cyan-300 rounded-full animate-float opacity-20"
+          style={{ animationDelay: "4s" }}
+        ></div>
+        <div
+          className="absolute bottom-1/4 left-1/2 w-1 h-1 bg-violet-300 rounded-full animate-float opacity-35"
+          style={{ animationDelay: "1s" }}
+        ></div>
+      </div>
+
+      {/* ================= SECTION: Main Login Container ================= */}
       <div className="relative z-10 flex items-center justify-center min-h-screen p-8">
         <div className="w-full max-w-lg">
-
           {/* ================= BRAND SECTION ================= */}
           <div className="text-center mb-12 animate-float">
             <div className="inline-flex items-center justify-center w-24 h-24 mb-8 rounded-3xl glass-effect glow-cyan relative">
-              <div className="absolute inset-0 gradient-accent rounded-3xl opacity-20 animate-pulse-slow" />
+              <div className="absolute inset-0 gradient-accent rounded-3xl opacity-20 animate-pulse-slow"></div>
               <div className="relative z-10 flex items-center space-x-1">
                 <i className="fa-solid fa-pen-nib text-2xl text-cyan-400"></i>
                 <div className="flex space-x-1">
@@ -56,7 +78,8 @@ export default function Login() {
 
             <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
               Auto
-              <span className="gradient-accent bg-clip-text text-transparent">
+               <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
+
                 Poster
               </span>
             </h1>
@@ -128,22 +151,55 @@ export default function Login() {
       </div>
 
       {/* RIGHT FEATURE CARDS */}
-      <div className="hidden xl:flex flex-col gap-6 absolute right-8 top-32 z-10">
-        <FeatureCard
-          title="AI-Powered Content"
-          icon={faRobot}
-          items={[
-            "Platform-optimized posts",
-            "Smart image suggestions",
-            "Engagement analytics",
-          ]}
-        />
-        <FeatureCard
-          title="Multi-Platform"
-          icon={faShareNodes}
-          items={["Twitter/X", "LinkedIn", "Medium"]}
-        />
+<div className="hidden xl:flex flex-col gap-6 absolute right-8 top-32 z-10">
+
+  {/* AI Features Card */}
+  <div className="glass-effect rounded-2xl p-6 border border-cyan-400/20">
+    <div className="flex items-center mb-4">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-400 flex items-center justify-center mr-3">
+        <i className="fa-solid fa-robot text-white"></i>
       </div>
+      <h3 className="text-white font-semibold">AI-Powered Content</h3>
+    </div>
+    <ul className="space-y-2 text-sm text-gray-400">
+      <li className="flex items-center">
+        <i className="fa-solid fa-check text-green-400 mr-2 text-xs"></i>
+        Platform-optimized posts
+      </li>
+      <li className="flex items-center">
+        <i className="fa-solid fa-check text-green-400 mr-2 text-xs"></i>
+        Smart image suggestions
+      </li>
+      <li className="flex items-center">
+        <i className="fa-solid fa-check text-green-400 mr-2 text-xs"></i>
+        Engagement analytics
+      </li>
+    </ul>
+  </div>
+
+  {/* Platforms Card */}
+  <div className="glass-effect rounded-2xl p-6 border border-violet-400/20">
+    <div className="flex items-center mb-4">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-cyan-400 flex items-center justify-center mr-3">
+        <i className="fa-solid fa-share-nodes text-white"></i>
+      </div>
+      <h3 className="text-white font-semibold">Multi-Platform</h3>
+    </div>
+    <div className="flex space-x-2">
+      <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+        <i className="fa-brands fa-x-twitter text-white text-xs"></i>
+      </div>
+      <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+        <i className="fa-brands fa-linkedin-in text-white text-xs"></i>
+      </div>
+      <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+        <i className="fa-brands fa-medium text-white text-xs"></i>
+      </div>
+    </div>
+  </div>
+
+</div>
+
 
       <StatsBar />
       <SecurityBadge />
