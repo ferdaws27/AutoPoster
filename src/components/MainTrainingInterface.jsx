@@ -3,23 +3,31 @@ import { useState, useRef, useEffect } from "react";
 export default function MainTrainingInterface() {
   const fileInputRef = useRef(null);
 
-  const [phase, setPhase] = useState("upload");
-  // upload | uploading | analysis | results
-
+  const [phase, setPhase] = useState("upload"); // upload | uploading | analysis | results
   const [progress, setProgress] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [files, setFiles] = useState([]);
 
   /* ================= FILE HANDLING ================= */
 
-  const openFileBrowser = () => {
-    if (phase !== "upload") return;
-    fileInputRef.current?.click();
-  };
-
   const handleFiles = (selectedFiles) => {
     if (!selectedFiles || !selectedFiles.length) return;
-    setFiles(Array.from(selectedFiles));
+
+    // Transforme FileList en tableau
+    const newFiles = Array.from(selectedFiles);
+
+    // Évite les doublons basés sur le nom et la taille
+    setFiles((prevFiles) => {
+      const allFiles = [...prevFiles];
+      newFiles.forEach((file) => {
+        if (!allFiles.some((f) => f.name === file.name && f.size === file.size)) {
+          allFiles.push(file);
+        }
+      });
+      return allFiles;
+    });
+
+    // Lance le processus de progression
     setProgress(0);
     setPhase("uploading");
   };
@@ -50,18 +58,23 @@ export default function MainTrainingInterface() {
   useEffect(() => {
     if (phase !== "analysis") return;
 
-    const timer = setTimeout(() => {
-      setPhase("results");
-    }, 4500);
+    const timer = setTimeout(() => setPhase("results"), 4500);
 
     return () => clearTimeout(timer);
   }, [phase]);
 
+  /* ================= RESET WITHOUT REMOVING FILES ================= */
   const resetAll = () => {
     setPhase("upload");
     setProgress(0);
-    setFiles([]);
     setShowModal(false);
+    // ⚠️ Ne pas vider les fichiers existants pour garder l’historique
+    // setFiles([]); <-- supprimé
+  };
+
+  /* ================= OPEN FILE BROWSER ================= */
+  const openFileBrowser = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -139,6 +152,43 @@ export default function MainTrainingInterface() {
             )}
           </div>
 
+          {/* ================= DISPLAY UPLOADED FILES ================= */}
+          {files.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Uploaded Files
+              </h3>
+              <div className="grid gap-3">
+  {files.map((file, index) => (
+    <div
+      key={index}
+      className="bg-black/20 rounded-xl p-4 border border-gray-700/50 flex items-center justify-between"
+    >
+      <div className="flex items-center space-x-3">
+        <i className="fa-solid fa-file text-cyan-400"></i>
+        <span className="text-gray-300 text-sm">{file.name}</span>
+      </div>
+
+      <div className="flex items-center space-x-3">
+        <span className="text-xs text-gray-500">
+          {(file.size / 1024).toFixed(1)} KB
+        </span>
+        <button
+          className="text-red-400 hover:text-red-600 font-bold"
+          onClick={() => {
+            setFiles(prev => prev.filter((_, i) => i !== index));
+          }}
+        >
+          &times;
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
+
+            </div>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -151,84 +201,83 @@ export default function MainTrainingInterface() {
       )}
 
       {/* ================= ANALYSIS SECTION ================= */}
-{phase === "analysis" && (
-  <div className="glass-effect rounded-3xl p-8 mb-8 slide-up">
+      {phase === "analysis" && (
+        <div className="glass-effect rounded-3xl p-8 mb-8 slide-up">
 
-    <div className="text-center mb-8">
-      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center pulse-glow">
-        <i className="fa-solid fa-brain text-2xl text-violet-400"></i>
-      </div>
-      <h2 className="text-2xl font-bold text-white mb-2">
-        Analyzing Your Writing Style
-      </h2>
-      <p className="text-gray-400 analyzing-dots">
-        AI is processing your content
-      </p>
-    </div>
-
-    <div className="max-w-2xl mx-auto space-y-6">
-
-      {/* Tone Analysis */}
-      <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <i className="fa-solid fa-palette text-violet-400"></i>
-            <span className="text-white font-semibold">Analyzing Tone</span>
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center pulse-glow">
+              <i className="fa-solid fa-brain text-2xl text-violet-400"></i>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Analyzing Your Writing Style
+            </h2>
+            <p className="text-gray-400 analyzing-dots">
+              AI is processing your content
+            </p>
           </div>
-          <span className="text-cyan-400 text-sm">Processing...</span>
-        </div>
-        <div className="progress-bar h-2 rounded-full">
-          <div className="progress-fill w-full rounded-full animate-pulse"></div>
-        </div>
-      </div>
 
-      {/* Keywords Analysis */}
-      <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <i className="fa-solid fa-tags text-cyan-400"></i>
-            <span className="text-white font-semibold">Extracting Keywords</span>
+          <div className="max-w-2xl mx-auto space-y-6">
+
+            {/* Tone Analysis */}
+            <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <i className="fa-solid fa-palette text-violet-400"></i>
+                  <span className="text-white font-semibold">Analyzing Tone</span>
+                </div>
+                <span className="text-cyan-400 text-sm">Processing...</span>
+              </div>
+              <div className="progress-bar h-2 rounded-full">
+                <div className="progress-fill w-full rounded-full animate-pulse"></div>
+              </div>
+            </div>
+
+            {/* Keywords Analysis */}
+            <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <i className="fa-solid fa-tags text-cyan-400"></i>
+                  <span className="text-white font-semibold">Extracting Keywords</span>
+                </div>
+                <span className="text-gray-400 text-sm">Waiting...</span>
+              </div>
+              <div className="progress-bar h-2 rounded-full">
+                <div className="progress-fill w-full rounded-full animate-pulse opacity-40"></div>
+              </div>
+            </div>
+
+            {/* Rhythm Analysis */}
+            <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <i className="fa-solid fa-wave-square text-teal-400"></i>
+                  <span className="text-white font-semibold">Understanding Rhythm</span>
+                </div>
+                <span className="text-gray-400 text-sm">Waiting...</span>
+              </div>
+              <div className="progress-bar h-2 rounded-full">
+                <div className="progress-fill w-full rounded-full animate-pulse opacity-40"></div>
+              </div>
+            </div>
+
+            {/* Overall Progress */}
+            <div className="bg-black/30 rounded-2xl p-6 border border-violet-400/30">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-white font-semibold text-lg">
+                  Overall Progress
+                </span>
+                <span className="text-violet-400 font-bold text-lg">
+                  Processing
+                </span>
+              </div>
+              <div className="progress-bar h-4 rounded-full">
+                <div className="progress-fill w-full rounded-full animate-pulse"></div>
+              </div>
+            </div>
+
           </div>
-          <span className="text-gray-400 text-sm">Waiting...</span>
         </div>
-        <div className="progress-bar h-2 rounded-full">
-          <div className="progress-fill w-full rounded-full animate-pulse opacity-40"></div>
-        </div>
-      </div>
-
-      {/* Rhythm Analysis */}
-      <div className="scanning-line bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <i className="fa-solid fa-wave-square text-teal-400"></i>
-            <span className="text-white font-semibold">Understanding Rhythm</span>
-          </div>
-          <span className="text-gray-400 text-sm">Waiting...</span>
-        </div>
-        <div className="progress-bar h-2 rounded-full">
-          <div className="progress-fill w-full rounded-full animate-pulse opacity-40"></div>
-        </div>
-      </div>
-
-      {/* Overall Progress */}
-      <div className="bg-black/30 rounded-2xl p-6 border border-violet-400/30">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-white font-semibold text-lg">
-            Overall Progress
-          </span>
-          <span className="text-violet-400 font-bold text-lg">
-            Processing
-          </span>
-        </div>
-        <div className="progress-bar h-4 rounded-full">
-          <div className="progress-fill w-full rounded-full animate-pulse"></div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-)}
-
+      )}
 
       {/* ================= RESULTS SECTION ================= */}
       {phase === "results" && (

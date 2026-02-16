@@ -16,41 +16,7 @@ export default function App() {
   return (
     <div className="gradient-bg min-h-screen text-gray-100">
 
-      {/* SIDEBAR */}
-      <aside className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30">
-        <div className="p-6">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
-              <i className="fa-solid fa-pen-nib text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">AutoPoster</span>
-          </div>
-
-          <nav className="space-y-2">
-            {[
-              ["fa-chart-line", "Dashboard"],
-              ["fa-plus", "Create Post"],
-              ["fa-calendar", "Scheduler"],
-              ["fa-folder", "Posts Library"],
-              ["fa-chart-bar", "Analytics"],
-              ["fa-microphone", "Voice Trainer"],
-            ].map(([icon, label]) => (
-              <div
-                key={label}
-                className="flex items-center space-x-3 p-3 rounded-2xl text-gray-300 hover:bg-white/5 cursor-pointer"
-              >
-                <i className={`fa-solid ${icon} w-5`} />
-                <span>{label}</span>
-              </div>
-            ))}
-
-            <div className="flex items-center space-x-3 p-3 rounded-2xl bg-cyan-400/10 text-cyan-400 border border-cyan-400/20">
-              <i className="fa-solid fa-photo-film w-5" />
-              <span>Media Companion</span>
-            </div>
-          </nav>
-        </div>
-      </aside>
+     
 
       {/* MAIN */}
       <main className="ml-64 p-8">

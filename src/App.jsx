@@ -12,6 +12,7 @@ import CreatePostPage from "./pages/CreatePostPage";
 import PostsLibrary from  "./pages/PostsLibrary";
 import HookGenerator from "./pages/HookGenerator";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
+import ABTesterPage from "./pages/ABTesterPage";
 
 
 
@@ -32,19 +33,24 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
-          <Route path="voicecloner" element={<VoiceCloner />} />
+          
           <Route path="/Scheduling" element={<SchedulingPage />} />
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
         <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
         <Route path="/hook-generator" element={<HookGenerator />} />
+         <Route path="/clone" element={<VoiceCloner />} />
+
 
         {/* Posts Library */}
         <Route path="/posts-library" element={<PostsLibrary />} />
+         <Route path="/MediaCompanionPage" element={<MediaCompanionPage />} />
+         <Route path="ABTesterPage" element={<ABTesterPage />}></Route>
+         
 
-          
-          
         </Route>
+        
+
       </Routes>
     </Router>
   );

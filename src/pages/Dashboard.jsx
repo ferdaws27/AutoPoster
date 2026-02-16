@@ -69,7 +69,7 @@ const [content, setContent] = useState("");
       </aside> */}
 
       {/* ================= MAIN ================= */}
-      <main className="ml-72 p-8">
+      <main className=" p-8">
 
         {/* HEADER */}
         <header className="mb-8 flex justify-between items-center">
