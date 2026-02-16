@@ -27,7 +27,7 @@ export default function SettingsPage() {
      
 
       {/* MAIN CONTENT */}
-      <main className="ml-64 p-8">
+      <main className="p-8">
         {/* ✅ HEADER SECTION — AJOUTÉ */}
         <div className="flex items-center justify-between mb-8">
           <div>

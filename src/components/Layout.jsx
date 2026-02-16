@@ -2,15 +2,16 @@ import { NavLink, Outlet } from "react-router-dom";
 
 export default function Layout() {
   const navItems = [
-    ["fa-chart-line", "Dashboard", "/"],
-    ["fa-plus", "Create Post", "/create-post"],
-    ["fa-calendar", "Scheduler", "/Scheduling"],
-    ["fa-folder", "Posts Library", "/posts-library"],
-    ["fa-chart-bar", "Analytics", "/analytics"],
-    ["fa-cog", "Settings", "/settings"],
-    ["fa-cog", "PerformanceOptimizer", "/PerformanceOptimizer"], // Settings inclus pour uniformité
-    
-  ];
+  ["fa-chart-line", "Dashboard", "/"],
+  ["fa-plus", "Create Post", "/create-post"],
+  ["fa-calendar", "Scheduler", "/Scheduling"],
+  ["fa-folder", "Posts Library", "/posts-library"],
+  ["fa-folder", "QuoteTemplate", "/QuoteTemplate"],
+  ["fa-chart-bar", "Analytics", "/analytics"],
+  ["fa-cog", "Settings", "/settings"],
+  ["fa-cog", "PerformanceOptimizer", "/PerformanceOptimizer"],
+];
+
 
   return (
     <div className="gradient-bg min-h-screen">

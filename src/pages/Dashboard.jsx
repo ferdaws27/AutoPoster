@@ -53,23 +53,11 @@ const [content, setContent] = useState("");
   };
 
   return (
-    <div className="gradient-bg min-h-screen text-white">
-
-      {/* ================= SIDEBAR =================
-      <aside className="fixed left-0 top-0 h-full w-72 sidebar-glass z-40 p-6">
-        <Brand />
-        <nav className="space-y-2">
-          <NavItem icon="fa-chart-line" label="Dashboard" active />
-          <NavItem icon="fa-plus" label="Create" />
-          <NavItem icon="fa-folder" label="Library" />
-          <NavItem icon="fa-calendar" label="Schedule" />
-          <NavItem icon="fa-chart-bar" label="Analytics" />
-          <NavItem icon="fa-cog" label="Settings" />
-        </nav>
-      </aside> */}
+    <div className="gradient-bg min-h-screen text-white m-0 p-0">
 
       {/* ================= MAIN ================= */}
-      <main className="ml-72 p-8">
+      <main className="flex-1 m-0 p-0 w-full">
+
 
         {/* HEADER */}
         <header className="mb-8 flex justify-between items-center">
