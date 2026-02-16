@@ -11,13 +11,8 @@ import SchedulingPage from "./pages/SchedulingPage";
 import CreatePostPage from "./pages/CreatePostPage";
 import PostsLibrary from  "./pages/PostsLibrary";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
-<<<<<<< HEAD
-import QuoteTemplate from "./pages/Quotetemplate"; // si .jsx
-
-=======
 import ABTesterPage from "./pages/ABTesterPage";
->>>>>>> 46646ae145a050626ddda62065379fd628f66fb5
-
+import HookGeneratePage from "./pages/HookGeneratePage";
 
 
 
@@ -42,13 +37,9 @@ export default function App() {
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
         <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
-<<<<<<< HEAD
-        <Route path="/QuoteTemplate" element={<QuoteTemplate />} />
-=======
-        <Route path="/hook-generator" element={<HookGenerator />} />
+        <Route path="/hook-generator" element={<HookGeneratePage />} />
          <Route path="/clone" element={<VoiceCloner />} />
 
->>>>>>> 46646ae145a050626ddda62065379fd628f66fb5
 
         {/* Posts Library */}
         <Route path="/posts-library" element={<PostsLibrary />} />
