@@ -47,38 +47,7 @@ export default function VoiceCloner() {
   return (
     <div className="min-h-screen gradient-bg text-white flex">
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className="w-64 glass-effect border-r border-white/10 p-6 hidden md:block">
-        <div className="flex items-center space-x-3 mb-10">
-          <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center">
-            <i className="fa-solid fa-pen-nib text-white"></i>
-          </div>
-          <span className="text-xl font-bold">AutoPoster</span>
-        </div>
-
-        <nav className="space-y-2 text-gray-300">
-          {[
-            "Dashboard",
-            "Create Post",
-            "Scheduler",
-            "Posts Library",
-            "Analytics",
-            "Voice Cloner",
-            "Settings",
-          ].map((item) => (
-            <div
-              key={item}
-              className={`p-3 rounded-xl cursor-pointer transition ${
-                item === "Voice Cloner"
-                  ? "gradient-accent text-white"
-                  : "hover:bg-white/10"
-              }`}
-            >
-              {item}
-            </div>
-          ))}
-        </nav>
-      </aside>
+      
 
       {/* ================= MAIN ================= */}
       <main className="flex-1 p-6 md:p-12">

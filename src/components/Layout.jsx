@@ -8,7 +8,15 @@ export default function Layout() {
     ["fa-folder", "Posts Library", "/posts-library"],
     ["fa-chart-bar", "Analytics", "/analytics"],
     ["fa-cog", "Settings", "/settings"],
-    ["fa-cog", "PerformanceOptimizer", "/PerformanceOptimizer"], // Settings inclus pour uniformité
+    ["fa-cog", "PerformanceOptimizer", "/PerformanceOptimizer"],
+     ["fa-microphone", "VoiceTrainer", "/voicetrainer"],
+    
+    ["fa-photo-film", "MediaCompanionPage", "/MediaCompanionPage"],
+     ["fa-flask", "ABTesterPage", "/ABTesterPage"],
+     ["fa-cog", "clone", "/clone"],
+
+
+    
     
   ];
 
