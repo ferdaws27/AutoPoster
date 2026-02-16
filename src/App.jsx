@@ -10,10 +10,9 @@ import Layout from "./components/Layout";
 import SchedulingPage from "./pages/SchedulingPage";
 import CreatePostPage from "./pages/CreatePostPage";
 import PostsLibrary from  "./pages/PostsLibrary";
-import HookGenerator from "./pages/HookGenerator";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 import ABTesterPage from "./pages/ABTesterPage";
-
+import HookGeneratePage from "./pages/HookGeneratePage";
 
 
 
@@ -38,7 +37,7 @@ export default function App() {
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
         <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
-        <Route path="/hook-generator" element={<HookGenerator />} />
+        <Route path="/hook-generator" element={<HookGeneratePage />} />
          <Route path="/clone" element={<VoiceCloner />} />
 
 

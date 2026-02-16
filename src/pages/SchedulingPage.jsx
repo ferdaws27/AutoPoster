@@ -67,58 +67,11 @@ export default function SchedulingPage() {
   };
 
   return (
-    <div className="flex text-white gradient-bg min-h-screen">
-      {/* SIDEBAR */}
-      <div className="w-64 glass-effect p-6 fixed h-full border-r border-white/10">
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
-            <i className="fa-solid fa-pen-nib"></i>
-          </div>
-          <span className="text-xl font-bold">AutoPoster</span>
-        </div>
+    <div className="flex text-white gradient-bg min-h-screen m-0 p-0">
 
-        <nav className="space-y-2">
-          {[
-            { name: "Dashboard", icon: "fa-chart-line", path: "/dashboard" },
-            { name: "Create Post", icon: "fa-plus", path: "/create-post" },
-           { name: "Hook Generator", icon: "fa-calendar-days", path: "/hook-generator" },
-            { name: "Create Post", icon: "fa-plus", path: "/create-post" },
-            { name: "Posts Library", icon: "fa-folder", path: "/posts-library" },
-            { name: "Analytics", icon: "fa-chart-pie", path: "/analytics" },
-            { name: "Settings", icon: "fa-gear", path: "/settings" },
-          ].map((item, i) => (
-            <div
-              key={i}
-              onClick={() => item.path && navigateTo(item.path)}
-              className={`flex items-center space-x-3 p-3 rounded-2xl cursor-pointer ${
-                item.name === "Scheduler"
-                  ? "bg-cyan-400/10 text-cyan-400 border border-cyan-400/20"
-                  : "text-gray-300 hover:bg-white/5 transition-colors"
-              }`}
-            >
-              <i className={`fa-solid ${item.icon}`}></i>
-              <span>{item.name}</span>
-            </div>
-          ))}
-        </nav>
-
-        {/* PROFILE */}
-        <div className="absolute bottom-6 left-6 right-6">
-          <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect border border-white/10">
-            <img
-              src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg"
-              className="w-10 h-10 rounded-xl"
-            />
-            <div>
-              <div className="text-white font-medium text-sm">Dr. Khalil</div>
-              <div className="text-gray-400 text-xs">Pro Plan</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* MAIN */}
-      <div className="ml-64 p-8 w-full">
+      <div className="m-0 p-0 w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Content Scheduler</h1>

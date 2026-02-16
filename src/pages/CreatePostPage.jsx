@@ -11,18 +11,6 @@ export default function CreatePostPage() {
     Medium: true,
   });
   const navigate = useNavigate();
-
-  // MENU ITEMS
-  const menuItems = [
-    { name: "Dashboard", icon: "fa-chart-line", path: "/dashboard" },
-    { name: "Create Post", icon: "fa-plus", path: "/create-post" },
-    { name: "Hook Generator", icon: "fa-calendar-days", path: "/hook-generator" },
-    { name: "Scheduler", icon: "fa-calendar-days", path: "/" }, // <-- ici on met "/" pour ouvrir ta vraie SchedulingPage
-    { name: "Posts Library", icon: "fa-folder", path: "/posts-library" },
-    { name: "Analytics", icon: "fa-chart-pie", path: "/analytics" },
-    { name: "Settings", icon: "fa-gear", path: "/settings" },
-  ];
-
   useEffect(() => {
     const textarea = ideaRef.current;
     const handler = () => setCharCount(textarea.value.length);
@@ -36,30 +24,9 @@ export default function CreatePostPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#0B1220] text-white">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-[#0F172A] p-6">
-        <h1 className="text-2xl font-bold text-cyan-400 mb-8">AutoPoster</h1>
-        <nav className="space-y-2">
-          {menuItems.map((item, i) => (
-            <div
-              key={i}
-              onClick={() => item.path && navigate(item.path)}  // <-- ouvre la bonne page
-              className={`flex items-center space-x-3 p-3 rounded-2xl cursor-pointer ${
-                item.name === "Create Post"
-                  ? "bg-cyan-400/10 text-cyan-400 border border-cyan-400/20"
-                  : "text-gray-300 hover:bg-white/5 transition-colors"
-              }`}
-            >
-              <i className={`fa-solid ${item.icon}`}></i>
-              <span>{item.name}</span>
-            </div>
-          ))}
-        </nav>
-      </aside>
-
+    <div className="flex min-h-screen bg-[#0B1220] text-white m-0 p-0">
       {/* MAIN CONTENT */}
-      <main className="flex-1 ml-0">
+      <main className="flex-1 m-0 p-0">
         <div className="gradient-bg min-h-screen text-white">
           {/* HEADER */}
           <div className="p-8 border-b border-gray-800">

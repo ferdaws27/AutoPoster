@@ -269,3 +269,10 @@ body {
 .whiteColor{
   color:white
 }
+.performance-waves-bg { background: linear-gradient(135deg,#0E1116,#1A1F26); }
+.gradient-accent { background: linear-gradient(135deg,#00C2FF,#7B61FF); }
+.glass-effect { backdrop-filter: blur(20px); background: rgba(14,17,22,.8); }
+.metric-value { background: linear-gradient(135deg,#00C2FF,#7B61FF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.apply-suggestions-btn { background: linear-gradient(135deg,#00C2FF,#7B61FF); }
+.confidence-bar { background:#333; height:4px; border-radius:8px; }
+.confidence-fill { background:linear-gradient(90deg,#00C2FF,#7B61FF); height:100%; border-radius:8px; }
