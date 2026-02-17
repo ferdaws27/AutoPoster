@@ -269,3 +269,23 @@ body {
 .whiteColor{
   color:white
 }
+/* ================= BRAND SIGNATURE ================= */
+.brand-signature {
+  padding: 16px 24px;
+  border-radius: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#0E1116, #0E1116) padding-box,
+    linear-gradient(135deg, #00C2FF, #7B61FF) border-box;
+
+  box-shadow: 0 10px 30px rgba(0, 194, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.brand-signature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(0, 194, 255, 0.25);
+}

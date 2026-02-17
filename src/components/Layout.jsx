@@ -6,7 +6,7 @@ export default function Layout() {
     ["fa-plus", "Create Post", "/create-post"], // Create Post
     ["fa-calendar", "Scheduler", "/Scheduling"], // Scheduler
     ["fa-folder", "Posts Library", "/posts-library"], // Posts Library
-    ["fa-chart-line", "Analytics", "/analytics"], // Analytics
+    ["fa-chart-line", "Analytics", "/Analytics"], // Analytics
     ["fa-cog", "Settings", "/settings"], // Settings
     ["fa-bolt", "Performance Optimizer", "/PerformanceOptimizer"], // Performance Optimizer
     ["fa-microphone-alt", "Voice Trainer", "/voicetrainer"], // Voice Trainer
