@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // pour navigation
 
 export default function PostsLibrary() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("drafts");
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
@@ -13,7 +11,6 @@ export default function PostsLibrary() {
     sort: "newest",
   });
 
-  // Posts simulés
   const postsData = [
     {
       title: "Building a SaaS Product",
@@ -87,7 +84,6 @@ export default function PostsLibrary() {
     },
   ];
 
-  // Filtrage + tri
   const filteredPosts = postsData
     .filter((post) => {
       if (activeTab === "drafts" && post.status !== "Draft") return false;
@@ -127,50 +123,10 @@ export default function PostsLibrary() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  // MENU ITEMS pour sidebar
-  const menuItems = [
-    { name: "Dashboard", icon: "fa-chart-line", path: "/PerformanceOptimizer" },
-    { name: "Create Post", icon: "fa-plus", path: "/create-post" },
-    { name: "Hook Generator", icon: "fa-calendar-days", path: "/hook-generator" },
-    { name: "Scheduler", icon: "fa-calendar-days", path: "/" },
-    { name: "Posts Library", icon: "fa-folder", path: "/posts-library" },
-    { name: "Analytics", icon: "fa-chart-pie", path: "/analytics" },
-    { name: "Settings", icon: "fa-gear", path: "/settings" },
-  ];
-
   return (
     <div className="gradient-bg min-h-screen text-white">
-      {/* SIDEBAR */}
-      <div className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30">
-        <div className="p-6">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
-              <i className="fa-solid fa-pen-nib"></i>
-            </div>
-            <span className="text-xl font-bold">AutoPoster</span>
-          </div>
+      <main className="ml-0 p-8">
 
-          <nav className="space-y-2">
-            {menuItems.map((item, idx) => (
-              <div
-                key={idx}
-                onClick={() => navigate(item.path)}
-                className={`flex items-center space-x-3 p-3 rounded-2xl cursor-pointer ${
-                  item.name === "Posts Library"
-                    ? "bg-cyan-400/10 text-cyan-400 border border-cyan-400/20"
-                    : "text-gray-300 hover:bg-white/5 transition-colors"
-                }`}
-              >
-                <i className={`fa-solid ${item.icon} w-5`}></i>
-                <span>{item.name}</span>
-              </div>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* MAIN */}
-      <div className="ml-64 p-8">
         {/* HEADER */}
         <div className="flex justify-between mb-8">
           <div>
@@ -205,89 +161,26 @@ export default function PostsLibrary() {
           </div>
         </div>
 
-        {/* SEARCH + FILTERS */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 space-y-4 md:space-y-0 md:space-x-4">
-          <div className="flex-1 glass-effect rounded-3xl p-6">
-            <input
-              type="text"
-              placeholder="Search posts..."
-              className="w-full bg-black/30 rounded-2xl pl-4 pr-4 py-3 text-white"
-              onChange={(e) => setSearch(e.target.value.toLowerCase())}
-            />
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <select
-                className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 focus:border-cyan-400 transition-colors appearance-none pr-10"
-                value={filters.platform}
-                onChange={(e) => handleFilterChange("platform", e.target.value)}
-              >
-                <option value="">All Platforms</option>
-                <option value="twitter">Twitter</option>
-                <option value="linkedin">LinkedIn</option>
-                <option value="medium">Medium</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <i className="fa-solid fa-chevron-down text-gray-400"></i>
-              </div>
-            </div>
-
-            <div className="relative">
-              <select
-                className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 focus:border-cyan-400 transition-colors appearance-none pr-10"
-                value={filters.date}
-                onChange={(e) => handleFilterChange("date", e.target.value)}
-              >
-                <option value="">All Time</option>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="quarter">Last 3 Months</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <i className="fa-solid fa-chevron-down text-gray-400"></i>
-              </div>
-            </div>
-
-            <div className="relative">
-              <select
-                className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 focus:border-cyan-400 transition-colors appearance-none pr-10"
-                value={filters.performance}
-                onChange={(e) => handleFilterChange("performance", e.target.value)}
-              >
-                <option value="">All Performance</option>
-                <option value="high">High Engagement</option>
-                <option value="medium">Medium Engagement</option>
-                <option value="low">Low Engagement</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <i className="fa-solid fa-chevron-down text-gray-400"></i>
-              </div>
-            </div>
-
-            <div className="relative">
-              <select
-                className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 focus:border-cyan-400 transition-colors appearance-none pr-10"
-                value={filters.sort}
-                onChange={(e) => handleFilterChange("sort", e.target.value)}
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="engagement">Best Engagement</option>
-                <option value="alphabetical">Alphabetical</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <i className="fa-solid fa-chevron-down text-gray-400"></i>
-              </div>
-            </div>
-          </div>
+        {/* SEARCH */}
+        <div className="glass-effect rounded-3xl p-6 mb-8">
+          <input
+            type="text"
+            placeholder="Search posts..."
+            className="w-full bg-black/30 rounded-2xl px-4 py-3 text-white"
+            onChange={(e) => setSearch(e.target.value.toLowerCase())}
+          />
         </div>
 
         {/* TABS */}
         <div className="flex space-x-8 border-b border-gray-700 mb-8">
           {[{ label: "Drafts", key: "drafts" }, { label: "Scheduled", key: "scheduled" }, { label: "Published", key: "published" }].map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`pb-4 ${activeTab === tab.key ? "tab-active" : "text-gray-400"}`}>
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`pb-4 ${
+                activeTab === tab.key ? "tab-active" : "text-gray-400"
+              }`}
+            >
               {tab.label}
             </button>
           ))}
@@ -301,16 +194,26 @@ export default function PostsLibrary() {
             <p className="text-gray-400">No posts found.</p>
           )}
         </div>
-      </div>
+
+      </main>
     </div>
   );
 }
 
-// Composant PostCard Professionnel
 function PostCard({ title, status, createdAt, platform, views, likes, comments }) {
-  const statusColor = status === "Draft" ? "status-draft" : status === "Scheduled" ? "status-scheduled" : "status-published";
+  const statusColor =
+    status === "Draft"
+      ? "status-draft"
+      : status === "Scheduled"
+      ? "status-scheduled"
+      : "status-published";
 
-  const platformIcon = platform === "twitter" ? "fa-x-twitter" : platform === "linkedin" ? "fa-linkedin" : "fa-medium";
+  const platformIcon =
+    platform === "twitter"
+      ? "fa-x-twitter"
+      : platform === "linkedin"
+      ? "fa-linkedin"
+      : "fa-medium";
 
   return (
     <div className="post-card glass-effect rounded-3xl p-6 border border-gray-700/50">
@@ -327,7 +230,6 @@ function PostCard({ title, status, createdAt, platform, views, likes, comments }
       <p className="text-gray-400 text-sm">Sample content preview for this post...</p>
       <p className="text-gray-500 text-xs mt-2">Created at: {createdAt}</p>
 
-      {/* Stats & Platform */}
       <div className="flex items-center justify-between mt-4 text-gray-300 text-sm">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-1">
