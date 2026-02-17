@@ -84,7 +84,7 @@ export default function SettingsPage() {
       </div>
 
       {/* GRID */}
-      <main className="ml-64 p-8">
+      <main className=" p-8">
         <div className="grid grid-cols-12 gap-8">
           {/* LEFT NAV */}
           <div className="col-span-3">

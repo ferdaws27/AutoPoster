@@ -19,7 +19,7 @@ export default function App() {
      
 
       {/* MAIN */}
-      <main className="ml-64 p-8">
+      <main className="p-8">
          <div className="space-y-16">
         {/* HEADER */}
         <section className="text-center max-w-4xl mx-auto mb-12">

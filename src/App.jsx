@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Login from "./pages/login";
 import Dashboard from "./pages/Dashboard";
+import HookGeneratePage from "./pages/HookGeneratePage";
 import SettingsPage from "./pages/settings";
 import VoiceTrainer from "./pages/voicetrainer";
 import MediaCompanionPage from "./pages/MediaCompanionPage";
@@ -10,8 +11,8 @@ import Layout from "./components/Layout";
 import SchedulingPage from "./pages/SchedulingPage";
 import CreatePostPage from "./pages/CreatePostPage";
 import PostsLibrary from  "./pages/PostsLibrary";
-import HookGenerator from "./pages/HookGenerator";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
+import Analytics from  "./pages/Analytics";
 import ABTesterPage from "./pages/ABTesterPage";
 
 
@@ -33,14 +34,15 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
+          <Route path="Analytics" element={<Analytics />} />
           
           <Route path="/Scheduling" element={<SchedulingPage />} />
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
         <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
-        <Route path="/hook-generator" element={<HookGenerator />} />
+        <Route path="/HookGeneratePage" element={<HookGeneratePage />} />
          <Route path="/clone" element={<VoiceCloner />} />
-
+        
 
         {/* Posts Library */}
         <Route path="/posts-library" element={<PostsLibrary />} />
