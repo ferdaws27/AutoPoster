@@ -9,11 +9,11 @@ export default function Layout() {
     ["fa-chart-bar", "Analytics", "/analytics"],
     ["fa-cog", "Settings", "/settings"],
     ["fa-cog", "PerformanceOptimizer", "/PerformanceOptimizer"],
-     ["fa-microphone", "VoiceTrainer", "/voicetrainer"],
-    
+    ["fa-quote-right", "QuoteTemplateGenerator", "/QuoteTemplateGenerator"],
     ["fa-photo-film", "MediaCompanionPage", "/MediaCompanionPage"],
-     ["fa-flask", "ABTesterPage", "/ABTesterPage"],
-     ["fa-cog", "clone", "/clone"],
+    ["fa-microphone", "VoiceTrainer", "/voicetrainer"],
+    ["fa-flask", "ABTesterPage", "/ABTesterPage"],
+    ["fa-cog", "clone", "/clone"],
 
 
     

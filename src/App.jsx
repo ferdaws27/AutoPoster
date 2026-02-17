@@ -13,6 +13,7 @@ import PostsLibrary from  "./pages/PostsLibrary";
 import HookGenerator from "./pages/HookGenerator";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 import ABTesterPage from "./pages/ABTesterPage";
+import QuoteTemplateGenerator from "./pages/QuoteTemplateGenerator";
 
 
 
@@ -42,7 +43,9 @@ export default function App() {
          <Route path="/clone" element={<VoiceCloner />} />
 
 
+
         {/* Posts Library */}
+        <Route path="QuoteTemplateGenerator" element={<QuoteTemplateGenerator />} />
         <Route path="/posts-library" element={<PostsLibrary />} />
          <Route path="/MediaCompanionPage" element={<MediaCompanionPage />} />
          <Route path="ABTesterPage" element={<ABTesterPage />}></Route>
