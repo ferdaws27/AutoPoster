@@ -6,7 +6,7 @@ export default function VoiceTrainer() {
 
       
       {/* ================= MAIN ================= */}
-      <div className="ml-64 p-8">
+      <div className=" p-8">
 
         {/* ================= HEADER ================= */}
         <div className="text-center max-w-4xl mx-auto mb-12">

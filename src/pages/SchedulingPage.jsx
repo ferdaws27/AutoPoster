@@ -67,11 +67,10 @@ export default function SchedulingPage() {
   };
 
   return (
-    <div className="flex text-white gradient-bg min-h-screen m-0 p-0">
-
+    <div className="flex text-white gradient-bg min-h-screen">
 
       {/* MAIN */}
-      <div className="m-0 p-0 w-full">
+      <div className=" p-8 w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Content Scheduler</h1>
