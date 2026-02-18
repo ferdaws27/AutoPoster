@@ -11,6 +11,7 @@ import Layout from "./components/Layout";
 import SchedulingPage from "./pages/SchedulingPage";
 import CreatePostPage from "./pages/CreatePostPage";
 import PostsLibrary from  "./pages/PostsLibrary";
+import Trendradar from  "./pages/Trendradar";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 import Analytics from  "./pages/Analytics";
 import ABTesterPage from "./pages/ABTesterPage";
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
           <Route path="Analytics" element={<Analytics />} />
+          <Route path="Trendradar" element={<Trendradar />} />
           
           <Route path="/Scheduling" element={<SchedulingPage />} />
            {/* Create Post */}

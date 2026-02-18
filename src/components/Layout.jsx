@@ -13,8 +13,9 @@ export default function Layout() {
     ["fa-magic", "Hook Generator", "/HookGeneratePage"], // Hook Generator
     ["fa-photo-video", "Media Companion", "/MediaCompanionPage"], // Media Companion
     ["fa-flask", "AB Tester", "/ABTesterPage"], // AB Tester
+    ["fa-flask", "Trendradar", "/Trendradar"], // AB Tester
     ["fa-clone", "Clone", "/clone"], // Clone
-  ];
+ ];
 
   return (
     <div className="gradient-bg min-h-screen">
