@@ -38,12 +38,9 @@ export default function App() {
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
           <Route path="Analytics" element={<Analytics />} />
-<<<<<<< HEAD
           <Route path="Trendradar" element={<Trendradar />} />
           
-=======
           <Route path="AIReputationPage" element={<AIReputationPage/>} />
->>>>>>> b661b9bf43afb359857054beae02316cd50b674b
           <Route path="/Scheduling" element={<SchedulingPage />} />
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
