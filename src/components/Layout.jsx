@@ -14,6 +14,10 @@ export default function Layout() {
     ["fa-photo-video", "Media Companion", "/MediaCompanionPage"], // Media Companion
     ["fa-flask", "AB Tester", "/ABTesterPage"], // AB Tester
     ["fa-clone", "Clone", "/clone"], // Clone
+    ["fa-star", "AIReputationPage", "/AIReputationPage"], // Clone
+
+
+
   ];
 
   return (

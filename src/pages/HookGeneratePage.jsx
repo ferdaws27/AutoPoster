@@ -1,245 +1,346 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 
-export default function HookGeneratePage() {
-  const navigate = useNavigate();
+const sampleHooksData = [
+  { text: "Here's the uncomfortable truth about AI that nobody talks about:", score: 94, type: "bold-statement" },
+  { text: "I spent 3 years studying AI implementation, and this shocked me the most:", score: 89, type: "personal-story" },
+  { text: "What if everything you know about artificial intelligence is wrong?", score: 87, type: "question" },
+  { text: "73% of businesses will fail to adapt to AI. Here's why:", score: 92, type: "statistic" },
+  { text: "The AI revolution isn't coming. It's already here, and you're missing it.", score: 90, type: "urgency" },
+];
 
-  const [quote, setQuote] = useState("");
+const platformsList = [
+  { key: 'twitter', label: 'Twitter', icon: 'fa-brands fa-twitter' },
+  { key: 'linkedin', label: 'LinkedIn', icon: 'fa-brands fa-linkedin' },
+  { key: 'medium', label: 'Medium', icon: 'fa-brands fa-medium' },
+];
+
+export default function HookGeneratorPage() {
+  const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
-  const [platforms, setPlatforms] = useState({
-    Twitter: true,
-    LinkedIn: true,
-    Medium: true,
-  });
   const [loading, setLoading] = useState(false);
-  const [variations, setVariations] = useState([]);
-  const [brandEnabled, setBrandEnabled] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [visualModal, setVisualModal] = useState({ visible: false, text: "" });
+  const [hooks, setHooks] = useState([]); // <-- vide au départ
+  const [selectedHook, setSelectedHook] = useState(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState(platformsList.map(p => p.key));
+  const [successOpen, setSuccessOpen] = useState(false);
 
-  const maxLength = 500;
+  useEffect(() => setCharCount(topic.length), [topic]);
 
-  const sampleVariations = [
-    {
-      text: "Success isn't just about reaching the destination—it's about who you become during the journey. Every challenge shapes your character. 🌟",
-      tone: "motivational",
-      platform: "Twitter",
-      engagement: "High",
-    },
-    {
-      text: "In my years of experience, true success is measured by the depths of character we develop along the way.",
-      tone: "reflective",
-      platform: "LinkedIn",
-      engagement: "Medium",
-    },
-    {
-      text: "Plot twist: The real treasure was the existential crisis we had along the way. 😅",
-      tone: "witty",
-      platform: "Twitter",
-      engagement: "High",
-    },
-  ];
-
-  const handleQuoteChange = (e) => {
-    setQuote(e.target.value);
-    setCharCount(e.target.value.length);
+  const togglePlatform = (key) => {
+    let updated = [...selectedPlatforms];
+    if (updated.includes(key)) {
+      if (updated.length === 1) return;
+      updated = updated.filter(p => p !== key);
+    } else {
+      updated.push(key);
+    }
+    setSelectedPlatforms(updated);
   };
 
-  const togglePlatform = (p) => {
-    setPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
-  };
-
-  const toggleBrand = () => setBrandEnabled((prev) => !prev);
-
-  const showNotification = (message, type = "info") => {
-    const id = Date.now();
-    setNotifications((prev) => [...prev, { id, message, type }]);
-    setTimeout(
-      () => setNotifications((prev) => prev.filter((n) => n.id !== id)),
-      4000
-    );
-  };
-
-  const generateVariations = () => {
-    if (!quote.trim()) return showNotification("Please enter a quote first", "error");
-    if (quote.trim().length < 10) return showNotification("Quote too short", "warning");
-
+  const generateHooks = () => {
+    if (!topic.trim()) return;
     setLoading(true);
-    setVariations([]);
+    setSelectedHook(null);
     setTimeout(() => {
-      setVariations(sampleVariations);
+      setHooks([...sampleHooksData]); // Simuler API
       setLoading(false);
     }, 2000);
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => showNotification("Copied!", "success"));
+  const regenerateHook = (index) => {
+    const newHooks = [...hooks];
+    const randomHooks = [
+      "Stop scrolling. This will change how you think about AI forever.",
+      "I made a $50K mistake with AI. Here's what I learned:",
+      "The AI trend everyone's talking about is actually dangerous. Here's why:",
+      "3 AI predictions that will seem obvious in 2025:",
+      "This AI breakthrough happened yesterday. No one noticed."
+    ];
+    const randIndex = Math.floor(Math.random() * randomHooks.length);
+    newHooks[index] = { text: randomHooks[randIndex], score: 85 + Math.floor(Math.random() * 15), type: 'regenerated' };
+    setHooks(newHooks);
+    if (selectedHook?.index === index) setSelectedHook(null);
   };
 
-  const makeVisual = (text) => setVisualModal({ visible: true, text });
-  const closeVisual = () => setVisualModal({ visible: false, text: "" });
-
-  
+  const selectHook = (hook, index) => setSelectedHook({ ...hook, index });
+  const insertHook = () => { if (selectedHook) setSuccessOpen(true); };
 
   return (
-    <div className="flex min-h-screen bg-[#0B1220] text-white">
-      
-
-      {/* MAIN */}
-      <main className="flex-1 ml-0">
-        <div className="gradient-bg min-h-screen text-white">
-          {/* HEADER */}
-          <div className="p-8 border-b border-gray-800">
-            <h1 className="text-3xl font-bold mb-2">Quote Template Generator</h1>
-            <p className="text-gray-400">
-              Transform any quote into multiple ready-to-share post examples
-            </p>
+    <div className="min-h-screen flex bg-gradient-to-br from-[#0E1116] to-[#1A1F26] text-white">
+     
+      {/* Main */}
+      <main className="flex-1 p-8 max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center pulse-glow">
+            <i className="fa-solid fa-fish-fins text-3xl"></i>
           </div>
+          <h1 className="text-4xl font-bold mb-4">Generate Powerful Hooks</h1>
+          <p className="text-xl text-gray-300 mb-2">Create engaging openings for your LinkedIn, X, or Medium posts</p>
+          <p className="text-gray-400">Transform any topic into scroll-stopping content from the first line</p>
+        </div>
 
-          {/* INPUT */}
-          <div className="p-8">
-            <div className="glass-effect post-card rounded-3xl p-8 border border-white/10">
-              <h2 className="text-xl font-semibold mb-4">Your Quote</h2>
-              <textarea
-                value={quote}
-                onChange={handleQuoteChange}
-                maxLength={maxLength}
-                className="w-full h-48 bg-transparent border border-white/10 rounded-2xl p-6 resize-none"
-                placeholder="Enter your quote here..."
-              />
-              <div className="flex justify-between mt-3 text-gray-400 text-sm">
-                <span>
-                  {charCount} / {maxLength} characters
-                </span>
-              </div>
+        {/* SECTION: Input Area */}
+<div className="glass-effect rounded-3xl p-8 mb-8 slide-up">
+  <div className="mb-6">
+    <label className="block text-white font-semibold text-lg mb-3 flex items-center">
+      <i className="fa-solid fa-lightbulb text-cyan-400 mr-2"></i>
+      What's your topic or idea?
+    </label>
+    <textarea
+      id="topic-input"
+      value={topic}
+      onChange={e => setTopic(e.target.value)}
+      maxLength={500}
+      placeholder="Enter your topic or paragraph idea... (e.g., 'The future of AI in healthcare', 'Why remote work is changing everything', 'My biggest business mistake')"
+      className="w-full h-32 bg-black/20 border border-gray-600 rounded-2xl p-4 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none"
+    ></textarea>
+    <div className="flex justify-between items-center mt-2">
+      <span className="text-gray-400 text-sm">Tip: Be specific about your angle or key message</span>
+      <span id="char-count" className="text-gray-400 text-sm">{topic.length}/500</span>
+    </div>
+  </div>
 
-              {/* PLATFORMS */}
-              <div className="flex items-center space-x-6 mt-6">
-                {["Twitter", "LinkedIn", "Medium"].map((p, i) => (
-                  <label key={i} className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={platforms[p]}
-                      onChange={() => togglePlatform(p)}
-                      className="sr-only"
-                    />
-                    <div className="ml-3 flex items-center">
-                      <i
-                        className={`fa-brands fa-${
-                          p === "Twitter" ? "x-twitter" : p.toLowerCase()
-                        } mr-2`}
-                      ></i>
-                      <span>{p}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
+  {/* Platform Selector */}
+  <div className="mb-8">
+    <label className="block text-white font-semibold text-lg mb-4 flex items-center">
+      <i className="fa-solid fa-globe text-violet-400 mr-2"></i>
+      Target Platforms
+    </label>
+    <div className="flex flex-wrap gap-4">
+      {platformsList.map(p => (
+        <div
+          key={p.key}
+          onClick={() => togglePlatform(p.key)}
+          className={`platform-selector flex items-center space-x-3 p-4 border border-gray-600 rounded-2xl cursor-pointer ${selectedPlatforms.includes(p.key) ? 'active bg-cyan-400/15 border-cyan-400 text-cyan-400' : ''}`}
+          data-platform={p.key}
+        >
+          <i className={`${p.icon} text-xl ${p.color ? p.color : ''}`}></i>
+          <div>
+            <div className="font-semibold">{p.label}</div>
+            <div className="text-sm text-gray-400">{p.description}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
 
-              {/* BUTTONS */}
-              <div className="flex justify-center space-x-4 mt-6">
-                <button
-                  onClick={generateVariations}
-                  className={`px-6 py-3 rounded-2xl gradient-accent flex items-center space-x-2 ${
-                    loading ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  <i className="fa-solid fa-wand-magic-sparkles"></i>
-                  <span>Generate Variations</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setQuote("");
-                    setCharCount(0);
-                    setVariations([]);
-                  }}
-                  className="px-6 py-3 rounded-2xl bg-gray-700 border border-gray-600 text-gray-300"
-                >
-                  <i className="fa-solid fa-trash mr-2"></i>Clear
-                </button>
-              </div>
+  {/* Generate Button */}
+  <div className="text-center">
+    <button
+      id="generate-btn"
+      onClick={generateHooks}
+      className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all transform hover:scale-105"
+    >
+      <i className="fa-solid fa-bolt mr-2"></i>
+      Generate Hooks
+    </button>
+  </div>
+</div>
+
+
+        {/* Hooks Section (Visible uniquement après génération) */}
+        {hooks.length > 0 && !loading && (
+          <div className="glass-effect rounded-3xl p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white flex items-center">
+                <i className="fa-solid fa-sparkles text-cyan-400 mr-3"></i>
+                AI-Suggested Hooks (Top 5)
+              </h2>
+              <button
+                onClick={generateHooks}
+                className="px-4 py-2 bg-black/30 border border-gray-600 rounded-2xl text-gray-300 hover:text-white hover:border-cyan-400 transition-all"
+              >
+                <i className="fa-solid fa-refresh mr-2"></i> Regenerate All
+              </button>
             </div>
-          </div>
 
-          {/* VARIATIONS */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-8 pb-8">
-            {variations.map(
-              (v, i) =>
-                platforms[v.platform] && (
-                  <div
-                    key={i}
-                    className="glass-effect post-card rounded-3xl p-6 border border-white/10 h-full"
-                  >
-                    <h3 className="text-cyan-400 text-lg font-semibold mb-3">
-                      {v.platform}
-                    </h3>
-                    <div className="bg-white/5 rounded-2xl p-4 text-gray-300 text-sm">
-                      {v.text}
-                    </div>
-                    <div className="mt-2 text-cyan-400 text-xs">
-                      {v.engagement} engagement
-                    </div>
-                    <div className="flex items-center space-x-3 mt-3">
+            <div className="space-y-4">
+              {hooks.map((hook, idx) => (
+                <div
+                  key={idx}
+                  className={`hook-card rounded-2xl p-6 cursor-pointer fade-in ${selectedHook?.index === idx ? "selected" : ""}`}
+                  onClick={() => selectHook(hook, idx)}
+                >
+                  <p className="text-white text-lg mb-2">"{hook.text}"</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm">{hook.type.replace("-", " ")} Hook</span>
+                    <div className="flex items-center space-x-4">
+                      <div className="engagement-bar w-20 h-2 rounded-full bg-gray-700/40">
+                        <div className="engagement-fill rounded-full bg-cyan-400" style={{ width: `${hook.score}%` }}></div>
+                      </div>
+                      <span className="text-cyan-400 font-semibold">{hook.score}%</span>
                       <button
-                        className="flex-1 px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30 transition-all text-sm"
-                        onClick={() => copyToClipboard(v.text)}
-                      >
-                        Copy
-                      </button>
-                      <button
-                        className="flex-1 px-4 py-2 bg-violet-400/20 text-violet-400 rounded-xl hover:bg-violet-400/30 transition-all text-sm"
-                        onClick={() => makeVisual(v.text)}
-                      >
-                        Visual
+  onClick={(e) => {
+    e.stopPropagation(); // empêche la sélection via le parent
+    selectHook(hook, idx); // optionnel, rend le hook visuellement sélectionné
+    insertHook();          // ouvre le modal de succès
+  }}
+  className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
+>
+  <i className="fa-solid fa-pen mr-1"></i> Use
+</button>
+
+                      <button onClick={(e) => { e.stopPropagation(); regenerateHook(idx); }} className="p-2 bg-black/30 border border-gray-600 rounded-xl text-gray-300 hover:text-white hover:border-cyan-400">
+                        <i className="fa-solid fa-refresh"></i>
                       </button>
                     </div>
                   </div>
-                )
-            )}
-          </div>
-
-          {/* BRAND */}
-          <div className="max-w-4xl mx-auto mb-12">
-            <div
-              className={`p-6 rounded-2xl cursor-pointer border border-white/10 flex justify-between items-center ${
-                brandEnabled ? "bg-cyan-400/10" : "bg-gray-700/40"
-              }`}
-              onClick={toggleBrand}
-            >
-              <div className="flex items-center space-x-4">
-                <i className="fa-solid fa-signature text-cyan-400"></i>
-                <span className="font-medium">Auto-include brand signature</span>
-              </div>
-              <span>{brandEnabled ? "Enabled" : "Disabled"}</span>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* NOTIFICATIONS */}
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              className="fixed top-8 right-8 p-4 bg-cyan-400/20 text-cyan-400 rounded-2xl z-50"
-            >
-              {n.message}
-            </div>
-          ))}
-
-          {/* MODAL */}
-          {visualModal.visible && (
-            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
-              <div className="glass-effect rounded-3xl p-8 w-full max-w-md border border-white/10">
-                <h2 className="text-2xl font-bold mb-6">Create Visual</h2>
-                <p className="text-gray-300 mb-4">{visualModal.text}</p>
-                <button
-                  className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300"
-                  onClick={closeVisual}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
+        )}
+        {/* Selected Hook Section */}
+{selectedHook && (
+  <div id="selected-hook-section" className="glass-effect rounded-3xl p-8 mb-4">
+    <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+      <i className="text-green-400 fa-solid fa-circle-check mr-3"></i>
+      Selected Hook
+    </h3>
+    <div id="selected-hook-display" className="bg-black/20 rounded-2xl p-6 border border-cyan-400/30">
+      <p id="selected-hook-text" className="text-white text-lg leading-relaxed">
+        "{selectedHook.text}"
+      </p>
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center space-x-4">
+          <span className="text-gray-400 text-sm">Platform:</span>
+          <div id="selected-platforms" className="flex space-x-2">
+            {selectedPlatforms.includes('medium') && <i className="text-green-400 fa-brands fa-medium"></i>}
+            {selectedPlatforms.includes('linkedin') && <i className="text-blue-600 fa-brands fa-linkedin"></i>}
+            {selectedPlatforms.includes('twitter') && <i className="text-blue-400 fa-brands fa-twitter"></i>}
+          </div>
         </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-gray-400 text-sm">Engagement Score:</span>
+          <span id="selected-score" className="text-cyan-400 font-semibold">{selectedHook.score}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+
+{selectedHook && (
+  <div className="text-center mb-8">
+    <button
+      id="insert-hook-btn"
+      onClick={() => setSuccessOpen(true)}
+      className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all"
+    >
+      <i className="fa-solid fa-pen mr-2"></i>
+      Insert Selected Hook Into Post
+    </button>
+  </div>
+)}
+
+
+
+        {/* Loader */}
+        {loading && (
+          <div className="text-center p-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center pulse-glow">
+              <i className="fa-solid fa-magic-wand-sparkles text-cyan-400 text-2xl"></i>
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2 generating-dots">Crafting your hooks</h3>
+            <p className="text-gray-400">AI is analyzing your topic and creating engaging openings...</p>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {successOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+            <div className="glass-effect rounded-3xl p-8 max-w-md w-full border border-green-400/30 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-400/20 flex items-center justify-center">
+                <i className="fa-solid fa-check-circle text-green-400 text-2xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Hook Inserted Successfully!</h3>
+              <p className="text-gray-400 mb-6">Your selected hook has been added to the post creator.</p>
+              <button onClick={() => setSuccessOpen(false)} className="w-full p-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90">
+                Continue Writing Post
+              </button>
+            </div>
+          </div>
+          
+        )}
+        {/* Tips Section */}
+<div id="tips-section" className="glass-effect rounded-3xl p-8 mt-8">
+  <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+    <i className="fas fa-graduation-cap text-yellow-400 mr-3"></i>
+    Hook Writing Tips
+  </h2>
+
+  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {/* Tip 1 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-question text-cyan-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Ask Questions</h3>
+      <p className="text-gray-400 text-sm">
+        Start with thought-provoking questions that make readers pause and think. Questions create immediate engagement.
+      </p>
+    </div>
+
+    {/* Tip 2 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-exclamation text-violet-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Make Bold Statements</h3>
+      <p className="text-gray-400 text-sm">
+        Controversial or surprising statements grab attention. Back them up with solid reasoning in your content.
+      </p>
+    </div>
+
+    {/* Tip 3 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-teal-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-book-open text-teal-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Tell Stories</h3>
+      <p className="text-gray-400 text-sm">
+        Personal anecdotes and mini-stories create emotional connections. Start with "Last week..." or "I learned..."
+      </p>
+    </div>
+
+    {/* Tip 4 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-yellow-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-list text-yellow-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Use Numbers</h3>
+      <p className="text-gray-400 text-sm">
+        Specific numbers and statistics add credibility. "5 ways...", "73% of people...", "In 30 seconds..."
+      </p>
+    </div>
+
+    {/* Tip 5 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-red-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-triangle-exclamation text-red-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Create Urgency</h3>
+      <p className="text-gray-400 text-sm">
+        Time-sensitive language motivates action. "Before it's too late...", "Right now...", "This changes everything..."
+      </p>
+    </div>
+
+    {/* Tip 6 */}
+    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
+      <div className="w-12 h-12 rounded-2xl bg-pink-400/20 flex items-center justify-center mb-4">
+        <i className="fas fa-heart text-pink-400"></i>
+      </div>
+      <h3 className="text-white font-semibold mb-2">Appeal to Emotions</h3>
+      <p className="text-gray-400 text-sm">
+        Tap into feelings like curiosity, fear, excitement, or surprise. Emotional hooks drive engagement and shares.
+      </p>
+    </div>
+  </div>
+</div>
+
+        
       </main>
     </div>
+
   );
 }

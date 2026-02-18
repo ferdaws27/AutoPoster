@@ -15,6 +15,7 @@ import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 import Analytics from  "./pages/Analytics";
 import ABTesterPage from "./pages/ABTesterPage";
 import QuoteTemplateGenerator from "./pages/QuoteTemplateGenerator";
+import AIReputationPage from "./pages/AIReputationPage";
 
 
 
@@ -36,10 +37,11 @@ export default function App() {
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
           <Route path="Analytics" element={<Analytics />} />
-          
+          <Route path="AIReputationPage" element={<AIReputationPage/>} />
           <Route path="/Scheduling" element={<SchedulingPage />} />
            {/* Create Post */}
         <Route path="/create-post" element={<CreatePostPage />} />
+        
         <Route path="/PerformanceOptimizer" element={<PerformanceOptimizer />} />
         <Route path="/HookGeneratePage" element={<HookGeneratePage />} />
          
