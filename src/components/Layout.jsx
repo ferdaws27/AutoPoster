@@ -15,7 +15,11 @@ export default function Layout() {
     ["fa-flask", "AB Tester", "/ABTesterPage"], // AB Tester
     ["fa-flask", "Trendradar", "/Trendradar"], // AB Tester
     ["fa-clone", "Clone", "/clone"], // Clone
- ];
+    ["fa-star", "AIReputationPage", "/AIReputationPage"], // Clone
+
+
+
+  ];
 
   return (
     <div className="gradient-bg min-h-screen">
