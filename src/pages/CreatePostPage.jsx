@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; 
 import { useNavigate } from "react-router-dom";
 
 export default function CreatePostPage() {
   const ideaRef = useRef(null);
   const [charCount, setCharCount] = useState(0);
-  const [showDraft, setShowDraft] = useState(false);
   const [publishTo, setPublishTo] = useState({
     Twitter: true,
     LinkedIn: true,
     Medium: true,
   });
+  const [variations, setVariations] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -24,21 +25,37 @@ export default function CreatePostPage() {
     setPublishTo((prev) => ({ ...prev, [platform]: !prev[platform] }));
   };
 
+  const generateText = async () => {
+    const idea = ideaRef.current.value.trim();
+    const platforms = Object.keys(publishTo).filter(p => publishTo[p]);
+
+    if (!idea) return alert("Enter your idea first");
+    if (platforms.length === 0) return alert("Select at least one platform");
+
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/generate_post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea, platforms })
+      });
+      const data = await res.json();
+      // S'assurer que variations n'est jamais undefined
+      setVariations(data.variations || {});
+    } catch (err) {
+      console.error(err);
+      alert("Error connecting to backend");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0B1220] text-white">
       <div className="gradient-bg min-h-screen text-white">
-        
-        {/* HEADER */}
         <div className="p-8 border-b border-gray-800">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">
-                Compose & Generate Post
-              </h1>
-              <p className="text-gray-400">
-                Write once, publish everywhere with AI optimization
-              </p>
-            </div>
+            <h1 className="text-3xl font-bold mb-2">Compose & Generate Post</h1>
           </div>
         </div>
 
@@ -68,7 +85,6 @@ export default function CreatePostPage() {
         {/* IDEA INPUT */}
         <div className="p-8">
           <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border">
-            <h2 className="text-xl font-semibold mb-4">Your Idea</h2>
             <textarea
               ref={ideaRef}
               className="w-full h-48 bg-gray-800/50 border border-gray-600 rounded-2xl p-6 resize-none"
@@ -76,79 +92,38 @@ export default function CreatePostPage() {
             ></textarea>
             <div className="flex justify-between mt-3 text-gray-400 text-sm">
               <span>{charCount} characters</span>
+              <button
+                onClick={generateText}
+                className="px-6 py-3 rounded-2xl gradient-accent text-white"
+              >
+                Generate Text
+              </button>
             </div>
           </div>
         </div>
 
         {/* OUTPUTS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-8 pb-8">
-          {["Twitter", "LinkedIn", "Medium"].map(
-            (p, i) =>
-              publishTo[p] && (
-                <div
-                  key={i}
-                  className="card-bg rounded-3xl p-6 border border-gray-700 h-full"
-                >
-                  <h3 className="text-cyan-400 text-lg font-semibold mb-3">
-                    {p}
-                  </h3>
-                  <div className="bg-gray-800/50 rounded-2xl p-4 text-gray-300 text-sm">
-                    Generated content preview...
-                  </div>
-                  <div className="mt-2 text-cyan-400 text-xs">
-                    Est. engagement
-                  </div>
-                </div>
-              )
-          )}
+          {variations && Object.entries(variations).map(([p, text]) => (
+            <div
+              key={p}
+              className="card-bg rounded-3xl p-6 border border-gray-700 h-full"
+            >
+              <h3 className="text-cyan-400 text-lg font-semibold mb-3">{p}</h3>
+              <textarea
+                className="w-full bg-gray-800/50 rounded-2xl p-4 text-gray-300 text-sm"
+                value={text}
+                onChange={(e) =>
+                  setVariations((prev) => ({ ...prev, [p]: e.target.value }))
+                }
+              ></textarea>
+            </div>
+          ))}
         </div>
 
-        {/* ACTIONS */}
-        <div className="flex justify-center space-x-4 pb-8">
-          <button className="px-6 py-3 rounded-2xl bg-violet-400/20 border border-violet-400/30 text-violet-400">
-            <i className="fa-solid fa-palette mr-2"></i>Plan Images
-          </button>
-
-          <button className="px-6 py-3 rounded-2xl gradient-accent text-white">
-            <i className="fa-solid fa-comments mr-2"></i>Generate Text
-          </button>
-
-          <button
-            onClick={() => setShowDraft(true)}
-            className="px-6 py-3 rounded-2xl bg-gray-700 border border-gray-600 text-gray-300"
-          >
-            <i className="fa-solid fa-save mr-2"></i>Save Draft
-          </button>
-
-          <button
-            onClick={() => navigate("/")}
-            className="px-6 py-3 rounded-2xl bg-cyan-400/20 border border-cyan-400/30 text-cyan-400"
-          >
-            <i className="fa-solid fa-clock mr-2"></i>Schedule
-          </button>
-        </div>
-
-        {/* MODAL */}
-        {showDraft && (
-          <Modal title="Save Draft" onClose={() => setShowDraft(false)} />
+        {loading && (
+          <div className="text-center text-white mb-8">Generating...</div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* MODAL */
-function Modal({ title, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="card-bg rounded-3xl p-8 w-full max-w-md border border-gray-700">
-        <h2 className="text-2xl font-bold mb-6">{title}</h2>
-        <button
-          onClick={onClose}
-          className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300"
-        >
-          Close
-        </button>
       </div>
     </div>
   );

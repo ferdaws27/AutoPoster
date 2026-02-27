@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 export default function Layout() {
   const navItems = [
-    ["fa-chart-line", "Dashboard", "/"],
+["fa-chart-line", "Dashboard", "/"],
     ["fa-plus", "Create Post", "/create-post"], // Create Post
     ["fa-calendar", "Scheduler", "/Scheduling"], // Scheduler
     ["fa-folder", "Posts Library", "/posts-library"], // Posts Library
