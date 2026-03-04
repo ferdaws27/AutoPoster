@@ -2,31 +2,26 @@ import { NavLink, Outlet } from "react-router-dom";
 
 export default function Layout() {
   const navItems = [
-["fa-chart-line", "Dashboard", "/"],
-    ["fa-plus", "Create Post", "/create-post"], // Create Post
-    ["fa-calendar", "Scheduler", "/Scheduling"], // Scheduler
-    ["fa-folder", "Posts Library", "/posts-library"], // Posts Library
-    ["fa-chart-line", "Analytics", "/Analytics"], // Analytics
-    ["fa-cog", "Settings", "/settings"], // Settings
-    ["fa-bolt", "Performance Optimizer", "/PerformanceOptimizer"], // Performance Optimizer
-    ["fa-microphone-alt", "Voice Trainer", "/voicetrainer"], // Voice Trainer
-    ["fa-magic", "Hook Generator", "/HookGeneratePage"], // Hook Generator
-    ["fa-photo-video", "Media Companion", "/MediaCompanionPage"], // Media Companion
-    ["fa-flask", "AB Tester", "/ABTesterPage"], // AB Tester
-    ["fa-flask", "Trendradar", "/Trendradar"], // AB Tester
-    ["fa-clone", "Clone", "/clone"], // Clone
-    ["fa-star", "AIReputationPage", "/AIReputationPage"], // Clone
-
-
-
+    ["fa-chart-line", "Dashboard", ""],                 // index route
+    ["fa-plus", "Create Post", "CreatePostPage"],
+    ["fa-calendar", "Scheduler", "scheduling"],
+    ["fa-folder", "Posts Library", "PostsLibrary"],
+    ["fa-chart-line", "Analytics", "analytics"],
+    ["fa-cog", "Settings", "settings"],
+    ["fa-bolt", "Performance Optimizer", "PerformanceOptimizer"],
+    ["fa-microphone-alt", "Voice Trainer", "voicetrainer"],
+    ["fa-magic", "Hook Generator", "HookGeneratePage"],
+    ["fa-photo-video", "Media Companion", "mediacompanion"],
+    ["fa-flask", "AB Tester", "ABTesterPage"],
+    ["fa-flask", "Trendradar", "trendradar"],
+    ["fa-clone", "Clone", "clone"],
+    ["fa-star", "AI Reputation", "AIReputationPage"],
   ];
 
   return (
     <div className="gradient-bg min-h-screen">
-      {/* SIDEBAR */}
       <aside className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30 flex flex-col">
         <div className="p-6">
-          {/* Logo */}
           <div className="flex items-center space-x-3 mb-8">
             <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
               <i className="fa-solid fa-pen-nib text-white" />
@@ -35,12 +30,12 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Navigation (scrollable) */}
         <nav className="flex-1 overflow-y-auto px-6 space-y-2">
-          {navItems.map(([icon, label, path]) => (
+          {navItems.map(([icon, label, to]) => (
             <NavLink
               key={label}
-              to={path}
+              to={to}
+              end={to === ""}   // مهم للـ Dashboard index باش isActive ما يتلخبطش
               className={({ isActive }) =>
                 `w-full flex items-center space-x-3 p-3 rounded-2xl border transition-colors ${
                   isActive
@@ -55,7 +50,6 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* USER PROFILE (fixe en bas) */}
         <div className="p-6">
           <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect">
             <img
@@ -71,7 +65,6 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="ml-64 p-8 min-h-screen text-white">
         <Outlet />
       </main>
