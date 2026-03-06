@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function PostsLibrary() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("drafts");
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
@@ -191,8 +193,12 @@ export default function PostsLibrary() {
               </button>
             </div>
 
-            <button className="px-6 py-3 gradient-accent rounded-2xl">
-              <i className="fa-solid fa-plus mr-2"></i>Create Post
+            <button
+              className="px-6 py-3 gradient-accent rounded-2xl"
+              onClick={() => navigate("/dashboard/CreatePostPage")}
+            >
+              <i className="fa-solid fa-plus mr-2"></i>
+              Create Post
             </button>
           </div>
         </div>

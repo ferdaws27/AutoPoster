@@ -1,7 +1,7 @@
 // App.jsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-import Login from "./pages/login";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import HookGeneratePage from "./pages/HookGeneratePage";
 import SettingsPage from "./pages/settings";
@@ -24,14 +24,10 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* Redirection automatique vers login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* OAuth callback (DOIT être public) */}
-        <Route path="/oauth/callback" element={<OAuthCallback />} />
-
-        {/* Login */}
+        {/* Login at / and /login */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
+
 
         {/* Dashboard + Sidebar */}
         <Route path="/dashboard" element={<Layout />}>
@@ -43,16 +39,15 @@ export default function App() {
           <Route path="Trendradar" element={<Trendradar />} />
           <Route path="AIReputationPage" element={<AIReputationPage />} />
           <Route path="Scheduling" element={<SchedulingPage />} />
-          <Route path="create-post" element={<CreatePostPage />} />
+          <Route path="CreatePostPage" element={<CreatePostPage />} />
           <Route path="PerformanceOptimizer" element={<PerformanceOptimizer />} />
           <Route path="HookGeneratePage" element={<HookGeneratePage />} />
           <Route path="clone" element={<VoiceCloner />} />
           <Route path="QuoteTemplateGenerator" element={<QuoteTemplateGenerator />} />
-          <Route path="posts-library" element={<PostsLibrary />} />
+          <Route path="PostsLibrary" element={<PostsLibrary />} />
           <Route path="ABTesterPage" element={<ABTesterPage />} />
         </Route>
 
-        {/* Fallback */}
       </Routes>
     </Router>
   );
