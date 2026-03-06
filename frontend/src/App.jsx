@@ -27,6 +27,7 @@ export default function App() {
         
 
         {/* Login */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
       
 
