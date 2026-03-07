@@ -30,8 +30,10 @@ export default function App() {
         
 
         {/* Login */}
+        {/* Login at / and /login */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-      
+
 
         {/* Dashboard + Sidebar */}
         <Route path="/dashboard" element={<Layout />}>
@@ -52,7 +54,6 @@ export default function App() {
           <Route path="ABTesterPage" element={<ABTesterPage />} />
         </Route>
 
-        
       </Routes>
     </Router>
   );
