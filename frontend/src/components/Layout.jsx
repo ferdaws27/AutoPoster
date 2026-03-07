@@ -16,6 +16,8 @@ export default function Layout() {
     ["fa-flask", "Trendradar", "trendradar"],
     ["fa-clone", "Clone", "clone"],
     ["fa-star", "AI Reputation", "AIReputationPage"],
+    ["fa-star", "QuoteTemplateGenerator", "QuoteTemplateGenerator"],
+
   ];
 
   return (
