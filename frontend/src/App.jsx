@@ -24,6 +24,9 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        {/* OAuth callback route for external providers (reads token from hash or query) */}
+        <Route path="/oauth/callback" element={<OAuthCallback />} />
+
         
 
         {/* Login */}
