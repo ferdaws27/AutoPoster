@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 export default function Layout() {
   const navItems = [
@@ -19,6 +20,38 @@ export default function Layout() {
     ["fa-star", "QuoteTemplateGenerator", "QuoteTemplateGenerator"],
 
   ];
+
+
+const [user, setUser] = useState(null);
+  const linkedinToken = localStorage.getItem("token"); // or however you store it
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch(
+          "http://127.0.0.1:5000/api/oauth/linkedin/me",
+          {
+            headers: {
+              Authorization: `Bearer ${linkedinToken}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+        console.log("ahaya data",data);
+        setUser(data);
+        localStorage.setItem("user", JSON.stringify(data)); // Store user in localStorage
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+
+    if (linkedinToken) {
+      fetchUser();
+    }
+  }, []);
+
+  if (!user) return <p>Loading user...</p>;
 
   return (
     <div className="gradient-bg min-h-screen">
@@ -55,13 +88,13 @@ export default function Layout() {
         <div className="p-6">
           <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect">
             <img
-              src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg"
+              src={user.profile_picture || ""}
               className="w-10 h-10 rounded-xl"
               alt="Profile"
             />
             <div>
-              <div className="text-white font-medium text-sm">Dr. Khalil</div>
-              <div className="text-gray-400 text-xs">Pro Plan</div>
+              <div className="text-white font-medium text-sm">{user.full_name}</div>
+              <div className="text-gray-400 text-xs">{user.role}</div>
             </div>
           </div>
         </div>

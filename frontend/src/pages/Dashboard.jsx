@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /* ================= COLORS ================= */
 const COLORS = {
@@ -11,7 +11,11 @@ const COLORS = {
 export default function Dashboard() {
   const [posts, setPosts] = useState([]);
 const [content, setContent] = useState("");
+const [user, setUser] = useState(null);
 
+useEffect(() => {
+  setUser(JSON.parse(localStorage.getItem("user"))); // Load user from localStorage on component mount
+}, []);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [platforms, setPlatforms] = useState({
@@ -62,7 +66,7 @@ const [content, setContent] = useState("");
         {/* HEADER */}
         <header className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold">Good morning, Dr. Khalil</h2>
+            <h2 className="text-3xl font-bold">Good morning, {user?.full_name || "Flen"}</h2>
             <p className="text-gray-400">Let's create something amazing today</p>
           </div>
           <div className="flex items-center space-x-4">
