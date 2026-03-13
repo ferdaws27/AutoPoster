@@ -33,18 +33,39 @@ export default function CreatePostPage() {
     if (platforms.length === 0) return alert("Select at least one platform");
 
     setLoading(true);
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
+      alert("OpenAI API key not found. Please set VITE_OPENAI_API_KEY in your environment variables.");
+      setLoading(false);
+      return;
+    }
+
+    const variations = {};
     try {
-      const res = await fetch("http://localhost:5000/api/generate_post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea, platforms })
-      });
-      const data = await res.json();
-      // S'assurer que variations n'est jamais undefined
-      setVariations(data.variations || {});
+      for (const platform of platforms) {
+        const prompt = `Generate a social media post for ${platform} about: ${idea}. Make it engaging and suitable for the platform.`;
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 200
+          })
+        });
+        if (!res.ok) {
+          throw new Error(`OpenAI API error for ${platform}: ${res.statusText}`);
+        }
+        const data = await res.json();
+        variations[platform] = data.choices[0].message.content.trim();
+      }
+      setVariations(variations);
     } catch (err) {
       console.error(err);
-      alert("Error connecting to backend");
+      alert("Error generating text: " + err.message);
     } finally {
       setLoading(false);
     }

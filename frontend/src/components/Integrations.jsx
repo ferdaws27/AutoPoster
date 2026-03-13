@@ -11,7 +11,7 @@ export default function Integrations() {
     },
     linkedin: {
       connected: true,
-      username: "Dr. Khalil Ahmed",
+      username: "Dr. Wael Ahmed",
       autoPost: false,
       visibility: "Public",
     },

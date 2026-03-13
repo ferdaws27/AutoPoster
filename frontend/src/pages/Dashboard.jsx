@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect } from "react";
+import UpcomingPosts from "../components/UpcomingPosts";
+import useDashboardStore from "../store/useDashboardStore";
 
 /* ================= COLORS ================= */
 const COLORS = {
@@ -9,21 +11,69 @@ const COLORS = {
 
 /* ================= DASHBOARD ================= */
 export default function Dashboard() {
-  const [posts, setPosts] = useState([]);
-const [content, setContent] = useState("");
+  const {
+    posts,
+    content,
+    user,
+    loading,
+    showCreateModal,
+    platforms,
+    aiOptions,
+    aiSuggestion,
+    aiIdeas,
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+    setContent,
+    setUser,
+    setLoading,
+    setShowCreateModal,
+    setPlatforms,
+    setAiOptions,
+    setAiSuggestion,
+    setAiIdeas,
+    loadUserFromStorage,
+    loadPostsFromStorage,
+    fetchPostsFromServer,
+    savePostsToStorage,
+    createDraft,
+    createScheduled,
+    markPublished,
+    refreshAIIdeas,
+    importPosts,
+  } = useDashboardStore();
 
-  const [platforms, setPlatforms] = useState({
-    twitter: true,
-    linkedin: true,
-    medium: false,
-  });
+  useEffect(() => {
+    loadUserFromStorage();
+    loadPostsFromStorage();
+    fetchPostsFromServer();
+  }, [loadUserFromStorage, loadPostsFromStorage, fetchPostsFromServer]);
 
-  const [aiOptions, setAiOptions] = useState({
-    optimize: true,
-    images: true,
-  });
+  useEffect(() => {
+    savePostsToStorage();
+  }, [posts, savePostsToStorage]);
+
+  useEffect(() => {
+    localStorage.setItem("autoposter_posts", JSON.stringify(posts));
+  }, [posts]);
+
+  const totalPosts = posts.length;
+  const scheduledCount = posts.filter((p) => p.status === "Scheduled").length;
+  const draftCount = posts.filter((p) => p.status === "Draft").length;
+  const publishedCount = posts.filter((p) => p.status === "Published").length;
+
+  const nextPostTime = posts
+    .filter((p) => p.scheduledAt)
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0]?.scheduledAt || "No scheduled post";
+
+  const nextPost = nextPostTime !== "No scheduled post" ? new Date(nextPostTime).toLocaleString() : "No scheduled post";
+
+  const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
+  const totalEngagement = posts.reduce((sum, p) => sum + (p.engagement || 0), 0);
+  const avgRating = posts.length ? (posts.reduce((sum, p) => sum + (p.rating || 0), 0) / posts.length).toFixed(1) : "4.2";
+
+  // showCreateModal and platforms are managed by Zustand store
+
+  // aiOptions managed through store (zustand)
+  // const [aiOptions, setAiOptions] = useState({ optimize: true, images: true });
    /* ========= QUICK ACTIONS LOGIC ========= */
   const handleImport = () => {
     document.getElementById("import-file").click();
@@ -32,11 +82,25 @@ const [content, setContent] = useState("");
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    console.log("Imported:", file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target.result);
+        if (Array.isArray(json.posts)) {
+          importPosts(json.posts);
+          setAiSuggestion("Import réussi !");
+        }
+      } catch (error) {
+        console.error("Import error:", error);
+        setAiSuggestion("Erreur lors de l'import. Vérifiez le format JSON.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleExport = () => {
-    const data = { posts: "example data" };
+    const data = { posts };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -48,8 +112,33 @@ const [content, setContent] = useState("");
     URL.revokeObjectURL(url);
   };
 
+  const handleMarkPublished = (id) => {
+    markPublished(id);
+  };
+
+  const handleRefreshAIIdeas = () => {
+    refreshAIIdeas();
+  };
+
+  const handleUseAIdea = (idea) => {
+    setContent(idea.title);
+    setShowCreateModal(true);
+    setAiSuggestion(`Idée appliquée : ${idea.title}`);
+  };
+
   const handleAIOptimize = () => {
-    console.log("AI Optimize triggered");
+    if (!content.trim()) {
+      setAiSuggestion("Please enter content first to optimize.");
+      return;
+    }
+
+    const optimized = content
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 280);
+
+    setContent(`✅ Optimized: ${optimized}`);
+    setAiSuggestion("Contenu optimisé automatiquement ! Vous pouvez modifier puis enregistrer.");
   };
 
   return (
@@ -62,7 +151,7 @@ const [content, setContent] = useState("");
         {/* HEADER */}
         <header className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold">Good morning, Dr. Khalil</h2>
+            <h2 className="text-3xl font-bold">Good morning, {user?.full_name || "Flen"}</h2>
             <p className="text-gray-400">Let's create something amazing today</p>
           </div>
           <div className="flex items-center space-x-4">
@@ -73,21 +162,31 @@ const [content, setContent] = useState("");
 
         {/* QUICK STATS */}
         <section className="grid grid-cols-3 gap-6 mb-8">
-          <StatCard icon="fa-file-lines" color="cyan" value="24" label="Total Posts" />
-          <StatCard icon="fa-heart" color="violet" value="8.4%" label="Engagement" />
-          <StatCard icon="fa-clock" color="green" value="2:30 PM" label="Next Post" />
+          <StatCard icon="fa-file-lines" color="cyan" value={loading ? "..." : totalPosts} label="Total Posts" />
+          <StatCard
+            icon="fa-heart"
+            color="violet"
+            value={loading ? "..." : `${Math.min(100, (scheduledCount + publishedCount) * 4)}%`}
+            label="Engagement"
+          />
+          <StatCard icon="fa-clock" color="green" value={loading ? "..." : nextPost} label="Next Post" />
         </section>
 
         {/* CONTENT GRID */}
         <section className="grid grid-cols-2 gap-8">
-          <UpcomingPosts posts={posts} />
-          <Card title="AI Ideas">
-            <p className="text-gray-400">AI-generated ideas will appear here.</p>
-          </Card>
+          <UpcomingPosts posts={posts} onPublish={handleMarkPublished} />
+          <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} />
         </section>
          {/* ================= RECENT ACTIVITY ================= */}
 <section className="mt-8">
-  <RecentActivity />
+  <RecentActivity
+    stats={{
+      postsPublished: publishedCount,
+      totalViews,
+      totalEngagement,
+      avgRating,
+    }}
+  />
 </section>
   
         {/* ================= QUICK ACTIONS BAR ================= */}
@@ -137,6 +236,9 @@ const [content, setContent] = useState("");
               className="hidden"
             />
       </div>
+      {aiSuggestion && (
+        <div className="mt-3 text-sm text-cyan-200 whitespace-pre-line">{aiSuggestion}</div>
+      )}
     </div>
   </div>
 </div>
@@ -199,18 +301,7 @@ const [content, setContent] = useState("");
   onClick={() => {
     if (!content.trim()) return;
 
-    setPosts(prev => [
-      {
-        id: Date.now(),
-        time: "Draft",
-        title: content.slice(0, 50),
-        desc: "Saved as draft",
-        status: "Draft",
-        statusColor: "cyan",
-        platforms: Object.keys(platforms).filter(p => platforms[p]),
-      },
-      ...prev,
-    ]);
+    createDraft(content, Object.keys(platforms).filter((p) => platforms[p]));
 
     setContent("");
     setShowCreateModal(false);
@@ -224,18 +315,7 @@ const [content, setContent] = useState("");
   onClick={() => {
     if (!content.trim()) return;
 
-    setPosts(prev => [
-      {
-        id: Date.now(),
-        time: "Scheduled",
-        title: content.slice(0, 50),
-        desc: "Post scheduled",
-        status: "Scheduled",
-        statusColor: "green",
-        platforms: Object.keys(platforms).filter(p => platforms[p]),
-      },
-      ...prev,
-    ]);
+    createScheduled(content, Object.keys(platforms).filter((p) => platforms[p]));
 
     setContent("");
     setShowCreateModal(false);
@@ -251,39 +331,6 @@ const [content, setContent] = useState("");
     </div>
   );
 }
-
-/* ================= UPCOMING POSTS COMPONENT ================= */
-
-const UpcomingPosts = ({ posts }) => (
-  <Card title="Upcoming Posts">
-    <div className="space-y-4">
-
-      
-  {posts.length === 0 && (
-    <p className="text-gray-400">No upcoming posts yet</p>
-  )}
-
-  {posts.map(post => (
-    <PostItem key={post.id} {...post} />
-  ))}
-</div>
-
-
-  </Card>
-);
-
-const PostItem = ({ time, title, desc, status, statusColor, platforms }) => {
-  const c = COLORS[statusColor];
-
-  return (
-    <div className="flex items-center p-4 rounded-2xl bg-gray-800/30 hover:bg-gray-700/30 transition-colors">
-      
-      <span className={`px-3 py-1 rounded-full ${c.bg} ${c.text} text-xs`}>
-        {status}
-      </span>
-    </div>
-  );
-};
 
 /* ================= REUSABLE COMPONENTS ================= */
 
@@ -368,7 +415,7 @@ const IconButton = ({ icon }) => (
     <i className={`fa-solid ${icon} text-gray-400`}></i>
   </button>
 );
-const RecentActivity = () => (
+const RecentActivity = ({ stats }) => (
   <div className="glass-effect rounded-3xl p-6 glow-card">
     <div className="flex items-center justify-between mb-6">
       <h2 className="text-xl font-bold text-white">Recent Activity</h2>
@@ -388,38 +435,113 @@ const RecentActivity = () => (
 
     <div className="grid grid-cols-4 gap-6">
 
-      {/* Posts Published */}
       <ActivityItem
         icon="fa-paper-plane"
-        value="12"
+        value={stats.postsPublished || 0}
         label="Posts Published"
         color="green"
       />
 
-      {/* Total Views */}
       <ActivityItem
         icon="fa-eye"
-        value="2.4K"
+        value={stats.totalViews ? `${stats.totalViews}` : "0"}
         label="Total Views"
         color="cyan"
       />
 
-      {/* Engagements */}
       <ActivityItem
         icon="fa-heart"
-        value="186"
+        value={stats.totalEngagement ? `${stats.totalEngagement}` : "0"}
         label="Engagements"
         color="violet"
       />
 
-      {/* Avg Rating */}
       <ActivityItem
         icon="fa-star"
-        value="4.2"
+        value={stats.avgRating || "4.2"}
         label="Avg Rating"
         color="yellow"
       />
 
+    </div>
+  </div>
+);
+
+const AIIdeas = ({ ideas = [], onRefresh, onUseIdea }) => (
+  <div id="ai-ideas-section" className="glass-effect rounded-3xl p-6 glow-card" style={{ opacity: 1, transform: "translateY(0px)", transition: "0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center">
+        <div className="w-8 h-8 rounded-xl gradient-accent flex items-center justify-center mr-3">
+          <i className="text-white text-sm fa-solid fa-lightbulb" />
+        </div>
+        <h2 className="text-xl font-bold text-white">AI Ideas</h2>
+      </div>
+      <button onClick={onRefresh} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">Refresh</button>
+    </div>
+
+    <div className="space-y-4 mb-6">
+      {ideas.length === 0 && (
+        <p className="text-gray-400 text-sm">No AI ideas available.</p>
+      )}
+      {ideas.map((idea) => {
+        const badgeStyle =
+          idea.status === "Scheduled"
+            ? "bg-green-400/20 text-green-400"
+            : idea.status === "Review"
+            ? "bg-yellow-400/20 text-yellow-400"
+            : "bg-cyan-400/20 text-cyan-400";
+
+        const platformStyle =
+          idea.platform === "twitter"
+            ? "bg-black"
+            : idea.platform === "linkedin"
+            ? "bg-blue-600"
+            : "bg-black";
+        const platformIcon =
+          idea.platform === "twitter"
+            ? "fa-x-twitter"
+            : idea.platform === "linkedin"
+            ? "fa-linkedin-in"
+            : "fa-medium";
+
+        return (
+          <div key={idea.id} className="p-4 rounded-2xl bg-gradient-to-br from-cyan-400/10 to-violet-400/10 border border-cyan-400/20 hover:border-cyan-400/40 transition-colors">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center">
+                <div className="w-6 h-6 rounded-lg bg-cyan-400/20 flex items-center justify-center mr-2">
+                  <i className="text-cyan-400 text-xs fa-solid fa-rocket" />
+                </div>
+                <span className="text-xs font-medium text-cyan-400 uppercase tracking-wide">{idea.category}</span>
+              </div>
+              <div className="flex space-x-1">
+                <div className="w-4 h-4 bg-black rounded flex items-center justify-center">
+                  <i className={`text-white text-xs fa-brands ${platformIcon}`} />
+                </div>
+              </div>
+            </div>
+
+            <h3 className="text-white font-semibold mb-2">{idea.title}</h3>
+            <p className="text-gray-300 text-sm mb-3">{idea.desc}</p>
+
+            <div className="flex items-center justify-between">
+              <span className={`px-2 py-1 text-xs rounded-full ${badgeStyle}`}>{idea.status}</span>
+              <button
+                onClick={() => onUseIdea && onUseIdea(idea)}
+                className="px-3 py-2 rounded-xl gradient-accent text-white text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Generate Post
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <div className="pt-4 border-t border-gray-700/50">
+      <button className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 transition-all text-sm font-medium">
+        <i className="fa-solid fa-wand-magic-sparkles mr-2" />
+        Generate More Ideas
+      </button>
     </div>
   </div>
 );
