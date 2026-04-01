@@ -1,477 +1,360 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faTrash, faCalendar, faSearch, faTh, faList, faEye } from '@fortawesome/free-solid-svg-icons';
+import { faXTwitter, faLinkedin, faMedium } from '@fortawesome/free-brands-svg-icons';
+import { usePosts } from '../context/PostsProvider';
 
 export default function PostsLibrary() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("drafts");
+  const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({
-    platform: "",
+  const [localFilters, setLocalFilters] = useState({
+    platform: "all",
     date: "",
     performance: "",
     sort: "newest",
   });
 
   const [selectedPosts, setSelectedPosts] = useState(new Set());
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  const postsData = [
-    {
-      title: "Building a SaaS Product",
-      status: "Draft",
-      platform: "twitter",
-      createdAt: "2026-02-05",
-      engagement: "high",
-      views: 120,
-      likes: 45,
-      comments: 10,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/4f8a2b3c1d-e9f6d7c8b9a0.png",
-    },
-    {
-      title: "AI Content Revolution",
-      status: "Draft",
-      platform: "linkedin",
-      createdAt: "2026-02-06",
-      engagement: "medium",
-      views: 80,
-      likes: 30,
-      comments: 5,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/7e9d6c5b4a-3f2e1d0c9b8a.png",
-    },
-    {
-      title: "Remote Work Productivity",
-      status: "Draft",
-      platform: "medium",
-      createdAt: "2026-02-07",
-      engagement: "low",
-      views: 50,
-      likes: 15,
-      comments: 3,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/9c8b7a6d5e-4f3e2d1c0b9a.png",
-    },
-    {
-      title: "Social Media Automation",
-      status: "Scheduled",
-      platform: "twitter",
-      createdAt: "2026-02-04",
-      engagement: "high",
-      views: 200,
-      likes: 90,
-      comments: 20,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder1.png",
-    },
-    {
-      title: "How I Raised $2M",
-      status: "Published",
-      platform: "linkedin",
-      createdAt: "2026-01-20",
-      engagement: "medium",
-      views: 150,
-      likes: 60,
-      comments: 15,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder2.png",
-    },
-    {
-      title: "Maximizing Team Efficiency",
-      status: "Published",
-      platform: "medium",
-      createdAt: "2026-01-25",
-      engagement: "low",
-      views: 70,
-      likes: 20,
-      comments: 5,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder3.png",
-    },
-    {
-      title: "AI in Daily Life",
-      status: "Scheduled",
-      platform: "twitter",
-      createdAt: "2026-02-03",
-      engagement: "high",
-      views: 180,
-      likes: 80,
-      comments: 18,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder4.png",
-    },
-  ];
+  // Use global posts store
+  const { 
+    posts, 
+    loading, 
+    error, 
+    stats,
+    deletePost,
+    setFilters: setGlobalFilters,
+    getFilteredPosts,
+    getPostsByStatus
+  } = usePosts();
 
-  const filteredPosts = postsData
-    .filter((post) => {
-      if (activeTab === "drafts" && post.status !== "Draft") return false;
-      if (activeTab === "scheduled" && post.status !== "Scheduled") return false;
-      if (activeTab === "published" && post.status !== "Published") return false;
-
-      const title = post.title.toLowerCase();
-      const content = "Sample content preview for this post...".toLowerCase();
-      if (!title.includes(search) && !content.includes(search)) return false;
-
-      if (filters.platform && post.platform !== filters.platform) return false;
-      if (filters.performance && post.engagement !== filters.performance) return false;
-
-      const today = new Date();
-      const postDate = new Date(post.createdAt);
-      const diffDays = (today - postDate) / (1000 * 60 * 60 * 24);
-
-      if (filters.date === "today" && diffDays > 0) return false;
-      if (filters.date === "week" && diffDays > 7) return false;
-      if (filters.date === "month" && diffDays > 30) return false;
-      if (filters.date === "quarter" && diffDays > 90) return false;
-
-      return true;
-    })
-    .sort((a, b) => {
-      if (filters.sort === "newest") return new Date(b.createdAt) - new Date(a.createdAt);
-      if (filters.sort === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
-      if (filters.sort === "engagement") {
-        const map = { high: 3, medium: 2, low: 1 };
-        return map[b.engagement] - map[a.engagement];
-      }
-      if (filters.sort === "alphabetical") return a.title.localeCompare(b.title);
-      return 0;
+  // Update global filters when local filters change
+  useEffect(() => {
+    setGlobalFilters({
+      status: activeTab === 'all' ? 'all' : activeTab,
+      platform: localFilters.platform === 'all' ? 'all' : localFilters.platform,
+      searchQuery: search
     });
+  }, [activeTab, localFilters.platform, search, setGlobalFilters]);
 
+  // Get filtered posts based on current filters
+  const filteredPosts = getFilteredPosts();
+
+  // Handle delete post
+  const handleDeletePost = async (postId) => {
+    try {
+      await deletePost(postId);
+      setToastMessage("Post deleted successfully");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      setToastMessage("Failed to delete post");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    try {
+      for (const postId of selectedPosts) {
+        await deletePost(postId);
+      }
+      setSelectedPosts(new Set());
+      setShowDeleteModal(false);
+      setToastMessage(`${selectedPosts.size} posts deleted successfully`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to delete posts:', error);
+      setToastMessage("Failed to delete posts");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  // Get platform icon
+  const getPlatformIcon = (platform) => {
+    switch (platform) {
+      case 'Twitter': return faXTwitter;
+      case 'LinkedIn': return faLinkedin;
+      case 'Medium': return faMedium;
+      default: return faXTwitter;
+    }
+  };
+
+  // Get platform color
+  const getPlatformColor = (platform) => {
+    switch (platform) {
+      case 'Twitter': return 'text-blue-400';
+      case 'LinkedIn': return 'text-violet-400';
+      case 'Medium': return 'text-teal-400';
+      default: return 'text-gray-400';
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  // Calculate engagement
+  const calculateEngagement = (post) => {
+    if (!post.engagement) return 0;
+    return (post.engagement.likes || 0) + (post.engagement.shares || 0) + (post.engagement.comments || 0);
+  };
+
+  // Get posts for current tab
+  const getTabPosts = () => {
+    if (activeTab === 'all') return filteredPosts;
+    return getPostsByStatus(activeTab);
+  };
+
+  const tabPosts = getTabPosts();
+
+  // Handle search
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  // Handle filter change
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setLocalFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const toggleSelectPost = (title) => {
-    const newSet = new Set(selectedPosts);
-    if (newSet.has(title)) newSet.delete(title);
-    else newSet.add(title);
-    setSelectedPosts(newSet);
-  };
-
-  const handleDelete = () => {
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = () => {
-    setShowDeleteModal(false);
-    showToastMessage("Post deleted successfully");
-    setSelectedPosts(new Set());
-  };
-
-  const cancelDelete = () => setShowDeleteModal(false);
-
-  const showToastMessage = (msg) => {
-    setToastMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
+  // Get platforms from posts
+  const availablePlatforms = [...new Set(posts.flatMap(post => 
+    post.platforms ? Object.keys(post.platforms).filter(p => post.platforms[p]) : []
+  ))];
 
   return (
-    <div className="gradient-bg min-h-screen text-white">
-      <main className="ml-0 p-8">
-        {/* HEADER */}
-        <div className="flex justify-between mb-8">
+    <div className="min-h-screen bg-[#0B1220] text-white p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Posts Library</h1>
-            <p className="text-gray-400">Manage all your content</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Posts Library</h1>
+            <p className="text-gray-400">Manage all your content in one place</p>
           </div>
+          <button 
+            onClick={() => navigate('/dashboard/CreatePostPage')}
+            className="px-6 py-3 bg-gradient-to-r from-cyan-400 to-violet-400 rounded-xl text-white font-medium hover:opacity-90 transition-opacity"
+          >
+            Create New Post
+          </button>
+        </div>
 
-          <div className="flex space-x-4">
-            <div className="flex bg-black/30 rounded-2xl p-1">
-              <button
-                onClick={() => setView("grid")}
-                className={`px-4 py-2 rounded-xl ${
-                  view === "grid" ? "bg-cyan-400/20 text-cyan-400" : "text-gray-400"
-                }`}
-              >
-                <i className="fa-solid fa-th-large mr-2"></i>Grid
-              </button>
-
-              <button
-                onClick={() => setView("list")}
-                className={`px-4 py-2 rounded-xl ${
-                  view === "list" ? "bg-cyan-400/20 text-cyan-400" : "text-gray-400"
-                }`}
-              >
-                <i className="fa-solid fa-list mr-2"></i>List
-              </button>
-            </div>
-
-            <button
-              className="px-6 py-3 gradient-accent rounded-2xl"
-              onClick={() => navigate("/dashboard/CreatePostPage")}
-            >
-              <i className="fa-solid fa-plus mr-2"></i>
-              Create Post
-            </button>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-black/30 rounded-xl p-6 border border-cyan-400/20">
+            <div className="text-cyan-400 text-sm font-medium mb-1">Total Posts</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </div>
+          <div className="bg-black/30 rounded-xl p-6 border border-violet-400/20">
+            <div className="text-violet-400 text-sm font-medium mb-1">Scheduled</div>
+            <div className="text-2xl font-bold">{stats.scheduled}</div>
+          </div>
+          <div className="bg-black/30 rounded-xl p-6 border border-teal-400/20">
+            <div className="text-teal-400 text-sm font-medium mb-1">Drafts</div>
+            <div className="text-2xl font-bold">{stats.drafts}</div>
+          </div>
+          <div className="bg-black/30 rounded-xl p-6 border border-orange-400/20">
+            <div className="text-orange-400 text-sm font-medium mb-1">Published</div>
+            <div className="text-2xl font-bold">{stats.published}</div>
           </div>
         </div>
 
-        {/* SEARCH + FILTERS */}
-        <div id="filters-section" className="glass-effect rounded-3xl p-6 mb-8">
-          <div className="flex items-center justify-between">
+        {/* Filters and Search */}
+        <div className="bg-black/30 rounded-xl p-6 mb-8">
+          <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <i className="fa-solid fa-search text-gray-400"></i>
+            <div className="flex-1 min-w-[300px]">
+              <div className="relative">
+                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search posts..."
+                  value={search}
+                  onChange={handleSearch}
+                  className="w-full pl-10 pr-4 py-2 bg-black/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+                />
               </div>
-              <input
-                type="text"
-                className="w-full bg-black/30 rounded-2xl pl-12 pr-4 py-3 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors"
-                placeholder="Search posts..."
-                onChange={(e) => setSearch(e.target.value.toLowerCase())}
-              />
             </div>
 
-            {/* Filters */}
-            <div className="flex items-center space-x-4">
-              {["platform", "date", "performance", "sort"].map((key) => (
-                <FilterSelect key={key} type={key} handleFilterChange={handleFilterChange} />
+            {/* Platform Filter */}
+            <select
+              value={localFilters.platform}
+              onChange={(e) => handleFilterChange('platform', e.target.value)}
+              className="px-4 py-2 bg-black/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+            >
+              <option value="all">All Platforms</option>
+              {availablePlatforms.map(platform => (
+                <option key={platform} value={platform}>{platform}</option>
               ))}
+            </select>
+
+            {/* View Toggle */}
+            <div className="flex bg-black/50 rounded-lg">
+              <button
+                onClick={() => setView('grid')}
+                className={`px-3 py-2 ${view === 'grid' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400'}`}
+              >
+                <FontAwesomeIcon icon={faTh} />
+              </button>
+              <button
+                onClick={() => setView('list')}
+                className={`px-3 py-2 ${view === 'list' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400'}`}
+              >
+                <FontAwesomeIcon icon={faList} />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* TABS */}
-        <div className="flex space-x-8 border-b border-gray-700 mb-8">
-          {[
-            { label: "Drafts", key: "drafts" },
-            { label: "Scheduled", key: "scheduled" },
-            { label: "Published", key: "published" },
-          ].map((tab) => (
+        {/* Tabs */}
+        <div className="flex space-x-1 mb-8 bg-black/30 rounded-xl p-1">
+          {['all', 'scheduled', 'drafts', 'published'].map(tab => (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`pb-4 ${activeTab === tab.key ? "tab-active" : "text-gray-400"}`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === tab 
+                  ? 'bg-cyan-400/20 text-cyan-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
             >
-              {tab.label}
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'all' && ` (${stats.total})`}
+              {tab === 'scheduled' && ` (${stats.scheduled})`}
+              {tab === 'drafts' && ` (${stats.drafts})`}
+              {tab === 'published' && ` (${stats.published})`}
             </button>
           ))}
         </div>
 
-        {/* POSTS */}
-        <div className={view === "grid" ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" : "space-y-4"}>
-          {filteredPosts.length > 0 ? (
-            filteredPosts.map((post, index) => (
-              <PostCard
-                key={index}
-                {...post}
-                isSelected={selectedPosts.has(post.title)}
-                toggleSelect={() => toggleSelectPost(post.title)}
-              />
-            ))
-          ) : (
-            <p className="text-gray-400">No posts found.</p>
-          )}
-        </div>
-
-        {/* Pagination */}
-        <Pagination total={45} current={1} />
-
-        {/* Bulk Actions Bar */}
-        {selectedPosts.size > 0 && (
-          <BulkActions
-            selectedCount={selectedPosts.size}
-            handleEdit={() => showToastMessage("Edit action")}
-            handleDuplicate={() => showToastMessage("Duplicate action")}
-            handleDelete={handleDelete}
-          />
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="text-gray-400">Loading posts...</div>
+          </div>
         )}
 
-        {/* Delete Modal */}
-        {showDeleteModal && <DeleteModal cancel={cancelDelete} confirm={confirmDelete} />}
-
-        {/* Toast */}
-        {showToast && <Toast message={toastMessage} />}
-      </main>
-    </div>
-  );
-}
-
-// ------------------- COMPONENTS -------------------
-
-function PostCard({ title, status, createdAt, platform, views, likes, comments, img, isSelected, toggleSelect }) {
-  const statusColor =
-    status === "Draft"
-      ? "status-draft"
-      : status === "Scheduled"
-      ? "status-scheduled"
-      : "status-published";
-
-  const platformIcon =
-    platform === "twitter" ? "fa-x-twitter" : platform === "linkedin" ? "fa-linkedin" : "fa-medium";
-
-  return (
-    <div
-      className={`post-card glass-effect rounded-3xl p-6 border border-gray-700/50 hover:border-cyan-400/30 animate-fade-in ${
-        isSelected ? "border-cyan-400" : ""
-      }`}
-      onClick={toggleSelect}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <span className={`${statusColor} px-3 py-1 rounded-xl text-sm font-medium`}>{status}</span>
-          <div className="flex items-center space-x-1">
-            <i className={`fa-brands ${platformIcon} text-sm`}></i>
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-12">
+            <div className="text-red-400 mb-4">Error: {error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-400/20 text-red-400 rounded-lg hover:bg-red-400/30"
+            >
+              Retry
+            </button>
           </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-cyan-400 transition-colors">
-            <i className="fa-solid fa-edit text-xs"></i>
-          </button>
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-violet-400 transition-colors">
-            <i className="fa-solid fa-copy text-xs"></i>
-          </button>
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors">
-            <i className="fa-solid fa-trash text-xs"></i>
-          </button>
-        </div>
+        )}
+
+        {/* Posts Grid/List */}
+        {!loading && !error && tabPosts.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">No posts found</div>
+            <button 
+              onClick={() => navigate('/dashboard/CreatePostPage')}
+              className="px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-lg hover:bg-cyan-400/30"
+            >
+              Create Your First Post
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && tabPosts.length > 0 && (
+          <div className={view === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+            {tabPosts.map(post => (
+              <div key={post.id} className="bg-black/30 rounded-xl p-6 border border-gray-700/50 hover:border-cyan-400/50 transition-colors">
+                {/* Post Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center space-x-2">
+                    {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
+                      <FontAwesomeIcon 
+                        key={platform}
+                        icon={getPlatformIcon(platform)}
+                        className={getPlatformColor(platform)}
+                      />
+                    ))}
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      post.status === 'scheduled' ? 'bg-blue-400/20 text-blue-400' :
+                      post.status === 'draft' ? 'bg-gray-400/20 text-gray-400' :
+                      'bg-green-400/20 text-green-400'
+                    }`}>
+                      {post.status}
+                    </span>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button className="text-gray-400 hover:text-white">
+                      <FontAwesomeIcon icon={faEdit} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeletePost(post.id)}
+                      className="text-gray-400 hover:text-red-400"
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Post Content */}
+                <div className="mb-4">
+                  <h3 className="text-white font-medium mb-2 line-clamp-2">
+                    {post.idea || post.content || 'Untitled Post'}
+                  </h3>
+                  <p className="text-gray-400 text-sm line-clamp-3">
+                    {post.content || 'No content available'}
+                  </p>
+                </div>
+
+                {/* Post Meta */}
+                <div className="flex justify-between items-center text-sm text-gray-400">
+                  <div className="flex items-center space-x-2">
+                    <FontAwesomeIcon icon={faCalendar} className="text-xs" />
+                    <span>{formatDate(post.createdAt)}</span>
+                  </div>
+                  {post.engagement && (
+                    <div className="flex items-center space-x-3">
+                      <span>{post.engagement.likes || 0} likes</span>
+                      <span>{post.engagement.comments || 0} comments</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Schedule Info */}
+                {post.scheduleDate && (
+                  <div className="mt-3 pt-3 border-t border-gray-700/50">
+                    <div className="text-sm text-cyan-400">
+                      Scheduled for {formatDate(post.scheduleDate)} at {post.scheduleTime}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {showToast && (
+          <div className="fixed bottom-4 right-4 bg-green-400/20 border border-green-400/50 text-green-400 px-6 py-3 rounded-lg">
+            {toastMessage}
+          </div>
+        )}
       </div>
-
-      <div className="mb-4">
-        <img className="w-full h-40 rounded-2xl object-cover mb-3" src={img} alt={title} />
-        <h3 className="text-white font-semibold text-lg mb-2 line-clamp-2">{title}</h3>
-        <p className="text-gray-400 text-sm line-clamp-3">Sample content preview for this post...</p>
-      </div>
-
-      <div className="flex items-center justify-between text-gray-400 text-sm">
-        <div className="flex items-center space-x-2">
-          <i className="fa-solid fa-calendar mr-1"></i>
-          Created {createdAt}
-        </div>
-        <div className="flex items-center space-x-4 text-sm">
-          <span className="flex items-center">
-            <i className="fa-solid fa-eye mr-1"></i>
-            {views}
-          </span>
-          <span className="flex items-center">
-            <i className="fa-solid fa-heart mr-1"></i>
-            {likes}
-          </span>
-          <span className="flex items-center">
-            <i className="fa-solid fa-comment mr-1"></i>
-            {comments}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FilterSelect({ type, handleFilterChange }) {
-  const optionsMap = {
-    platform: [
-      { label: "All Platforms", value: "" },
-      { label: "Twitter", value: "twitter" },
-      { label: "LinkedIn", value: "linkedin" },
-      { label: "Medium", value: "medium" },
-    ],
-    date: [
-      { label: "All Time", value: "" },
-      { label: "Today", value: "today" },
-      { label: "This Week", value: "week" },
-      { label: "This Month", value: "month" },
-      { label: "Last 3 Months", value: "quarter" },
-    ],
-    performance: [
-      { label: "All Performance", value: "" },
-      { label: "High Engagement", value: "high" },
-      { label: "Medium Engagement", value: "medium" },
-      { label: "Low Engagement", value: "low" },
-    ],
-    sort: [
-      { label: "Newest First", value: "newest" },
-      { label: "Oldest First", value: "oldest" },
-      { label: "Best Engagement", value: "engagement" },
-      { label: "Alphabetical", value: "alphabetical" },
-    ],
-  };
-
-  return (
-    <div className="relative">
-      <select
-        className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 appearance-none pr-10"
-        onChange={(e) => handleFilterChange(type, e.target.value)}
-        defaultValue={type === "sort" ? "newest" : ""}
-      >
-        {optionsMap[type].map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-        <i className="fa-solid fa-chevron-down text-gray-400"></i>
-      </div>
-    </div>
-  );
-}
-
-function Pagination({ total, current }) {
-  return (
-    <div id="pagination-section" className="flex items-center justify-between mt-12">
-      <div className="text-gray-400 text-sm">Showing 1-6 of {total} posts</div>
-      <div className="flex items-center space-x-2">
-        <button className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-          <i className="fa-solid fa-chevron-left"></i>
-        </button>
-        {[1, 2, 3].map((page) => (
-          <button
-            key={page}
-            className={`w-10 h-10 rounded-xl ${
-              page === current ? "bg-cyan-400/20 text-cyan-400" : "bg-black/30 text-gray-400 hover:text-white"
-            }`}
-          >
-            {page}
-          </button>
-        ))}
-        <span className="text-gray-400">...</span>
-        <button className="w-10 h-10 rounded-xl bg-black/30 text-gray-400 hover:text-white transition-colors">45</button>
-        <button className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-          <i className="fa-solid fa-chevron-right"></i>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function BulkActions({ selectedCount, handleEdit, handleDuplicate, handleDelete }) {
-  return (
-    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 glass-effect rounded-3xl p-4 border border-cyan-400/30 z-40">
-      <div className="flex items-center space-x-4">
-        <span className="text-white font-medium">{selectedCount} Selected</span>
-        <button className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 transition-colors" onClick={handleEdit}>
-          Edit
-        </button>
-        <button className="px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 transition-colors" onClick={handleDuplicate}>
-          Duplicate
-        </button>
-        <button className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 transition-colors" onClick={handleDelete}>
-          Delete
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DeleteModal({ cancel, confirm }) {
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-black/80 p-6 rounded-3xl text-white w-96">
-        <h2 className="text-xl font-bold mb-4">Are you sure you want to delete?</h2>
-        <div className="flex justify-end space-x-4">
-          <button className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600" onClick={cancel}>
-            Cancel
-          </button>
-          <button className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600" onClick={confirm}>
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Toast({ message }) {
-  return (
-    <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 bg-cyan-400 text-black px-6 py-3 rounded-xl animate-fade-in-out z-50">
-      {message}
     </div>
   );
 }
