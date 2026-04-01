@@ -37,29 +37,160 @@ export default function HookGeneratorPage() {
     setSelectedPlatforms(updated);
   };
 
-  const generateHooks = () => {
+  const generateHooks = async () => {
     if (!topic.trim()) return;
     setLoading(true);
     setSelectedHook(null);
-    setTimeout(() => {
-      setHooks([...sampleHooksData]); // Simuler API
+
+    try {
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        alert("API key not configured. Please set VITE_OPENAI_API_KEY in your environment.");
+        setLoading(false);
+        return;
+      }
+
+      const prompt = `Generate exactly 5 powerful, engaging social media hooks for the following topic:
+
+Topic: "${topic}"
+
+Create diverse hooks that use different techniques:
+1. One bold/controversial statement
+2. One personal story hook ("I learned...", "Last week...")
+3. One question to make readers curious
+4. One statistic/number-based hook
+5. One urgency/time-sensitive hook
+
+Return ONLY a valid JSON array (no additional text) with exactly 5 objects. Each object must have:
+- "text": the hook message (under 150 chars for Twitter compatibility)
+- "type": one of ["bold-statement", "personal-story", "question", "statistic", "urgency"]
+- "score": engagement prediction from 75 to 98
+
+Example format:
+[
+  {"text": "Here's the uncomfortable truth about AI that nobody talks about:", "type": "bold-statement", "score": 94},
+  {"text": "I spent 3 years studying AI implementation, and this shocked me the most:", "type": "personal-story", "score": 89}
+]
+
+Generate 5 hooks now:`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": "http://localhost:5173",
+          "X-Title": "AutoPoster App"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-3.5-turbo",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 800
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content.trim();
+      
+      // Parse JSON response
+      const generatedHooks = JSON.parse(content);
+      
+      if (Array.isArray(generatedHooks) && generatedHooks.length > 0) {
+        setHooks(generatedHooks);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (error) {
+      console.error("Error generating hooks:", error);
+      alert(`Error generating hooks: ${error.message}\n\nUsing sample hooks instead.`);
+      setHooks([...sampleHooksData]);
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
-  const regenerateHook = (index) => {
-    const newHooks = [...hooks];
-    const randomHooks = [
-      "Stop scrolling. This will change how you think about AI forever.",
-      "I made a $50K mistake with AI. Here's what I learned:",
-      "The AI trend everyone's talking about is actually dangerous. Here's why:",
-      "3 AI predictions that will seem obvious in 2025:",
-      "This AI breakthrough happened yesterday. No one noticed."
-    ];
-    const randIndex = Math.floor(Math.random() * randomHooks.length);
-    newHooks[index] = { text: randomHooks[randIndex], score: 85 + Math.floor(Math.random() * 15), type: 'regenerated' };
-    setHooks(newHooks);
-    if (selectedHook?.index === index) setSelectedHook(null);
+  const regenerateHook = async (index) => {
+    setLoading(true);
+    
+    try {
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        alert("API key not configured.");
+        setLoading(false);
+        return;
+      }
+
+      const prompt = `Generate 1 unique, creative, and engaging social media hook for this topic:
+
+Topic: "${topic}"
+
+Make it completely different from this existing hook:
+"${hooks[index].text}"
+
+Create a hook that:
+- Is under 150 characters for Twitter compatibility
+- Uses one unique engagement technique (curiosity, surprise, humor, etc.)
+- Has high engagement potential
+
+Return ONLY a valid JSON object (no additional text) with this format:
+{"text": "the hook message", "type": "creative-variant", "score": 85}
+
+Generate the hook now:`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": "http://localhost:5173",
+          "X-Title": "AutoPoster App"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-3.5-turbo",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 200
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("API error");
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content.trim();
+      const newHook = JSON.parse(content);
+      
+      const newHooks = [...hooks];
+      newHooks[index] = { ...newHook, score: Math.max(75, Math.min(98, newHook.score)) };
+      setHooks(newHooks);
+      
+      if (selectedHook?.index === index) setSelectedHook(null);
+    } catch (error) {
+      console.error("Error regenerating hook:", error);
+      // Fallback to random sample
+      const newHooks = [...hooks];
+      const randomHooks = [
+        "Stop scrolling. This will change how you think about this forever.",
+        "I made a $50K mistake. Here's what I learned:",
+        "Everyone's talking about this, but nobody understands why it matters.",
+        "3 predictions that will seem obvious by next year:",
+        "This happened yesterday. Almost nobody noticed."
+      ];
+      const randIndex = Math.floor(Math.random() * randomHooks.length);
+      newHooks[index] = { ...newHooks[index], text: randomHooks[randIndex], score: 85 + Math.floor(Math.random() * 10) };
+      setHooks(newHooks);
+      if (selectedHook?.index === index) setSelectedHook(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectHook = (hook, index) => setSelectedHook({ ...hook, index });

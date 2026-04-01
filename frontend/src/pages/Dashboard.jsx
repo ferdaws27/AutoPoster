@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import UpcomingPosts from "../components/UpcomingPosts";
 import useDashboardStore from "../store/useDashboardStore";
+import { usePosts } from "../hooks/usePosts";
 
 /* ================= COLORS ================= */
 const COLORS = {
@@ -12,10 +13,8 @@ const COLORS = {
 /* ================= DASHBOARD ================= */
 export default function Dashboard() {
   const {
-    posts,
     content,
     user,
-    loading,
     showCreateModal,
     platforms,
     aiOptions,
@@ -31,43 +30,42 @@ export default function Dashboard() {
     setAiSuggestion,
     setAiIdeas,
     loadUserFromStorage,
-    loadPostsFromStorage,
-    fetchPostsFromServer,
-    savePostsToStorage,
-    createDraft,
-    createScheduled,
-    markPublished,
     refreshAIIdeas,
     importPosts,
+    createDraft,
+    createScheduled,
   } = useDashboardStore();
+
+  // Use the centralized posts hook for consistent data management
+  const { 
+    posts, 
+    stats, 
+    loading 
+  } = usePosts();
 
   useEffect(() => {
     loadUserFromStorage();
-    loadPostsFromStorage();
-    fetchPostsFromServer();
-  }, [loadUserFromStorage, loadPostsFromStorage, fetchPostsFromServer]);
-
-  useEffect(() => {
-    savePostsToStorage();
-  }, [posts, savePostsToStorage]);
-
-  useEffect(() => {
-    localStorage.setItem("autoposter_posts", JSON.stringify(posts));
-  }, [posts]);
+  }, [loadUserFromStorage]);
 
   const totalPosts = posts.length;
-  const scheduledCount = posts.filter((p) => p.status === "Scheduled").length;
-  const draftCount = posts.filter((p) => p.status === "Draft").length;
-  const publishedCount = posts.filter((p) => p.status === "Published").length;
+  const scheduledCount = stats.scheduled || 0;
+  const draftCount = stats.drafts || 0;
+  const publishedCount = stats.published || 0;
 
   const nextPostTime = posts
-    .filter((p) => p.scheduledAt)
-    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0]?.scheduledAt || "No scheduled post";
+    .filter((p) => p.scheduleDate && p.scheduleTime)
+    .sort((a, b) => {
+      const dateA = new Date(`${a.scheduleDate} ${a.scheduleTime}`);
+      const dateB = new Date(`${b.scheduleDate} ${b.scheduleTime}`);
+      return dateA - dateB;
+    })[0];
 
-  const nextPost = nextPostTime !== "No scheduled post" ? new Date(nextPostTime).toLocaleString() : "No scheduled post";
+  const nextPost = nextPostTime 
+    ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleString() 
+    : "No scheduled post";
 
-  const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
-  const totalEngagement = posts.reduce((sum, p) => sum + (p.engagement || 0), 0);
+  const totalViews = posts.reduce((sum, p) => sum + (p.engagement?.views || 0), 0);
+  const totalEngagement = posts.reduce((sum, p) => sum + ((p.engagement?.likes || 0) + (p.engagement?.shares || 0) + (p.engagement?.comments || 0)), 0);
   const avgRating = posts.length ? (posts.reduce((sum, p) => sum + (p.rating || 0), 0) / posts.length).toFixed(1) : "4.2";
 
   // showCreateModal and platforms are managed by Zustand store
@@ -113,7 +111,8 @@ export default function Dashboard() {
   };
 
   const handleMarkPublished = (id) => {
-    markPublished(id);
+    // Post published - can be tracked here if needed
+    console.log("Post published:", id);
   };
 
   const handleRefreshAIIdeas = () => {
@@ -145,7 +144,7 @@ export default function Dashboard() {
     <div className="gradient-bg min-h-screen text-white m-0 p-0">
 
       {/* ================= MAIN ================= */}
-      <main className="flex-1 m-0 p-0 w-full">
+      <main className="flex-1 m-0 px-8 py-8 w-full">
 
 
         {/* HEADER */}

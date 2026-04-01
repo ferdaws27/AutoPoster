@@ -7,22 +7,34 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
       </div>
 
       <div className="space-y-4">
-        {posts.length === 0 ? (
+        {!posts || posts.length === 0 ? (
           <p className="text-gray-400 text-sm">No upcoming posts yet</p>
         ) : (
           posts.map((post) => {
+            // Handle both scheduledAt and scheduleDate/scheduleTime formats
             const formattedTime = post.scheduledAt
               ? new Date(post.scheduledAt).toLocaleString()
+              : (post.scheduleDate && post.scheduleTime)
+              ? new Date(`${post.scheduleDate} ${post.scheduleTime}`).toLocaleString()
               : post.time || "TBD";
 
             const statusStyle =
-              post.status === "Scheduled"
+              post.status === "scheduled"
                 ? "bg-green-400/20 text-green-400"
+                : post.status === "draft"
+                ? "bg-yellow-400/20 text-yellow-400"
+                : post.status === "posted"
+                ? "bg-blue-400/20 text-blue-400"
                 : post.status === "Review"
                 ? "bg-yellow-400/20 text-yellow-400"
-                : post.status === "Published"
-                ? "bg-green-400/20 text-green-400"
                 : "bg-cyan-400/20 text-cyan-400";
+
+            // Handle both array and object platforms formats
+            const platformArray = Array.isArray(post.platforms) 
+              ? post.platforms 
+              : post.platforms 
+              ? Object.keys(post.platforms).filter(p => post.platforms[p])
+              : [];
 
             return (
               <div
@@ -32,9 +44,10 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
                 <div className="flex-shrink-0">
                   <div className="text-white font-medium text-sm mb-1">{formattedTime}</div>
                   <div className="flex space-x-2">
-                    {(post.platforms || []).map((p) => {
-                      const platformStyle = p === "linkedin" ? "bg-blue-600" : p === "twitter" ? "bg-black" : "bg-black";
-                      const iconClass = p === "twitter" ? "fa-x-twitter" : p === "linkedin" ? "fa-linkedin-in" : "fa-medium";
+                    {platformArray.map((p) => {
+                      const platformName = typeof p === 'string' ? p.toLowerCase() : p;
+                      const platformStyle = platformName === "linkedin" ? "bg-blue-600" : platformName === "twitter" ? "bg-black" : "bg-teal-600";
+                      const iconClass = platformName === "twitter" ? "fa-x-twitter" : platformName === "linkedin" ? "fa-linkedin-in" : "fa-medium";
 
                       return (
                         <div key={p} className={`w-6 h-6 ${platformStyle} rounded-lg flex items-center justify-center`}>
@@ -46,8 +59,8 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
                 </div>
 
                 <div className="flex-1 ml-4">
-                  <div className="text-white font-medium mb-1">{post.title || "Untitled post"}</div>
-                  <div className="text-gray-400 text-sm">{post.desc || post.excerpt || "No description"}</div>
+                  <div className="text-white font-medium mb-1">{post.title || post.idea || "Untitled post"}</div>
+                  <div className="text-gray-400 text-sm line-clamp-2">{post.desc || post.content || post.excerpt || "No description"}</div>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
