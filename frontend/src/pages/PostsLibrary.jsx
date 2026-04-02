@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePosts } from "../hooks/usePosts";
 
 export default function PostsLibrary() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("drafts");
+  const { posts, deletePost, updatePost, duplicatePost } = usePosts();
+  const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({
@@ -18,118 +20,55 @@ export default function PostsLibrary() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  const postsData = [
-    {
-      title: "Building a SaaS Product",
-      status: "Draft",
-      platform: "twitter",
-      createdAt: "2026-02-05",
-      engagement: "high",
-      views: 120,
-      likes: 45,
-      comments: 10,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/4f8a2b3c1d-e9f6d7c8b9a0.png",
-    },
-    {
-      title: "AI Content Revolution",
-      status: "Draft",
-      platform: "linkedin",
-      createdAt: "2026-02-06",
-      engagement: "medium",
-      views: 80,
-      likes: 30,
-      comments: 5,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/7e9d6c5b4a-3f2e1d0c9b8a.png",
-    },
-    {
-      title: "Remote Work Productivity",
-      status: "Draft",
-      platform: "medium",
-      createdAt: "2026-02-07",
-      engagement: "low",
-      views: 50,
-      likes: 15,
-      comments: 3,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/9c8b7a6d5e-4f3e2d1c0b9a.png",
-    },
-    {
-      title: "Social Media Automation",
-      status: "Scheduled",
-      platform: "twitter",
-      createdAt: "2026-02-04",
-      engagement: "high",
-      views: 200,
-      likes: 90,
-      comments: 20,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder1.png",
-    },
-    {
-      title: "How I Raised $2M",
-      status: "Published",
-      platform: "linkedin",
-      createdAt: "2026-01-20",
-      engagement: "medium",
-      views: 150,
-      likes: 60,
-      comments: 15,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder2.png",
-    },
-    {
-      title: "Maximizing Team Efficiency",
-      status: "Published",
-      platform: "medium",
-      createdAt: "2026-01-25",
-      engagement: "low",
-      views: 70,
-      likes: 20,
-      comments: 5,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder3.png",
-    },
-    {
-      title: "AI in Daily Life",
-      status: "Scheduled",
-      platform: "twitter",
-      createdAt: "2026-02-03",
-      engagement: "high",
-      views: 180,
-      likes: 80,
-      comments: 18,
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/placeholder4.png",
-    },
-  ];
-
-  const filteredPosts = postsData
+  const filteredPosts = posts
     .filter((post) => {
-      if (activeTab === "drafts" && post.status !== "Draft") return false;
-      if (activeTab === "scheduled" && post.status !== "Scheduled") return false;
-      if (activeTab === "published" && post.status !== "Published") return false;
+      // Filter by tab
+      if (activeTab === "drafts" && post.status !== "draft") return false;
+      if (activeTab === "scheduled" && post.status !== "scheduled") return false;
+      if (activeTab === "published" && post.status !== "posted") return false;
 
-      const title = post.title.toLowerCase();
-      const content = "Sample content preview for this post...".toLowerCase();
-      if (!title.includes(search) && !content.includes(search)) return false;
+      // Search filter
+      const searchTerm = search.toLowerCase();
+      const title = (post.idea || post.content || "").toLowerCase();
+      if (searchTerm && !title.includes(searchTerm)) return false;
 
-      if (filters.platform && post.platform !== filters.platform) return false;
-      if (filters.performance && post.engagement !== filters.performance) return false;
+      // Platform filter
+      if (filters.platform && post.platforms) {
+        const hasPlatform = Object.keys(post.platforms).some(p => 
+          p.toLowerCase().includes(filters.platform.toLowerCase()) && post.platforms[p]
+        );
+        if (!hasPlatform) return false;
+      }
 
-      const today = new Date();
-      const postDate = new Date(post.createdAt);
-      const diffDays = (today - postDate) / (1000 * 60 * 60 * 24);
+      // Date filter
+      if (filters.date) {
+        const postDate = new Date(post.createdAt || post.scheduleDate);
+        const today = new Date();
+        const diffDays = (today - postDate) / (1000 * 60 * 60 * 24);
 
-      if (filters.date === "today" && diffDays > 0) return false;
-      if (filters.date === "week" && diffDays > 7) return false;
-      if (filters.date === "month" && diffDays > 30) return false;
-      if (filters.date === "quarter" && diffDays > 90) return false;
+        if (filters.date === "today" && diffDays > 1) return false;
+        if (filters.date === "week" && diffDays > 7) return false;
+        if (filters.date === "month" && diffDays > 30) return false;
+        if (filters.date === "quarter" && diffDays > 90) return false;
+      }
 
       return true;
     })
     .sort((a, b) => {
-      if (filters.sort === "newest") return new Date(b.createdAt) - new Date(a.createdAt);
-      if (filters.sort === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
-      if (filters.sort === "engagement") {
-        const map = { high: 3, medium: 2, low: 1 };
-        return map[b.engagement] - map[a.engagement];
+      if (filters.sort === "newest") {
+        return new Date(b.createdAt || b.scheduleDate) - new Date(a.createdAt || a.scheduleDate);
       }
-      if (filters.sort === "alphabetical") return a.title.localeCompare(b.title);
+      if (filters.sort === "oldest") {
+        return new Date(a.createdAt || a.scheduleDate) - new Date(b.createdAt || b.scheduleDate);
+      }
+      if (filters.sort === "engagement") {
+        const aEngagement = (a.engagement?.likes || 0) + (a.engagement?.shares || 0) + (a.engagement?.comments || 0);
+        const bEngagement = (b.engagement?.likes || 0) + (b.engagement?.shares || 0) + (b.engagement?.comments || 0);
+        return bEngagement - aEngagement;
+      }
+      if (filters.sort === "alphabetical") {
+        return (a.idea || a.content || "").localeCompare(b.idea || b.content || "");
+      }
       return 0;
     });
 
@@ -137,21 +76,31 @@ export default function PostsLibrary() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const toggleSelectPost = (title) => {
+  const toggleSelectPost = (postId) => {
     const newSet = new Set(selectedPosts);
-    if (newSet.has(title)) newSet.delete(title);
-    else newSet.add(title);
+    if (newSet.has(postId)) newSet.delete(postId);
+    else newSet.add(postId);
     setSelectedPosts(newSet);
   };
 
   const handleDelete = () => {
+    if (selectedPosts.size === 0) return;
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    setShowDeleteModal(false);
-    showToastMessage("Post deleted successfully");
-    setSelectedPosts(new Set());
+  const confirmDelete = async () => {
+    try {
+      // Delete all selected posts
+      const deletePromises = Array.from(selectedPosts).map(postId => deletePost(postId));
+      await Promise.all(deletePromises);
+      
+      setShowDeleteModal(false);
+      showToastMessage(`${selectedPosts.size} post(s) deleted successfully`);
+      setSelectedPosts(new Set());
+    } catch (error) {
+      console.error('Failed to delete posts:', error);
+      showToastMessage("Failed to delete posts. Please try again.");
+    }
   };
 
   const cancelDelete = () => setShowDeleteModal(false);
@@ -160,6 +109,21 @@ export default function PostsLibrary() {
     setToastMessage(msg);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleEditPost = (post) => {
+    // Navigate to create post page with post data for editing
+    navigate("/dashboard/CreatePostPage", { state: { editPost: post } });
+  };
+
+  const handleDuplicatePost = async (post) => {
+    try {
+      await duplicatePost(post.id);
+      showToastMessage("Post duplicated successfully");
+    } catch (error) {
+      console.error('Failed to duplicate post:', error);
+      showToastMessage("Failed to duplicate post");
+    }
   };
 
   return (
@@ -231,6 +195,7 @@ export default function PostsLibrary() {
         {/* TABS */}
         <div className="flex space-x-8 border-b border-gray-700 mb-8">
           {[
+            { label: "All Posts", key: "all" },
             { label: "Drafts", key: "drafts" },
             { label: "Scheduled", key: "scheduled" },
             { label: "Published", key: "published" },
@@ -250,14 +215,20 @@ export default function PostsLibrary() {
           {filteredPosts.length > 0 ? (
             filteredPosts.map((post, index) => (
               <PostCard
-                key={index}
-                {...post}
-                isSelected={selectedPosts.has(post.title)}
-                toggleSelect={() => toggleSelectPost(post.title)}
+                key={post.id || index}
+                post={post}
+                isSelected={selectedPosts.has(post.id)}
+                toggleSelect={() => toggleSelectPost(post.id)}
+                onEdit={() => handleEditPost(post)}
+                onDuplicate={() => handleDuplicatePost(post)}
               />
             ))
           ) : (
-            <p className="text-gray-400">No posts found.</p>
+            <div className="col-span-full text-center py-12">
+              <i className="fa-solid fa-inbox text-4xl text-gray-600 mb-4"></i>
+              <p className="text-gray-400 text-lg">No posts found matching your criteria.</p>
+              <p className="text-gray-500 text-sm">Try adjusting your filters or create a new post.</p>
+            </div>
           )}
         </div>
 
@@ -286,69 +257,108 @@ export default function PostsLibrary() {
 
 // ------------------- COMPONENTS -------------------
 
-function PostCard({ title, status, createdAt, platform, views, likes, comments, img, isSelected, toggleSelect }) {
+function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate }) {
   const statusColor =
-    status === "Draft"
+    post.status === "draft"
       ? "status-draft"
-      : status === "Scheduled"
+      : post.status === "scheduled"
       ? "status-scheduled"
       : "status-published";
 
-  const platformIcon =
-    platform === "twitter" ? "fa-x-twitter" : platform === "linkedin" ? "fa-linkedin" : "fa-medium";
+  const statusLabel =
+    post.status === "draft"
+      ? "Draft"
+      : post.status === "scheduled"
+      ? "Scheduled"
+      : "Published";
+
+  // Get active platforms
+  const activePlatforms = post.platforms ? Object.keys(post.platforms).filter(p => post.platforms[p]) : [];
+
+  // Calculate engagement
+  const engagement = (post.engagement?.likes || 0) + (post.engagement?.shares || 0) + (post.engagement?.comments || 0);
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return "No date";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   return (
     <div
-      className={`post-card glass-effect rounded-3xl p-6 border border-gray-700/50 hover:border-cyan-400/30 animate-fade-in ${
-        isSelected ? "border-cyan-400" : ""
+      className={`post-card glass-effect rounded-3xl p-6 border border-gray-700/50 hover:border-cyan-400/30 animate-fade-in cursor-pointer ${
+        isSelected ? "border-cyan-400 ring-2 ring-cyan-400/20" : ""
       }`}
       onClick={toggleSelect}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <span className={`${statusColor} px-3 py-1 rounded-xl text-sm font-medium`}>{status}</span>
+          <span className={`${statusColor} px-3 py-1 rounded-xl text-sm font-medium`}>{statusLabel}</span>
           <div className="flex items-center space-x-1">
-            <i className={`fa-brands ${platformIcon} text-sm`}></i>
+            {activePlatforms.map(platform => (
+              <i key={platform} className={`fa-brands ${
+                platform === 'Twitter' ? 'fa-x-twitter' :
+                platform === 'LinkedIn' ? 'fa-linkedin' :
+                'fa-medium'
+              } text-sm text-gray-400`}></i>
+            ))}
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-cyan-400 transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-cyan-400 transition-colors"
+          >
             <i className="fa-solid fa-edit text-xs"></i>
           </button>
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-violet-400 transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-violet-400 transition-colors"
+          >
             <i className="fa-solid fa-copy text-xs"></i>
           </button>
-          <button className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleSelect(); }}
+            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
+          >
             <i className="fa-solid fa-trash text-xs"></i>
           </button>
         </div>
       </div>
 
       <div className="mb-4">
-        <img className="w-full h-40 rounded-2xl object-cover mb-3" src={img} alt={title} />
-        <h3 className="text-white font-semibold text-lg mb-2 line-clamp-2">{title}</h3>
-        <p className="text-gray-400 text-sm line-clamp-3">Sample content preview for this post...</p>
+        <div className="w-full h-32 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-violet-400/20 flex items-center justify-center mb-3">
+          <i className="fa-solid fa-image text-2xl text-gray-400"></i>
+        </div>
+        <h3 className="text-white font-semibold text-lg mb-2 line-clamp-2">
+          {post.idea || post.content || "Untitled Post"}
+        </h3>
+        <p className="text-gray-400 text-sm line-clamp-3">
+          {post.content ? post.content.substring(0, 120) + "..." : "No content preview available"}
+        </p>
       </div>
 
       <div className="flex items-center justify-between text-gray-400 text-sm">
         <div className="flex items-center space-x-2">
           <i className="fa-solid fa-calendar mr-1"></i>
-          Created {createdAt}
+          {post.scheduleDate && post.scheduleTime
+            ? `Scheduled: ${formatDate(post.scheduleDate)} ${post.scheduleTime}`
+            : `Created: ${formatDate(post.createdAt)}`
+          }
         </div>
-        <div className="flex items-center space-x-4 text-sm">
-          <span className="flex items-center">
-            <i className="fa-solid fa-eye mr-1"></i>
-            {views}
-          </span>
-          <span className="flex items-center">
-            <i className="fa-solid fa-heart mr-1"></i>
-            {likes}
-          </span>
-          <span className="flex items-center">
-            <i className="fa-solid fa-comment mr-1"></i>
-            {comments}
-          </span>
-        </div>
+        {post.status === 'posted' && (
+          <div className="flex items-center space-x-4 text-sm">
+            <span className="flex items-center">
+              <i className="fa-solid fa-eye mr-1"></i>
+              {post.engagement?.views || 0}
+            </span>
+            <span className="flex items-center">
+              <i className="fa-solid fa-heart mr-1"></i>
+              {engagement}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
