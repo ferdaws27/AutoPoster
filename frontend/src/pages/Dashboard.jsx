@@ -36,23 +36,30 @@ export default function Dashboard() {
     createScheduled,
   } = useDashboardStore();
 
-  // Use the centralized posts hook for consistent data management
-  const { 
-    posts, 
-    stats, 
-    loading 
+  const {
+    posts,
+    stats,
+    loading
   } = usePosts();
 
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
-  const totalPosts = posts.length;
+  const normalizedPosts = (posts || []).map((p) => ({
+    ...p,
+    scheduleDate: p.scheduleDate || p.schedule_date || null,
+    scheduleTime: p.scheduleTime || p.schedule_time || null,
+  }));
+
+  const scheduledPosts = normalizedPosts.filter((p) => p.status === "scheduled");
+
+  const totalPosts = normalizedPosts.length;
   const scheduledCount = stats.scheduled || 0;
   const draftCount = stats.drafts || 0;
   const publishedCount = stats.published || 0;
 
-  const nextPostTime = posts
+  const nextPostTime = scheduledPosts
     .filter((p) => p.scheduleDate && p.scheduleTime)
     .sort((a, b) => {
       const dateA = new Date(`${a.scheduleDate} ${a.scheduleTime}`);
@@ -60,19 +67,31 @@ export default function Dashboard() {
       return dateA - dateB;
     })[0];
 
-  const nextPost = nextPostTime 
-    ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleString() 
+  const nextPost = nextPostTime
+    ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleString()
     : "No scheduled post";
 
-  const totalViews = posts.reduce((sum, p) => sum + (p.engagement?.views || 0), 0);
-  const totalEngagement = posts.reduce((sum, p) => sum + ((p.engagement?.likes || 0) + (p.engagement?.shares || 0) + (p.engagement?.comments || 0)), 0);
-  const avgRating = posts.length ? (posts.reduce((sum, p) => sum + (p.rating || 0), 0) / posts.length).toFixed(1) : "4.2";
+  const totalViews = normalizedPosts.reduce(
+    (sum, p) => sum + (p.engagement?.views || 0),
+    0
+  );
 
-  // showCreateModal and platforms are managed by Zustand store
+  const totalEngagement = normalizedPosts.reduce(
+    (sum, p) =>
+      sum +
+      (p.engagement?.likes || 0) +
+      (p.engagement?.shares || 0) +
+      (p.engagement?.comments || 0),
+    0
+  );
 
-  // aiOptions managed through store (zustand)
-  // const [aiOptions, setAiOptions] = useState({ optimize: true, images: true });
-   /* ========= QUICK ACTIONS LOGIC ========= */
+  const avgRating = normalizedPosts.length
+    ? (
+        normalizedPosts.reduce((sum, p) => sum + (p.rating || 0), 0) /
+        normalizedPosts.length
+      ).toFixed(1)
+    : "4.2";
+
   const handleImport = () => {
     document.getElementById("import-file").click();
   };
@@ -98,7 +117,7 @@ export default function Dashboard() {
   };
 
   const handleExport = () => {
-    const data = { posts };
+    const data = { posts: normalizedPosts };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -111,7 +130,6 @@ export default function Dashboard() {
   };
 
   const handleMarkPublished = (id) => {
-    // Post published - can be tracked here if needed
     console.log("Post published:", id);
   };
 
@@ -142,12 +160,7 @@ export default function Dashboard() {
 
   return (
     <div className="gradient-bg min-h-screen text-white m-0 p-0">
-
-      {/* ================= MAIN ================= */}
       <main className="flex-1 m-0 px-8 py-8 w-full">
-
-
-        {/* HEADER */}
         <header className="mb-8 flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold">Good morning, {user?.full_name || "Flen"}</h2>
@@ -159,7 +172,6 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* QUICK STATS */}
         <section className="grid grid-cols-3 gap-6 mb-8">
           <StatCard icon="fa-file-lines" color="cyan" value={loading ? "..." : totalPosts} label="Total Posts" />
           <StatCard
@@ -171,80 +183,75 @@ export default function Dashboard() {
           <StatCard icon="fa-clock" color="green" value={loading ? "..." : nextPost} label="Next Post" />
         </section>
 
-        {/* CONTENT GRID */}
         <section className="grid grid-cols-2 gap-8">
-          <UpcomingPosts posts={posts} onPublish={handleMarkPublished} />
+          <UpcomingPosts posts={scheduledPosts} onPublish={handleMarkPublished} />
           <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} />
         </section>
-         {/* ================= RECENT ACTIVITY ================= */}
-<section className="mt-8">
-  <RecentActivity
-    stats={{
-      postsPublished: publishedCount,
-      totalViews,
-      totalEngagement,
-      avgRating,
-    }}
-  />
-</section>
-  
-        {/* ================= QUICK ACTIONS BAR ================= */}
-<div id="quick-actions-bar" className="mt-8">
-  <div className="glass-effect rounded-3xl p-6 glow-card">
-    <div className="flex items-center justify-between">
 
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-1">
-          Quick Actions
-        </h3>
-        <p className="text-gray-400 text-sm">
-          Streamline your content workflow
-        </p>
-      </div>
+        <section className="mt-8">
+          <RecentActivity
+            stats={{
+              postsPublished: publishedCount,
+              totalViews,
+              totalEngagement,
+              avgRating,
+            }}
+          />
+        </section>
 
-      <div className="flex items-center space-x-4">
-<button
-  onClick={handleImport}
-  className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
->
-  <i className="fa-solid fa-upload mr-2"></i>
-  Import Content
-</button>
+        <div id="quick-actions-bar" className="mt-8">
+          <div className="glass-effect rounded-3xl p-6 glow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1">
+                  Quick Actions
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Streamline your content workflow
+                </p>
+              </div>
 
-<button
-  onClick={handleExport}
-  className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
->
-  <i className="fa-solid fa-download mr-2"></i>
-  Export Data
-</button>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleImport}
+                  className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
+                >
+                  <i className="fa-solid fa-upload mr-2"></i>
+                  Import Content
+                </button>
 
-<button
-  onClick={handleAIOptimize}
-  className="flex items-center px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
->
-  <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
-  AI Optimize
-</button>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
+                >
+                  <i className="fa-solid fa-download mr-2"></i>
+                  Export Data
+                </button>
 
-<input
-              id="import-file"
-              type="file"
-              accept=".json,.csv"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-      </div>
-      {aiSuggestion && (
-        <div className="mt-3 text-sm text-cyan-200 whitespace-pre-line">{aiSuggestion}</div>
-      )}
-    </div>
-  </div>
-</div>
+                <button
+                  onClick={handleAIOptimize}
+                  className="flex items-center px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
+                >
+                  <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
+                  AI Optimize
+                </button>
 
+                <input
+                  id="import-file"
+                  type="file"
+                  accept=".json,.csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+              {aiSuggestion && (
+                <div className="mt-3 text-sm text-cyan-200 whitespace-pre-line">{aiSuggestion}</div>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
 
-      {/* FLOATING BUTTON */}
       <button
         onClick={() => setShowCreateModal(true)}
         className="fixed bottom-8 right-8 w-16 h-16 rounded-2xl gradient-accent pulse-glow z-50"
@@ -252,11 +259,9 @@ export default function Dashboard() {
         <i className="fa-solid fa-plus text-xl"></i>
       </button>
 
-      {/* ================= CREATE POST MODAL ================= */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="glass-effect rounded-3xl p-8 max-w-4xl w-full relative">
-
             <div className="flex justify-between mb-6">
               <div>
                 <h3 className="text-2xl font-bold">Create New Post</h3>
@@ -268,15 +273,22 @@ export default function Dashboard() {
             </div>
 
             <Section title="Select Platforms">
-              <Platform label="Twitter/X" icon="fa-x-twitter"
+              <Platform
+                label="Twitter/X"
+                icon="fa-x-twitter"
                 checked={platforms.twitter}
                 onClick={() => setPlatforms({ ...platforms, twitter: !platforms.twitter })}
               />
-              <Platform label="LinkedIn" icon="fa-linkedin-in" blue
+              <Platform
+                label="LinkedIn"
+                icon="fa-linkedin-in"
+                blue
                 checked={platforms.linkedin}
                 onClick={() => setPlatforms({ ...platforms, linkedin: !platforms.linkedin })}
               />
-              <Platform label="Medium" icon="fa-medium"
+              <Platform
+                label="Medium"
+                icon="fa-medium"
                 checked={platforms.medium}
                 onClick={() => setPlatforms({ ...platforms, medium: !platforms.medium })}
               />
@@ -287,42 +299,40 @@ export default function Dashboard() {
                 className="w-full min-h-32 p-4 rounded-2xl bg-gray-800/60 border border-gray-600 focus:border-cyan-400 outline-none"
                 placeholder="Share your thoughts, insights, or ideas..."
                 value={content}
-  onChange={(e) => setContent(e.target.value)}
+                onChange={(e) => setContent(e.target.value)}
               />
             </Section>
 
-            {/* AI OPTIONS (IDENTIQUE HTML) */}
             <AIOptions aiOptions={aiOptions} setAiOptions={setAiOptions} />
 
             <div className="flex gap-4 mt-6">
               <button
-  className="flex-1 p-4 rounded-2xl border border-gray-600"
-  onClick={() => {
-    if (!content.trim()) return;
+                className="flex-1 p-4 rounded-2xl border border-gray-600"
+                onClick={() => {
+                  if (!content.trim()) return;
 
-    createDraft(content, Object.keys(platforms).filter((p) => platforms[p]));
+                  createDraft(content, Object.keys(platforms).filter((p) => platforms[p]));
 
-    setContent("");
-    setShowCreateModal(false);
-  }}
->
-  Save Draft
-</button>
+                  setContent("");
+                  setShowCreateModal(false);
+                }}
+              >
+                Save Draft
+              </button>
 
               <button
-  className="flex-1 p-4 rounded-2xl gradient-accent"
-  onClick={() => {
-    if (!content.trim()) return;
+                className="flex-1 p-4 rounded-2xl gradient-accent"
+                onClick={() => {
+                  if (!content.trim()) return;
 
-    createScheduled(content, Object.keys(platforms).filter((p) => platforms[p]));
+                  createScheduled(content, Object.keys(platforms).filter((p) => platforms[p]));
 
-    setContent("");
-    setShowCreateModal(false);
-  }}
->
-  Generate & Preview
-</button>
-
+                  setContent("");
+                  setShowCreateModal(false);
+                }}
+              >
+                Generate & Preview
+              </button>
             </div>
           </div>
         </div>
@@ -414,6 +424,7 @@ const IconButton = ({ icon }) => (
     <i className={`fa-solid ${icon} text-gray-400`}></i>
   </button>
 );
+
 const RecentActivity = ({ stats }) => (
   <div className="glass-effect rounded-3xl p-6 glow-card">
     <div className="flex items-center justify-between mb-6">
@@ -433,7 +444,6 @@ const RecentActivity = ({ stats }) => (
     </div>
 
     <div className="grid grid-cols-4 gap-6">
-
       <ActivityItem
         icon="fa-paper-plane"
         value={stats.postsPublished || 0}
@@ -461,7 +471,6 @@ const RecentActivity = ({ stats }) => (
         label="Avg Rating"
         color="yellow"
       />
-
     </div>
   </div>
 );
@@ -490,12 +499,6 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea }) => (
             ? "bg-yellow-400/20 text-yellow-400"
             : "bg-cyan-400/20 text-cyan-400";
 
-        const platformStyle =
-          idea.platform === "twitter"
-            ? "bg-black"
-            : idea.platform === "linkedin"
-            ? "bg-blue-600"
-            : "bg-black";
         const platformIcon =
           idea.platform === "twitter"
             ? "fa-x-twitter"
@@ -544,6 +547,7 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea }) => (
     </div>
   </div>
 );
+
 const ActivityItem = ({ icon, value, label, color }) => (
   <div className="text-center p-4 rounded-2xl bg-gray-800/30">
     <div className={`w-12 h-12 rounded-2xl bg-${color}-400/20 flex items-center justify-center mx-auto mb-3`}>
@@ -558,7 +562,6 @@ const AIOptions = ({ aiOptions, setAiOptions }) => (
   <div className="mb-6">
     <h3 className="font-semibold mb-3">AI Enhancement Options</h3>
     <div className="grid grid-cols-2 gap-4">
-
       <label
         onClick={() => setAiOptions({ ...aiOptions, optimize: !aiOptions.optimize })}
         className={`flex items-center p-3 rounded-xl border cursor-pointer ${
@@ -578,7 +581,6 @@ const AIOptions = ({ aiOptions, setAiOptions }) => (
         <i className="fa-solid fa-image text-cyan-400 mr-3"></i>
         AI Image Suggestions
       </label>
-
     </div>
   </div>
 );
