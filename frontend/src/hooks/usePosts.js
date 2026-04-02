@@ -1,4 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../services/api';
+
+// Helper function to calculate engagement display
+const calculateEngagementDisplay = (stats) => {
+  // For now, return a simple count. In the future, this could aggregate engagement from all posts
+  const totalPosts = (stats.draft || 0) + (stats.scheduled || 0) + (stats.published || 0);
+  return totalPosts > 0 ? totalPosts.toString() : '0';
+};
 
 export const usePosts = () => {
   const [posts, setPosts] = useState([]);
@@ -11,9 +19,18 @@ export const usePosts = () => {
     engagement: '0'
   });
 
-  // Initialize posts from localStorage
+  // Check if user is authenticated (has JWT token)
+  const isAuthenticated = () => {
+    return !!localStorage.getItem('token');
+  };
+
+  // Initialize posts from backend or localStorage
   useEffect(() => {
-    syncWithLocalStorage();
+    if (isAuthenticated()) {
+      syncWithBackend();
+    } else {
+      syncWithLocalStorage();
+    }
   }, []);
 
   // Update stats when posts change
@@ -48,6 +65,49 @@ export const usePosts = () => {
     });
   }, [posts]);
 
+  const syncWithBackend = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // Get posts
+      const postsResponse = await apiFetch('/api/posts/');
+      if (postsResponse.success) {
+        // Transform backend data to frontend format
+        const backendPosts = postsResponse.data.posts.map(post => ({
+          id: post._id,
+          content: post.content,
+          platforms: post.platforms,
+          status: post.status,
+          scheduleDate: post.schedule_date,
+          scheduleTime: post.schedule_time,
+          engagement: post.engagement,
+          createdAt: post.created_at,
+          updatedAt: post.updated_at
+        }));
+        setPosts(backendPosts);
+      }
+
+      // Get stats
+      const statsResponse = await apiFetch('/api/posts/stats/summary');
+      if (statsResponse.success) {
+        const backendStats = statsResponse.data.stats;
+        setStats({
+          drafts: backendStats.draft || 0,
+          scheduled: backendStats.scheduled || 0,
+          published: backendStats.published || 0,
+          engagement: calculateEngagementDisplay(backendStats)
+        });
+      }
+    } catch (err) {
+      console.error('Error syncing posts from backend:', err);
+      setError(err.message);
+      // Fallback to localStorage if backend fails
+      syncWithLocalStorage();
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const syncWithLocalStorage = useCallback(() => {
     try {
       const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
@@ -70,29 +130,65 @@ export const usePosts = () => {
   const createPost = useCallback(async (postData) => {
     try {
       setLoading(true);
-      const newPost = {
-        id: Date.now(),
-        createdAt: new Date().toISOString(),
-        ...postData
-      };
 
-      // Determine which storage bucket based on status
-      if (postData.status === 'draft') {
-        const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
-        drafts.push(newPost);
-        localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
-      } else if (postData.status === 'scheduled') {
-        const scheduled = JSON.parse(localStorage.getItem('autoposter_scheduled') || '[]');
-        scheduled.push(newPost);
-        localStorage.setItem('autoposter_scheduled', JSON.stringify(scheduled));
+      if (isAuthenticated()) {
+        // Use backend API
+        const backendData = {
+          content: postData.content,
+          platforms: postData.platforms || {},
+          status: postData.status || 'draft',
+          schedule_date: postData.scheduleDate,
+          schedule_time: postData.scheduleTime,
+          engagement: postData.engagement || {}
+        };
+
+        const response = await apiFetch('/api/posts/', {
+          method: 'POST',
+          body: JSON.stringify(backendData)
+        });
+
+        if (response.success) {
+          const newPost = {
+            id: response.data._id,
+            content: response.data.content,
+            platforms: response.data.platforms,
+            status: response.data.status,
+            scheduleDate: response.data.schedule_date,
+            scheduleTime: response.data.schedule_time,
+            engagement: response.data.engagement,
+            createdAt: response.data.created_at,
+            updatedAt: response.data.updated_at
+          };
+
+          setPosts(prev => [newPost, ...prev]);
+          return newPost;
+        }
       } else {
-        const published = JSON.parse(localStorage.getItem('autoposter_published') || '[]');
-        published.push(newPost);
-        localStorage.setItem('autoposter_published', JSON.stringify(published));
-      }
+        // Fallback to localStorage
+        const newPost = {
+          id: Date.now(),
+          createdAt: new Date().toISOString(),
+          ...postData
+        };
 
-      syncWithLocalStorage();
-      return newPost;
+        // Determine which storage bucket based on status
+        if (postData.status === 'draft') {
+          const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
+          drafts.push(newPost);
+          localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
+        } else if (postData.status === 'scheduled') {
+          const scheduled = JSON.parse(localStorage.getItem('autoposter_scheduled') || '[]');
+          scheduled.push(newPost);
+          localStorage.setItem('autoposter_scheduled', JSON.stringify(scheduled));
+        } else {
+          const published = JSON.parse(localStorage.getItem('autoposter_published') || '[]');
+          published.push(newPost);
+          localStorage.setItem('autoposter_published', JSON.stringify(published));
+        }
+
+        setPosts(prev => [newPost, ...prev]);
+        return newPost;
+      }
     } catch (err) {
       console.error('Error creating post:', err);
       setError(err.message);
@@ -100,32 +196,65 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, [syncWithLocalStorage]);
+  }, []);
 
   const updatePost = useCallback(async (postId, postData) => {
     try {
       setLoading(true);
-      
-      // Find and update the post in the appropriate storage
-      const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
-      let updated = false;
 
-      for (const key of storageKeys) {
-        const items = JSON.parse(localStorage.getItem(key) || '[]');
-        const index = items.findIndex(p => p.id === postId);
-        if (index !== -1) {
-          items[index] = { ...items[index], ...postData, id: postId };
-          localStorage.setItem(key, JSON.stringify(items));
-          updated = true;
-          break;
+      if (isAuthenticated()) {
+        // Use backend API
+        const backendData = {};
+        if (postData.content !== undefined) backendData.content = postData.content;
+        if (postData.platforms !== undefined) backendData.platforms = postData.platforms;
+        if (postData.status !== undefined) backendData.status = postData.status;
+        if (postData.scheduleDate !== undefined) backendData.schedule_date = postData.scheduleDate;
+        if (postData.scheduleTime !== undefined) backendData.schedule_time = postData.scheduleTime;
+        if (postData.engagement !== undefined) backendData.engagement = postData.engagement;
+
+        const response = await apiFetch(`/api/posts/${postId}`, {
+          method: 'PUT',
+          body: JSON.stringify(backendData)
+        });
+
+        if (response.success) {
+          const updatedPost = {
+            id: response.data._id,
+            content: response.data.content,
+            platforms: response.data.platforms,
+            status: response.data.status,
+            scheduleDate: response.data.schedule_date,
+            scheduleTime: response.data.schedule_time,
+            engagement: response.data.engagement,
+            createdAt: response.data.created_at,
+            updatedAt: response.data.updated_at
+          };
+
+          setPosts(prev => prev.map(p => p.id === postId ? updatedPost : p));
+          return updatedPost;
         }
-      }
+      } else {
+        // Fallback to localStorage
+        const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
+        let updated = false;
 
-      if (!updated) {
-        throw new Error('Post not found');
-      }
+        for (const key of storageKeys) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          const index = items.findIndex(p => p.id === postId);
+          if (index !== -1) {
+            items[index] = { ...items[index], ...postData, id: postId };
+            localStorage.setItem(key, JSON.stringify(items));
+            updated = true;
+            break;
+          }
+        }
 
-      syncWithLocalStorage();
+        if (!updated) {
+          throw new Error('Post not found');
+        }
+
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...postData } : p));
+      }
     } catch (err) {
       console.error('Error updating post:', err);
       setError(err.message);
@@ -133,24 +262,36 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, [syncWithLocalStorage]);
+  }, []);
 
   const deletePost = useCallback(async (postId) => {
     try {
       setLoading(true);
-      
-      const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
 
-      for (const key of storageKeys) {
-        const items = JSON.parse(localStorage.getItem(key) || '[]');
-        const filtered = items.filter(p => p.id !== postId);
-        if (filtered.length !== items.length) {
-          localStorage.setItem(key, JSON.stringify(filtered));
-          break;
+      if (isAuthenticated()) {
+        // Use backend API
+        const response = await apiFetch(`/api/posts/${postId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.success) {
+          setPosts(prev => prev.filter(p => p.id !== postId));
         }
-      }
+      } else {
+        // Fallback to localStorage
+        const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
 
-      syncWithLocalStorage();
+        for (const key of storageKeys) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          const filtered = items.filter(p => p.id !== postId);
+          if (filtered.length !== items.length) {
+            localStorage.setItem(key, JSON.stringify(filtered));
+            break;
+          }
+        }
+
+        setPosts(prev => prev.filter(p => p.id !== postId));
+      }
     } catch (err) {
       console.error('Error deleting post:', err);
       setError(err.message);
@@ -158,7 +299,65 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, [syncWithLocalStorage]);
+  }, []);
+
+  const duplicatePost = useCallback(async (postId) => {
+    try {
+      setLoading(true);
+
+      if (isAuthenticated()) {
+        // Use backend API
+        const response = await apiFetch(`/api/posts/${postId}/duplicate`, {
+          method: 'POST'
+        });
+
+        if (response.success) {
+          const newPost = {
+            id: response.data._id,
+            content: response.data.content,
+            platforms: response.data.platforms,
+            status: response.data.status,
+            scheduleDate: response.data.schedule_date,
+            scheduleTime: response.data.schedule_time,
+            engagement: response.data.engagement,
+            createdAt: response.data.created_at,
+            updatedAt: response.data.updated_at
+          };
+
+          setPosts(prev => [newPost, ...prev]);
+          return newPost;
+        }
+      } else {
+        // Fallback to localStorage - duplicate the post locally
+        const existingPost = posts.find(p => p.id === postId);
+        if (!existingPost) {
+          throw new Error('Post not found');
+        }
+
+        const duplicatedPost = {
+          ...existingPost,
+          id: Date.now(),
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          scheduleDate: null,
+          scheduleTime: null
+        };
+
+        const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
+        drafts.push(duplicatedPost);
+        localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
+
+        setPosts(prev => [duplicatedPost, ...prev]);
+        return duplicatedPost;
+      }
+    } catch (err) {
+      console.error('Error duplicating post:', err);
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [posts]);
 
   const getPostsByDateRange = useCallback((startDate, endDate) => {
     return posts.filter(post => {
@@ -175,7 +374,9 @@ export const usePosts = () => {
     createPost,
     updatePost,
     deletePost,
+    duplicatePost,
     getPostsByDateRange,
-    syncWithLocalStorage
+    syncWithLocalStorage,
+    syncWithBackend
   };
 };
