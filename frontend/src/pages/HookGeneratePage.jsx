@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 const sampleHooksData = [
@@ -16,6 +17,7 @@ const platformsList = [
 ];
 
 export default function HookGeneratorPage() {
+  const navigate = useNavigate();
   const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -39,17 +41,21 @@ export default function HookGeneratorPage() {
 
   const generateHooks = async () => {
     if (!topic.trim()) return;
+
     setLoading(true);
     setSelectedHook(null);
+    setHooks([]);
 
     try {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
       
       if (!apiKey) {
-        alert("API key not configured. Please set VITE_OPENAI_API_KEY in your environment.");
         setLoading(false);
+        alert("API key not configured. Please set VITE_OPENAI_API_KEY in your environment variables.");
         return;
       }
+
+      console.log('Using API Key:', apiKey ? 'Configured' : 'Missing');
 
       const prompt = `Generate exactly 5 powerful, engaging social media hooks for the following topic:
 
@@ -63,14 +69,14 @@ Create diverse hooks that use different techniques:
 5. One urgency/time-sensitive hook
 
 Return ONLY a valid JSON array (no additional text) with exactly 5 objects. Each object must have:
-- "text": the hook message (under 150 chars for Twitter compatibility)
+- "text": hook message (under 150 chars for Twitter compatibility)
 - "type": one of ["bold-statement", "personal-story", "question", "statistic", "urgency"]
 - "score": engagement prediction from 75 to 98
 
 Example format:
 [
-  {"text": "Here's the uncomfortable truth about AI that nobody talks about:", "type": "bold-statement", "score": 94},
-  {"text": "I spent 3 years studying AI implementation, and this shocked me the most:", "type": "personal-story", "score": 89}
+  {"text": "Here's uncomfortable truth about AI that nobody talks about:", "type": "bold-statement", "score": 94},
+  {"text": "I spent 3 years studying AI implementation, and this shocked me most:", "type": "personal-story", "score": 89}
 ]
 
 Generate 5 hooks now:`;
@@ -93,7 +99,7 @@ Generate 5 hooks now:`;
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error:", errorText);
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -143,7 +149,7 @@ Create a hook that:
 Return ONLY a valid JSON object (no additional text) with this format:
 {"text": "the hook message", "type": "creative-variant", "score": 85}
 
-Generate the hook now:`;
+Generate hook now:`;
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -161,7 +167,9 @@ Generate the hook now:`;
       });
 
       if (!response.ok) {
-        throw new Error("API error");
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -194,7 +202,31 @@ Generate the hook now:`;
   };
 
   const selectHook = (hook, index) => setSelectedHook({ ...hook, index });
-  const insertHook = () => { if (selectedHook) setSuccessOpen(true); };
+
+  const insertHook = () => {
+    if (selectedHook) {
+      // Stocker le hook sélectionné dans localStorage
+      const hookData = {
+        text: selectedHook.text,
+        platform: selectedPlatforms[0] || 'twitter', // Utiliser la première plateforme sélectionnée
+        score: selectedHook.score,
+        type: selectedHook.type,
+        reason: selectedHook.reason || 'High engagement potential',
+        originalTopic: topic,
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem('selectedHook', JSON.stringify(hookData));
+      
+      // Afficher la notification de succès
+      setSuccessOpen(true);
+      
+      // Navigation automatique après un court délai
+      setTimeout(() => {
+        navigate('/dashboard/CreatePostPage');
+      }, 2000);
+    }
+  };
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-[#0E1116] to-[#1A1F26] text-white">
@@ -301,15 +333,15 @@ Generate the hook now:`;
                       </div>
                       <span className="text-cyan-400 font-semibold">{hook.score}%</span>
                       <button
-  onClick={(e) => {
-    e.stopPropagation(); // empêche la sélection via le parent
-    selectHook(hook, idx); // optionnel, rend le hook visuellement sélectionné
-    insertHook();          // ouvre le modal de succès
-  }}
-  className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
->
-  <i className="fa-solid fa-pen mr-1"></i> Use
-</button>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectHook(hook, idx);
+                          insertHook();
+                        }}
+                        className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
+                      >
+                        <i className="fa-solid fa-pen mr-1"></i> Use
+                      </button>
 
                       <button onClick={(e) => { e.stopPropagation(); regenerateHook(idx); }} className="p-2 bg-black/30 border border-gray-600 rounded-xl text-gray-300 hover:text-white hover:border-cyan-400">
                         <i className="fa-solid fa-refresh"></i>
@@ -355,7 +387,7 @@ Generate the hook now:`;
   <div className="text-center mb-8">
     <button
       id="insert-hook-btn"
-      onClick={() => setSuccessOpen(true)}
+      onClick={insertHook}
       className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all"
     >
       <i className="fa-solid fa-pen mr-2"></i>
