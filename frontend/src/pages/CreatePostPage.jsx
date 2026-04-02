@@ -14,6 +14,7 @@ export default function CreatePostPage() {
   });
   const [variations, setVariations] = useState({});
   const [loading, setLoading] = useState(false);
+  const [hookInfo, setHookInfo] = useState(null);
   const [selectedImages, setSelectedImages] = useState({});
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
@@ -128,6 +129,44 @@ export default function CreatePostPage() {
   }, []);
 
   const navigate = useNavigate();
+
+  // Récupérer le hook depuis localStorage
+  useEffect(() => {
+    const storedHook = localStorage.getItem('selectedHook');
+    if (storedHook) {
+      try {
+        const hookData = JSON.parse(storedHook);
+        setHookInfo(hookData);
+        
+        // Pré-remplir le textarea avec le hook
+        if (ideaRef.current && hookData.text) {
+          ideaRef.current.value = hookData.text;
+          setCharCount(hookData.text.length);
+          
+          // Configurer les plateformes selon le hook
+          const platformMap = {
+            'twitter': 'Twitter',
+            'linkedin': 'LinkedIn', 
+            'medium': 'Medium'
+          };
+          
+          const hookPlatform = platformMap[hookData.platform];
+          if (hookPlatform) {
+            setPublishTo({
+              Twitter: hookPlatform === 'Twitter',
+              LinkedIn: hookPlatform === 'LinkedIn',
+              Medium: hookPlatform === 'Medium',
+            });
+          }
+        }
+        
+        // Nettoyer localStorage après utilisation
+        localStorage.removeItem('selectedHook');
+      } catch (error) {
+        console.error('Erreur lors de la récupération du hook:', error);
+      }
+    }
+  }, []);
 
   // Test API key loading immediately
   useEffect(() => {
@@ -933,6 +972,28 @@ Generate keywords now:`
 
         {/* IDEA INPUT */}
         <div className="p-8">
+          {hookInfo && (
+            <div className="mb-4 p-4 bg-green-400/10 border border-green-400/30 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-400 text-sm font-medium mb-1">
+                    <i className="fa-solid fa-check-circle mr-2"></i>
+                    Hook inséré depuis le HookGenerator
+                  </p>
+                  <p className="text-gray-400 text-xs">
+                    Score: {hookInfo.score}% | Platform: {hookInfo.platform} | Type: {hookInfo.type}
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/dashboard/HookGeneratorPage')}
+                  className="px-3 py-1 bg-cyan-400/20 border border-cyan-400/50 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/30"
+                >
+                  <i className="fa-solid fa-arrow-left mr-1"></i>
+                  Retour
+                </button>
+              </div>
+            </div>
+          )}
           <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white">Your Idea</h2>

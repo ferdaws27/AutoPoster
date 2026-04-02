@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 export default function Layout() {
   const navItems = [
-    ["fa-chart-line", "Dashboard", ""],                 // index route
+    ["fa-chart-line", "Dashboard", ""],
     ["fa-plus", "Create Post", "CreatePostPage"],
     ["fa-calendar", "Scheduler", "scheduling"],
     ["fa-folder", "Posts Library", "PostsLibrary"],
@@ -11,14 +11,13 @@ export default function Layout() {
     ["fa-cog", "Settings", "settings"],
     ["fa-bolt", "Performance Optimizer", "PerformanceOptimizer"],
     ["fa-microphone-alt", "Voice Trainer", "voicetrainer"],
-    ["fa-magic", "Hook Generator", "HookGeneratePage"],
-    ["fa-photo-video", "Media Companion", "mediacompanion"],
+    ["fa-magic", "Hook Generator", "HookGeneratorPage "],
+    ["fa-photo-video", "Media Companion", "MediaCompanion"],
     ["fa-flask", "AB Tester", "ABTesterPage"],
-    ["fa-flask", "Trendradar", "trendradar"],
-    ["fa-clone", "Clone", "clone"],
+    ["fa-flask", "Trendradar", "Trendradar"],
+    ["fa-clone", "Clone", "Clone"],
     ["fa-star", "AI Reputation", "AIReputationPage"],
-    ["fa-star", "QuoteTemplateGenerator", "QuoteTemplateGenerator"],
-
+    ["fa-star", "Quote Template Generator", "QuoteTemplateGenerator"],
   ];
 
 
