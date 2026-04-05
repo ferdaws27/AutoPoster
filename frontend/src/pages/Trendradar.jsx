@@ -202,7 +202,7 @@ export default function TrendRadar() {
                 <p className="text-gray-400 text-sm mb-3">{topic.desc}</p>
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
-                    <i className="fa-brands fa-x-twitter text-blue-400"></i>
+                    <i className="fa-brands fa-twitter text-blue-400"></i>
                     <span className="text-gray-300 text-sm">{topic.twitter} posts</span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -292,7 +292,7 @@ export default function TrendRadar() {
         Platform Insights
       </h2>
       {[
-        { platform: "Twitter", icon: "fa-x-twitter", color: "blue", engagement: "+23%", times: "9AM, 1PM, 5PM EST" },
+        { platform: "Twitter", icon: "fa-twitter", color: "blue", engagement: "+23%", times: "9AM, 1PM, 5PM EST" },
         { platform: "LinkedIn", icon: "fa-linkedin", color: "violet", engagement: "+18%", times: "8AM, 12PM, 6PM EST" },
         { platform: "Medium", icon: "fa-medium", color: "teal", engagement: "+15%", times: "7AM, 2PM, 8PM EST" },
       ].map((p, idx) => (

@@ -275,7 +275,7 @@ export default function Dashboard() {
             <Section title="Select Platforms">
               <Platform
                 label="Twitter/X"
-                icon="fa-x-twitter"
+                icon="fa-twitter"
                 checked={platforms.twitter}
                 onClick={() => setPlatforms({ ...platforms, twitter: !platforms.twitter })}
               />
@@ -501,7 +501,7 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea }) => (
 
         const platformIcon =
           idea.platform === "twitter"
-            ? "fa-x-twitter"
+            ? "fa-twitter"
             : idea.platform === "linkedin"
             ? "fa-linkedin-in"
             : "fa-medium";

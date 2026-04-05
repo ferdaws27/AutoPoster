@@ -440,3 +440,102 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 15px 40px rgba(0, 194, 255, 0.25);
 }
+
+/* ================= AUDIENCE ANALYZER STYLES ================= */
+.persona-card {
+  transition: all 0.4s ease;
+  background: linear-gradient(145deg, rgba(14, 17, 22, 0.9), rgba(26, 31, 38, 0.9));
+  position: relative;
+  overflow: hidden;
+}
+
+.persona-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 24px;
+  padding: 2px;
+  background: linear-gradient(135deg, transparent, rgba(0, 194, 255, 0.2), transparent);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.persona-card:hover::before {
+  opacity: 1;
+}
+
+.persona-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 194, 255, 0.15);
+}
+
+.metric-card {
+  transition: all 0.3s ease;
+  background: linear-gradient(145deg, rgba(14, 17, 22, 0.9), rgba(26, 31, 38, 0.9));
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 194, 255, 0.15);
+}
+
+.insight-item {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.insight-item:hover {
+  background: rgba(0, 194, 255, 0.05);
+  border-color: rgba(0, 194, 255, 0.3);
+}
+
+.persona-glow {
+  animation: personaGlow 4s ease-in-out infinite;
+}
+
+@keyframes personaGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(0, 194, 255, 0.1); }
+  50% { box-shadow: 0 0 30px rgba(123, 97, 255, 0.2); }
+}
+
+.metric-value {
+  background: linear-gradient(135deg, #00C2FF, #7B61FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.interest-tag {
+  background: rgba(0, 194, 255, 0.1);
+  border: 1px solid rgba(0, 194, 255, 0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.interest-tag:hover {
+  background: rgba(0, 194, 255, 0.2);
+  border-color: rgba(0, 194, 255, 0.4);
+}
+
+.pulse-ai {
+  animation: pulseAI 2s ease-in-out infinite;
+}
+
+@keyframes pulseAI {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.data-point {
+  animation: dataPointPulse 3s ease-in-out infinite;
+}
+
+@keyframes dataPointPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}

@@ -298,7 +298,7 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate }) {
           <div className="flex items-center space-x-1">
             {activePlatforms.map(platform => (
               <i key={platform} className={`fa-brands ${
-                platform === 'Twitter' ? 'fa-x-twitter' :
+                platform === 'Twitter' ? 'fa-twitter' :
                 platform === 'LinkedIn' ? 'fa-linkedin' :
                 'fa-medium'
               } text-sm text-gray-400`}></i>

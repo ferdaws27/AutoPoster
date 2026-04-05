@@ -18,6 +18,7 @@ import ABTesterPage from "./pages/ABTesterPage";
 import QuoteTemplateGenerator from "./pages/QuoteTemplateGenerator";
 import AIReputationPage from "./pages/AIReputationPage";
 import OAuthCallback from "./pages/OAuthCallback";
+import AudienceAnalyzer from "./pages/AudienceAnalyzer";
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
             path="QuoteTemplateGenerator"
             element={<QuoteTemplateGenerator />}
           />
+          <Route path="audience-analyzer" element={<AudienceAnalyzer />} />
         </Route>
       </Routes>
     </Router>

@@ -5,7 +5,7 @@ import {
   faPlus, faChevronLeft, faChevronRight, faEdit, faTrash, faTimes, 
   faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { faXTwitter, faLinkedin, faMedium } from '@fortawesome/free-brands-svg-icons';
+import { faTwitter, faLinkedin, faMedium } from '@fortawesome/free-brands-svg-icons';
 import { usePosts } from '../hooks/usePosts';
 
 export default function SchedulingPage() {
@@ -613,7 +613,7 @@ export default function SchedulingPage() {
                             {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
                               <FontAwesomeIcon 
                                 key={platform}
-                                icon={platform === 'Twitter' ? faXTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
+                                icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
                                 className={`${platformTextColors[platform]} text-xs`}
                               />
                             ))}
@@ -743,7 +743,7 @@ export default function SchedulingPage() {
                                 {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
                                   <FontAwesomeIcon 
                                     key={platform}
-                                    icon={platform === 'Twitter' ? faXTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
+                                    icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
                                     className={`${platformTextColors[platform]} text-xs`}
                                   />
                                 ))}

@@ -18,6 +18,7 @@ export default function Layout() {
     ["fa-clone", "Clone", "Clone"],
     ["fa-star", "AI Reputation", "AIReputationPage"],
     ["fa-star", "Quote Template Generator", "QuoteTemplateGenerator"],
+    ["fa-users", "Audience Analyzer", "audience-analyzer"],
   ];
 
 
@@ -69,7 +70,7 @@ const [user, setUser] = useState(null);
             <NavLink
               key={label}
               to={to}
-              end={to === ""}   // مهم للـ Dashboard index باش isActive ما يتلخبطش
+              end={to === ""} 
               className={({ isActive }) =>
                 `w-full flex items-center space-x-3 p-3 rounded-2xl border transition-colors ${
                   isActive

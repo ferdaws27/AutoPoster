@@ -373,7 +373,7 @@ export default function MainTrainingInterface() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <i className="fa-brands fa-x-twitter text-blue-400"></i>
+                      <i className="fa-brands fa-twitter text-blue-400"></i>
                       <span className="text-gray-300">Twitter</span>
                     </div>
                     <span className="text-blue-400 font-medium">Concise & Punchy</span>

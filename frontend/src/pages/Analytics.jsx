@@ -8,7 +8,7 @@ import {
   faArrowUp, faArrowDown, faHeart, faEye, faUsers,
   faImage, faVideo, faAlignLeft, faPoll, faExternalLinkAlt, faChartLine
 } from "@fortawesome/free-solid-svg-icons";
-import { faLinkedin, faMedium, faTwitter, faXTwitter } from "@fortawesome/free-brands-svg-icons";
+import { faLinkedin, faMedium, faTwitter } from "@fortawesome/free-brands-svg-icons";
 
 export default function PostsLibrary() {
   const [activeTab, setActiveTab] = useState("drafts");
@@ -104,7 +104,7 @@ export default function PostsLibrary() {
       title: "How AI is revolutionizing content creation",
       subtitle: "The future of automated posting...",
       img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/63f95caaec-47f7d4f9c4f55d6dc2ac.png",
-      platforms: [faLinkedin, faXTwitter],
+      platforms: [faLinkedin, faTwitter],
       engagement: "2,847",
       growth: "+342% vs avg",
       reach: "45.2K",
@@ -126,7 +126,7 @@ export default function PostsLibrary() {
       title: "The ultimate guide to social media automation",
       subtitle: "Save 10+ hours per week with these tools...",
       img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/3808a2bf47-56d7a0f837f22ed8c61f.png",
-      platforms: [faXTwitter],
+      platforms: [faTwitter],
       engagement: "1,673",
       growth: "+124% vs avg",
       reach: "28.7K",
@@ -148,7 +148,7 @@ export default function PostsLibrary() {
       title: "10 productivity hacks for remote workers",
       subtitle: "Boost your efficiency while working from home...",
       img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/1b4d13dfcb-bab7c9dddbecc8979146.png",
-      platforms: [faXTwitter, faLinkedin],
+      platforms: [faTwitter, faLinkedin],
       engagement: "1,289",
       growth: "+76% vs avg",
       reach: "21.8K",

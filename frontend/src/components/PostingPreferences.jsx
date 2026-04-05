@@ -66,7 +66,7 @@ export default function PostingPreferences() {
           <div className="grid gap-4">
             {/* Twitter */}
             <PlatformTime
-              icon="fa-x-twitter"
+              icon="fa-twitter"
               color="text-blue-400"
               name="Twitter"
               times={["09:00", "15:00", "19:00"]}

@@ -23,7 +23,7 @@ import {
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faXTwitter,
+  faTwitter,
   faLinkedin,
   faMedium,
 } from "@fortawesome/free-brands-svg-icons";
@@ -885,7 +885,7 @@ const schedulePosts = async () => {
                   <FontAwesomeIcon
                     icon={
                       platform === "Twitter"
-                        ? faXTwitter
+                        ? faTwitter
                         : platform === "LinkedIn"
                         ? faLinkedin
                         : faMedium
@@ -984,7 +984,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                       <FontAwesomeIcon
                         icon={
                           platform === "Twitter"
-                            ? faXTwitter
+                            ? faTwitter
                             : platform === "LinkedIn"
                             ? faLinkedin
                             : faMedium

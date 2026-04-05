@@ -47,7 +47,7 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
                     {platformArray.map((p) => {
                       const platformName = typeof p === 'string' ? p.toLowerCase() : p;
                       const platformStyle = platformName === "linkedin" ? "bg-blue-600" : platformName === "twitter" ? "bg-black" : "bg-teal-600";
-                      const iconClass = platformName === "twitter" ? "fa-x-twitter" : platformName === "linkedin" ? "fa-linkedin-in" : "fa-medium";
+                      const iconClass = platformName === "twitter" ? "fa-twitter" : platformName === "linkedin" ? "fa-linkedin-in" : "fa-medium";
 
                       return (
                         <div key={p} className={`w-6 h-6 ${platformStyle} rounded-lg flex items-center justify-center`}>
