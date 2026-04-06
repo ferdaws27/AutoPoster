@@ -124,7 +124,7 @@ function PlatformTime({ icon, color, name, times, lastEmpty }) {
             key={t}
             type="time"
             defaultValue={t}
-            className="input-field rounded-xl px-3 py-2 text-white text-sm bg-black/30"
+            className="input-field rounded-xl px-3 py-2 text-white text-sm bg-black/30 [color-scheme:dark]"
           />
         ))}
         {lastEmpty && <span className="text-gray-500 text-sm">—</span>}

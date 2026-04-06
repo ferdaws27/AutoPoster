@@ -62,16 +62,10 @@ export const usePosts = () => {
   useEffect(() => {
     const initPosts = async () => {
       try {
-        const token = await ensureAuthenticated();
-        if (token) {
-          // ✅ Always fetch from backend for authenticated users
-          // Backend automatically filters posts by user_id from JWT
-          syncWithBackend();
-        } else {
-          console.warn('No authentication token available');
-          setError('Authentication required. Please log in.');
-          setPosts([]);
-        }
+        // Try to authenticate, but don't fail if it doesn't work
+        await ensureAuthenticated();
+        // Fetch posts regardless (backend handles guest users now)
+        syncWithBackend();
       } catch (err) {
         console.error('Init error:', err);
         setPosts([]);

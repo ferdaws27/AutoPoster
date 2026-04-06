@@ -947,7 +947,7 @@ export default function SchedulingPage() {
                       type="date" 
                       value={newPost.date}
                       onChange={(e) => setNewPost(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
                     />
                   </div>
                   <div>
@@ -956,7 +956,7 @@ export default function SchedulingPage() {
                       type="time" 
                       value={newPost.time}
                       onChange={(e) => setNewPost(prev => ({ ...prev, time: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -1077,7 +1077,7 @@ export default function SchedulingPage() {
                       type="date" 
                       value={editingPost.date}
                       onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
                     />
                   </div>
                   <div>
@@ -1086,7 +1086,7 @@ export default function SchedulingPage() {
                       type="time" 
                       value={editingPost.time}
                       onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
                     />
                   </div>
                 </div>

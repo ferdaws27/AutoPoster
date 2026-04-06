@@ -1,9 +1,42 @@
 export default function UpcomingPosts({ posts = [], onPublish }) {
+  // Format date in a logical and dynamic way
+  const formatScheduleDate = (scheduleDate, scheduleTime) => {
+    if (!scheduleDate || !scheduleTime) return "TBD";
+    
+    try {
+      const postDate = new Date(`${scheduleDate}T${scheduleTime}`);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const postDateOnly = new Date(postDate.getFullYear(), postDate.getMonth(), postDate.getDate());
+      
+      let dateStr = "";
+      const timePart = postDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+      
+      if (postDateOnly.getTime() === today.getTime()) {
+        dateStr = `Today at ${timePart}`;
+      } else if (postDateOnly.getTime() === tomorrow.getTime()) {
+        dateStr = `Tomorrow at ${timePart}`;
+      } else {
+        const daysDiff = Math.floor((postDateOnly - today) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 0 && daysDiff <= 7) {
+          dateStr = `${postDate.toLocaleDateString("en-US", { weekday: "short" })} at ${timePart}`;
+        } else {
+          dateStr = `${postDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${timePart}`;
+        }
+      }
+      return dateStr;
+    } catch (e) {
+      return "Invalid date";
+    }
+  };
+
   // Show all posts passed in, sorted by date, limited to 5
   const upcomingPosts = (posts || [])
     .sort((a, b) => {
-      const dateA = a.scheduleDate ? new Date(`${a.scheduleDate} ${a.scheduleTime || '00:00'}`) : new Date(a.createdAt || 0);
-      const dateB = b.scheduleDate ? new Date(`${b.scheduleDate} ${b.scheduleTime || '00:00'}`) : new Date(b.createdAt || 0);
+      const dateA = a.scheduleDate ? new Date(`${a.scheduleDate}T${a.scheduleTime || '00:00'}`) : new Date(a.createdAt || 0);
+      const dateB = b.scheduleDate ? new Date(`${b.scheduleDate}T${b.scheduleTime || '00:00'}`) : new Date(b.createdAt || 0);
       return dateA - dateB;
     })
     .slice(0, 5); // Show only next 5 posts
@@ -20,12 +53,9 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
           <p className="text-gray-400 text-sm">No upcoming posts yet</p>
         ) : (
           upcomingPosts.map((post) => {
-            // Handle both scheduledAt and scheduleDate/scheduleTime formats
-            const formattedTime = post.scheduledAt
-              ? new Date(post.scheduledAt).toLocaleString()
-              : (post.scheduleDate && post.scheduleTime)
-              ? new Date(`${post.scheduleDate} ${post.scheduleTime}`).toLocaleString()
-              : "TBD";
+            // Use the new dynamic date formatter
+            const formattedTime = formatScheduleDate(post.scheduleDate, post.scheduleTime) || 
+                                  (post.scheduledAt ? new Date(post.scheduledAt).toLocaleString() : "TBD");
 
             const statusStyle =
               post.status === "scheduled"

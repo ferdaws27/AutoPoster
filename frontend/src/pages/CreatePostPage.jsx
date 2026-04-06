@@ -731,8 +731,8 @@ const schedulePosts = async () => {
       content: idea,
       platforms: publishTo,
       status: "scheduled",
-      schedule_date: scheduleDate,   // ✅ FIX
-      schedule_time: scheduleTime,   // ✅ FIX
+      scheduleDate: scheduleDate,
+      scheduleTime: scheduleTime,
       engagement: {},
     });
 
@@ -1329,7 +1329,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                     type="date"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none"
+                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
                   />
                 </div>
                 <div>
@@ -1338,7 +1338,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                     type="time"
                     value={scheduleTime}
                     onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none"
+                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
                   />
                 </div>
               </div>
