@@ -1,4 +1,4 @@
-export default function UpcomingPosts({ posts = [], onPublish }) {
+export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) {
   // Format date in a logical and dynamic way
   const formatScheduleDate = (scheduleDate, scheduleTime) => {
     if (!scheduleDate || !scheduleTime) return "TBD";
@@ -120,8 +120,11 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
       </div>
 
       <div className="mt-6 pt-4 border-t border-gray-700/50">
-        <button className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 transition-all text-sm font-medium">
-          <i className="fa-solid fa-plus mr-2"></i>
+        <button 
+          onClick={onScheduleNew}
+          className="w-full p-4 rounded-2xl border-2 border-cyan-400/40 bg-cyan-400/5 text-cyan-400 hover:bg-cyan-400/15 hover:border-cyan-400/70 transition-all text-sm font-semibold flex items-center justify-center gap-2"
+        >
+          <i className="fa-solid fa-calendar-plus"></i>
           Schedule New Post
         </button>
       </div>

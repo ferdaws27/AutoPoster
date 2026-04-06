@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import UpcomingPosts from "../components/UpcomingPosts";
 import useDashboardStore from "../store/useDashboardStore";
 import { usePosts } from "../hooks/usePosts";
@@ -12,6 +13,7 @@ const COLORS = {
 
 /* ================= DASHBOARD ================= */
 export default function Dashboard() {
+  const navigate = useNavigate();
   const {
     content,
     user,
@@ -174,6 +176,10 @@ export default function Dashboard() {
     console.log("Post published:", id);
   };
 
+  const handleScheduleNew = () => {
+    navigate("/dashboard/scheduling");
+  };
+
   const handleRefreshAIIdeas = () => {
     refreshAIIdeas();
   };
@@ -225,7 +231,7 @@ export default function Dashboard() {
         </section>
 
         <section className="grid grid-cols-2 gap-8">
-          <UpcomingPosts posts={scheduledPosts} onPublish={handleMarkPublished} />
+          <UpcomingPosts posts={scheduledPosts} onPublish={handleMarkPublished} onScheduleNew={handleScheduleNew} />
           <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} />
         </section>
 
@@ -294,8 +300,9 @@ export default function Dashboard() {
       </main>
 
       <button
-        onClick={() => setShowCreateModal(true)}
-        className="fixed bottom-8 right-8 w-16 h-16 rounded-2xl gradient-accent pulse-glow z-50"
+        onClick={() => navigate("/dashboard/CreatePostPage")}
+        className="fixed bottom-8 right-8 w-16 h-16 rounded-2xl gradient-accent pulse-glow z-50 flex items-center justify-center hover:scale-110 transition-transform"
+        title="Create New Post"
       >
         <i className="fa-solid fa-plus text-xl"></i>
       </button>
