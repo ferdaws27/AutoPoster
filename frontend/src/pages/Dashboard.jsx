@@ -39,12 +39,46 @@ export default function Dashboard() {
   const {
     posts,
     stats,
-    loading
+    loading,
+    error,
+    syncWithBackend
   } = usePosts();
+
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  // Add a manual refresh handler
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manually refreshing posts...');
+    await syncWithBackend();
+  };
+
+  if (error) {
+    return (
+      <div className="gradient-bg min-h-screen text-white m-0 p-0">
+        <main className="flex-1 m-0 px-8 py-8 w-full">
+          <div className="glass-effect rounded-3xl p-8 border border-red-400/30 mb-8">
+            <div className="flex items-start space-x-4">
+              <div className="text-red-400 text-2xl">⚠️</div>
+              <div>
+                <h3 className="text-xl font-bold text-red-400 mb-2">Error Loading Posts</h3>
+                <p className="text-gray-300 mb-4">{error}</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const normalizedPosts = (posts || []).map((p) => ({
     ...p,
@@ -52,7 +86,14 @@ export default function Dashboard() {
     scheduleTime: p.scheduleTime || p.schedule_time || null,
   }));
 
-  const scheduledPosts = normalizedPosts.filter((p) => p.status === "scheduled");
+  // Show all posts (scheduled, draft, and posted) sorted by date
+  const allPosts = normalizedPosts.sort((a, b) => {
+    const dateA = a.scheduleDate ? new Date(`${a.scheduleDate} ${a.scheduleTime || '00:00'}`) : new Date(a.createdAt || 0);
+    const dateB = b.scheduleDate ? new Date(`${b.scheduleDate} ${b.scheduleTime || '00:00'}`) : new Date(b.createdAt || 0);
+    return dateA - dateB;
+  });
+
+  const scheduledPosts = allPosts; // Show all posts in upcoming
 
   const totalPosts = normalizedPosts.length;
   const scheduledCount = stats.scheduled || 0;
@@ -307,31 +348,67 @@ export default function Dashboard() {
 
             <div className="flex gap-4 mt-6">
               <button
-                className="flex-1 p-4 rounded-2xl border border-gray-600"
-                onClick={() => {
+                className="flex-1 p-4 rounded-2xl border border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSaving || !content.trim()}
+                onClick={async () => {
                   if (!content.trim()) return;
-
-                  createDraft(content, Object.keys(platforms).filter((p) => platforms[p]));
-
-                  setContent("");
-                  setShowCreateModal(false);
+                  
+                  try {
+                    setIsSaving(true);
+                    await createDraft(content, Object.keys(platforms).filter((p) => platforms[p]));
+                    
+                    // Refresh posts from backend
+                    setTimeout(() => syncWithBackend(), 500);
+                    
+                    setContent("");
+                    setShowCreateModal(false);
+                  } catch (err) {
+                    console.error('Error creating draft:', err);
+                  } finally {
+                    setIsSaving(false);
+                  }
                 }}
               >
-                Save Draft
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Draft'
+                )}
               </button>
 
               <button
-                className="flex-1 p-4 rounded-2xl gradient-accent"
-                onClick={() => {
+                className="flex-1 p-4 rounded-2xl gradient-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSaving || !content.trim()}
+                onClick={async () => {
                   if (!content.trim()) return;
-
-                  createScheduled(content, Object.keys(platforms).filter((p) => platforms[p]));
-
-                  setContent("");
-                  setShowCreateModal(false);
+                  
+                  try {
+                    setIsSaving(true);
+                    await createScheduled(content, Object.keys(platforms).filter((p) => platforms[p]));
+                    
+                    // Refresh posts from backend
+                    setTimeout(() => syncWithBackend(), 500);
+                    
+                    setContent("");
+                    setShowCreateModal(false);
+                  } catch (err) {
+                    console.error('Error scheduling post:', err);
+                  } finally {
+                    setIsSaving(false);
+                  }
                 }}
               >
-                Generate & Preview
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Generate & Preview'
+                )}
               </button>
             </div>
           </div>

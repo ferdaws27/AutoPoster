@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePosts } from "../hooks/usePosts";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHistory,
@@ -29,6 +30,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 
 export default function CreatePostPage() {
+  const { createPost } = usePosts();
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
@@ -47,6 +49,7 @@ export default function CreatePostPage() {
   const [draftName, setDraftName] = useState("");
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState([
     {
       type: "suggestion",
@@ -683,89 +686,68 @@ Return valid JSON array only like:
 
 const saveDraft = async () => {
   const idea = ideaRef.current.value.trim();
+
   if (!idea) return alert("Please enter an idea before saving");
   if (!draftName.trim()) return alert("Please enter a draft name");
 
   try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("http://localhost:5000/api/posts/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({
-        content: idea,
-        status: "draft",
-        platforms: publishTo,
-        engagement: {}
-      })
+    await createPost({
+      idea,
+      content: idea,
+      platforms: publishTo,
+      status: "draft",
+      engagement: {}
     });
 
-    const data = await res.json();
-    console.log("POST RESPONSE:", data);
-
-    if (!res.ok) {
-      throw new Error(data.error || data.msg || "Erreur lors de l'enregistrement du post");
-    }
-
-    alert("Draft saved in MongoDB successfully!");
+    alert("Draft saved successfully!");
     setShowSaveDraftModal(false);
     setDraftName("");
+
+    await refreshStats(); // update stats
   } catch (err) {
     console.error("SAVE DRAFT ERROR:", err);
     alert(err.message);
   }
 };
+
 const schedulePosts = async () => {
   const idea = ideaRef.current.value.trim();
 
   if (!idea) return alert("Please enter an idea first");
-  if (!scheduleDate || !scheduleTime) {
-    return alert("Please select both date and time for scheduling");
-  }
+  if (!scheduleDate || !scheduleTime)
+    return alert("Please select both date and time");
 
-  const scheduledPlatforms = Object.keys(publishTo).filter(p => publishTo[p]);
+  const scheduledPlatforms = Object.keys(publishTo).filter(
+    (p) => publishTo[p]
+  );
+
   if (scheduledPlatforms.length === 0) {
     return alert("Please select at least one platform to schedule");
   }
 
   try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("http://localhost:5000/api/posts/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({
-        content: idea,
-        status: "scheduled",
-        platforms: publishTo,
-        schedule_date: scheduleDate,
-        schedule_time: scheduleTime,
-        engagement: {}
-      })
+    await createPost({
+      idea,
+      content: idea,
+      platforms: publishTo,
+      status: "scheduled",
+      schedule_date: scheduleDate,   // ✅ FIX
+      schedule_time: scheduleTime,   // ✅ FIX
+      engagement: {},
     });
 
-    const data = await res.json();
-    console.log("SCHEDULE RESPONSE:", data);
-
-    if (!res.ok) {
-      throw new Error(data.error || data.msg || "Erreur lors de l'enregistrement du post");
-    }
-
-    alert("Post scheduled in MongoDB successfully!");
+    alert("Post scheduled successfully!");
     setShowScheduleModal(false);
     setScheduleDate("");
     setScheduleTime("");
+
+    await refreshStats();
   } catch (err) {
     console.error("SCHEDULE ERROR:", err);
     alert(err.message);
   }
 };
+
   const getMoreTips = async () => {
     const idea = ideaRef.current.value.trim();
     if (!idea) return alert("Enter your idea first");
@@ -848,7 +830,7 @@ const schedulePosts = async () => {
                 History
               </button>
               <button
-                onClick={getMoreTips}
+                onClick={() => setShowAiAssistant(true)}
                 className="px-4 py-2 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"
               >
                 <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
@@ -1207,69 +1189,79 @@ The AI will adapt your content for each platform's unique style and audience.`}
           </div>
         </div>
 
-        <div className="fixed right-8 top-1/2 transform -translate-y-1/2 w-80 z-30 hidden xl:block">
-          <div className="card-bg rounded-3xl p-6 border border-gray-700 glow-border">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center mr-3">
-                  <FontAwesomeIcon icon={faRobot} className="text-white" />
-                </div>
-                <h3 className="text-white font-semibold">AI Assistant</h3>
-              </div>
-              {loading && (
-                <FontAwesomeIcon icon={faSpinner} className="text-cyan-400 animate-spin" />
-              )}
-            </div>
-
-            <div className="space-y-4">
-              {loading ? (
-                <div className="p-4 bg-gray-800/50 rounded-2xl text-center">
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    className="text-cyan-400 animate-spin text-xl mb-2"
-                  />
-                  <p className="text-gray-400 text-sm">
-                    Generating AI suggestions...
-                  </p>
-                </div>
-              ) : aiSuggestions.length > 0 ? (
-                aiSuggestions.map((suggestion, index) => (
-                  <div key={index} className="p-4 bg-gray-800/50 rounded-2xl">
-                    <div
-                      className={`text-sm font-medium mb-2 ${
-                        suggestion.type === "suggestion"
-                          ? "text-cyan-400"
-                          : suggestion.type === "optimization"
-                          ? "text-violet-400"
-                          : "text-green-400"
-                      }`}
-                    >
-                      {suggestion.icon} {suggestion.title}
-                    </div>
-                    <div className="text-gray-300 text-sm">
-                      {suggestion.content}
-                    </div>
+        {showAiAssistant && (
+          <div className="fixed right-8 top-1/2 transform -translate-y-1/2 w-80 z-30 hidden xl:block">
+            <div className="card-bg rounded-3xl p-6 border border-gray-700 glow-border">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center mr-3">
+                    <FontAwesomeIcon icon={faRobot} className="text-white" />
                   </div>
-                ))
-              ) : (
-                <div className="p-4 bg-gray-800/50 rounded-2xl text-center">
-                  <p className="text-gray-400 text-sm">
-                    Enter an idea and click "Get More Tips" for personalized suggestions
-                  </p>
+                  <h3 className="text-white font-semibold">AI Assistant</h3>
                 </div>
-              )}
-            </div>
+                <div className="flex items-center space-x-2">
+                  {loading && (
+                    <FontAwesomeIcon icon={faSpinner} className="text-cyan-400 animate-spin" />
+                  )}
+                  <button
+                    onClick={() => setShowAiAssistant(false)}
+                    className="p-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-all"
+                  >
+                    <FontAwesomeIcon icon={faTimes} className="text-sm" />
+                  </button>
+                </div>
+              </div>
 
-            <button
-              onClick={getMoreTips}
-              disabled={loading}
-              className="w-full mt-4 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
-              Get More Tips
-            </button>
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="p-4 bg-gray-800/50 rounded-2xl text-center">
+                    <FontAwesomeIcon
+                      icon={faSpinner}
+                      className="text-cyan-400 animate-spin text-xl mb-2"
+                    />
+                    <p className="text-gray-400 text-sm">
+                      Generating AI suggestions...
+                    </p>
+                  </div>
+                ) : aiSuggestions.length > 0 ? (
+                  aiSuggestions.map((suggestion, index) => (
+                    <div key={index} className="p-4 bg-gray-800/50 rounded-2xl">
+                      <div
+                        className={`text-sm font-medium mb-2 ${
+                          suggestion.type === "suggestion"
+                            ? "text-cyan-400"
+                            : suggestion.type === "optimization"
+                            ? "text-violet-400"
+                            : "text-green-400"
+                        }`}
+                      >
+                        {suggestion.icon} {suggestion.title}
+                      </div>
+                      <div className="text-gray-300 text-sm">
+                        {suggestion.content}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-gray-800/50 rounded-2xl text-center">
+                    <p className="text-gray-400 text-sm">
+                      Enter an idea and click "Get More Tips" for personalized suggestions
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={getMoreTips}
+                disabled={loading}
+                className="w-full mt-4 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
+                Get More Tips
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="px-8 pb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

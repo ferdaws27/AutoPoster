@@ -6,9 +6,13 @@ export async function apiFetch(path, options = {}) {
   const token = localStorage.getItem("token");
 
   const headers = {
-    "Content-Type": "application/json",
     ...(options.headers || {}),
   };
+
+  // Only add Content-Type for requests with a body (POST, PUT, PATCH)
+  if (options.body || options.method?.toUpperCase() === 'POST' || options.method?.toUpperCase() === 'PUT' || options.method?.toUpperCase() === 'PATCH') {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) headers.Authorization = `Bearer ${token}`;
 

@@ -172,42 +172,97 @@ const useDashboardStore = create((set, get) => ({
     }),
 
   // action to add a generated post from ai idea or input
-  createDraft: (content, platforms) =>
-    set((state) => ({
-      posts: [
-        {
-          id: Date.now(),
-          time: "Draft",
-          title: content.slice(0, 50),
-          desc: "Saved as draft",
-          status: "Draft",
-          statusColor: "cyan",
-          platforms: platforms,
-          scheduledAt: null,
-        },
-        ...state.posts,
-      ],
-    })),
+  createDraft: async (content, platforms) => {
+    try {
+      const platformsObj = Array.isArray(platforms) 
+        ? platforms.reduce((acc, p) => ({ ...acc, [p]: true }), {})
+        : platforms || {};
 
-  createScheduled: (content, platforms) =>
-    set((state) => {
+      // Create via backend API
+      const response = await apiFetch('/api/posts/', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: content,
+          platforms: platformsObj,
+          status: 'draft'
+        })
+      });
+
+      if (response.success && response.data) {
+        const newPost = {
+          id: response.data._id,
+          title: content.slice(0, 50),
+          desc: response.data.content,
+          content: response.data.content,
+          status: 'draft',
+          statusColor: 'cyan',
+          platforms: platformsObj,
+          scheduledAt: null,
+          createdAt: response.data.created_at,
+          idea: response.data.content
+        };
+
+        set((state) => ({
+          posts: [newPost, ...state.posts],
+          aiSuggestion: '✅ Draft saved successfully!'
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to create draft');
+      }
+    } catch (error) {
+      console.error('Failed to create draft:', error);
+      set({ aiSuggestion: `❌ Error: ${error.message}` });
+      throw error;
+    }
+  },
+
+  createScheduled: async (content, platforms) => {
+    try {
+      const platformsObj = Array.isArray(platforms) 
+        ? platforms.reduce((acc, p) => ({ ...acc, [p]: true }), {})
+        : platforms || {};
+
       const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      return {
-        posts: [
-          {
-            id: Date.now(),
-            time: "Scheduled",
-            title: content.slice(0, 50),
-            desc: "Post scheduled",
-            status: "Scheduled",
-            statusColor: "green",
-            platforms: platforms,
-            scheduledAt,
-          },
-          ...state.posts,
-        ],
-      };
-    }),
+
+      // Create via backend API
+      const response = await apiFetch('/api/posts/', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: content,
+          platforms: platformsObj,
+          status: 'scheduled',
+          schedule_date: scheduledAt.split('T')[0],
+          schedule_time: scheduledAt.split('T')[1].slice(0, 5)
+        })
+      });
+
+      if (response.success && response.data) {
+        const newPost = {
+          id: response.data._id,
+          title: content.slice(0, 50),
+          desc: response.data.content,
+          content: response.data.content,
+          status: 'scheduled',
+          statusColor: 'green',
+          platforms: platformsObj,
+          scheduledAt,
+          createdAt: response.data.created_at,
+          idea: response.data.content
+        };
+
+        set((state) => ({
+          posts: [newPost, ...state.posts],
+          aiSuggestion: '✅ Post scheduled successfully!'
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to schedule post');
+      }
+    } catch (error) {
+      console.error('Failed to schedule post:', error);
+      set({ aiSuggestion: `❌ Error: ${error.message}` });
+      throw error;
+    }
+  },
 }));
 
 export default useDashboardStore;

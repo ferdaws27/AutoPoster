@@ -5,7 +5,7 @@ import {
   faPlus, faChevronLeft, faChevronRight, faEdit, faTrash, faTimes, 
   faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { faTwitter, faLinkedin, faMedium } from '@fortawesome/free-brands-svg-icons';
+import { faTwitter, faLinkedin, faMedium, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import { usePosts } from '../hooks/usePosts';
 
 export default function SchedulingPage() {
@@ -15,11 +15,15 @@ export default function SchedulingPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showErrorToast, setShowErrorToast] = useState(false);
   const [successMessage, setSuccessMessage] = useState({ title: '', description: '' });
+  const [errorMessage, setErrorMessage] = useState({ title: '', description: '' });
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [filterTab, setFilterTab] = useState('all');
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newPost, setNewPost] = useState({
     content: '',
     platforms: { Twitter: false, LinkedIn: true, Medium: false },
@@ -47,6 +51,18 @@ export default function SchedulingPage() {
     getPostsByDateRange,
     syncWithLocalStorage 
   } = usePosts();
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      setErrorMessage({
+        title: '⚠️ Error Loading Posts',
+        description: error
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    }
+  }, [error]);
 
   // Generate days for current view
   const generateViewDays = () => {
@@ -175,18 +191,33 @@ export default function SchedulingPage() {
   const handleSchedulePost = async () => {
     // Validate form
     if (!newPost.content.trim()) {
-      alert('Please enter post content');
+      setErrorMessage({
+        title: '⚠️ Missing Content',
+        description: 'Please enter post content'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
       return;
     }
     
     if (!newPost.date || !newPost.time) {
-      alert('Please select both date and time');
+      setErrorMessage({
+        title: '⚠️ Missing Schedule',
+        description: 'Please select both date and time'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
       return;
     }
 
     const selectedPlatformsList = Object.keys(newPost.platforms).filter(p => newPost.platforms[p]);
     if (selectedPlatformsList.length === 0) {
-      alert('Please select at least one platform');
+      setErrorMessage({
+        title: '⚠️ No Platform Selected',
+        description: 'Please select at least one platform'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
       return;
     }
 
@@ -195,6 +226,7 @@ export default function SchedulingPage() {
     console.log('Selected platforms:', selectedPlatformsList);
 
     try {
+      setIsSaving(true);
       // Create scheduled posts for each selected platform using the hook
       const scheduledPosts = await Promise.all(
         selectedPlatformsList.map(platform => 
@@ -229,25 +261,44 @@ export default function SchedulingPage() {
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
       console.error('Failed to schedule post:', error);
-      alert('Failed to schedule post. Please try again.');
+      setErrorMessage({
+        title: '❌ Failed to Schedule',
+        description: error.message || 'Could not create the post. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Handle save as draft
+  // Handle save draft
   const handleSaveDraft = async () => {
     // Validate form
     if (!newPost.content.trim()) {
-      alert('Please enter post content');
+      setErrorMessage({
+        title: '⚠️ Missing Content',
+        description: 'Please enter post content'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
       return;
     }
 
     const selectedPlatformsList = Object.keys(newPost.platforms).filter(p => newPost.platforms[p]);
     if (selectedPlatformsList.length === 0) {
-      alert('Please select at least one platform');
+      setErrorMessage({
+        title: '⚠️ No Platform Selected',
+        description: 'Please select at least one platform'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
       return;
     }
 
     try {
+      setIsSaving(true);
       // Create draft posts for each selected platform using the hook
       const draftPosts = await Promise.all(
         selectedPlatformsList.map(platform => 
@@ -281,12 +332,21 @@ export default function SchedulingPage() {
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
       console.error('Failed to save draft:', error);
-      alert('Failed to save draft. Please try again.');
+      setErrorMessage({
+        title: '❌ Failed to Save Draft',
+        description: error.message || 'Could not save the draft. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Handle edit post
   const handleEditPost = (post) => {
+    if (!post || post.status === 'posted') return; // Don't allow editing posted content
+    
     setSelectedPost(post);
     setEditingPost({
       content: post.idea || post.content || '',
@@ -314,7 +374,13 @@ export default function SchedulingPage() {
       return;
     }
 
+    setIsSaving(true);
     try {
+      console.log('Saving edited post:', {
+        postId: selectedPost.id,
+        editingPost
+      });
+
       // Update post using the hook
       await updatePost(selectedPost.id, {
         idea: editingPost.content,
@@ -328,13 +394,23 @@ export default function SchedulingPage() {
       // Update UI
       setShowEditModal(false);
       setSelectedPost(null);
+      setEditingPost({
+        content: '',
+        platforms: { Twitter: false, LinkedIn: false, Medium: false },
+        date: '',
+        time: '',
+        selectedImage: 0
+      });
       setSuccessMessage({ title: 'Post updated successfully', description: 'Your changes have been saved' });
       setShowSuccessToast(true);
       
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
       console.error('Failed to update post:', error);
-      alert('Failed to update post. Please try again.');
+      const errorMessage = error?.message || 'Failed to update post. Please try again.';
+      alert(errorMessage);
+    } finally {
+      setIsSaving(false);
     }
   };
   const calculateEngagement = (post) => {
@@ -354,6 +430,7 @@ export default function SchedulingPage() {
   const handleDeletePost = async () => {
     if (!selectedPost) return;
 
+    setIsDeleting(true);
     try {
       await deletePost(selectedPost.id);
       setShowDeleteModal(false);
@@ -364,6 +441,8 @@ export default function SchedulingPage() {
     } catch (error) {
       console.error('Failed to delete post:', error);
       alert('Failed to delete post. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -454,50 +533,27 @@ export default function SchedulingPage() {
   };
 
   // Handle sync all
-  const handleSyncAll = async () => {
-    setIsSyncing(true);
-    
-    try {
-      // Load fresh data from localStorage
-      const scheduledPosts = JSON.parse(localStorage.getItem('autoposter_scheduled') || '[]');
-      const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
-      const published = JSON.parse(localStorage.getItem('autoposter_published') || '[]');
-      
-      // Combine and format all posts
-      const allPosts = [
-        ...scheduledPosts.map(post => ({ ...post, status: 'scheduled' })),
-        ...drafts.map(post => ({ ...post, status: 'draft' })),
-        ...published.map(post => ({ ...post, status: 'posted', engagement: post.engagement || { likes: 0, shares: 0, comments: 0 } }))
-      ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+ const handleSyncAll = async () => {
+  setIsSyncing(true);
+  try {
+    // Utiliser la fonction du hook au lieu de setPosts
+    syncWithLocalStorage();
 
-      // Update state
-      setPosts(allPosts);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Simulate API sync (in real app, this would sync with server)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Show success message
-      setSuccessMessage({ 
-        title: 'Sync completed successfully', 
-        description: `Synchronized ${allPosts.length} posts from all platforms` 
-      });
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-
-      console.log('Sync completed:', {
-        scheduled: scheduledPosts.length,
-        drafts: drafts.length,
-        published: published.length,
-        total: allPosts.length
-      });
-   
-    } catch (error) {
-      console.error('Sync failed:', error);
-      alert('Sync failed. Please try again.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+    setSuccessMessage({
+      title: 'Sync completed successfully',
+      description: `Synchronized ${posts.length} posts`
+    });
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  } catch (error) {
+    console.error('Sync failed:', error);
+    alert('Sync failed. Please try again.');
+  } finally {
+    setIsSyncing(false);
+  }
+};
   const platformColors = {
     Twitter: 'bg-blue-400',
     LinkedIn: 'bg-violet-400', 
@@ -544,7 +600,10 @@ export default function SchedulingPage() {
             
             {/* Add Schedule Button */}
             <button 
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                console.log('Add Schedule clicked, showing modal');
+                setShowAddModal(true);
+              }}
               className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
             >
               <FontAwesomeIcon icon={faPlus} />
@@ -580,6 +639,22 @@ export default function SchedulingPage() {
 
               {/* Posts List */}
               <div className="space-y-4">
+                {loading && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-8 h-8 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin mb-3"></div>
+                    <p className="text-gray-400 text-sm">Loading your posts...</p>
+                  </div>
+                )}
+                
+                {!loading && filteredPosts.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-600 text-3xl mb-3" />
+                    <p className="text-gray-400 text-sm">
+                      {posts.length === 0 ? 'No posts yet. Create one to get started!' : 'No posts match this filter'}
+                    </p>
+                  </div>
+                )}
+                
                 {filteredPosts.map((post, index) => (
                   <div 
                     key={post.id}
@@ -629,7 +704,13 @@ export default function SchedulingPage() {
                                   e.stopPropagation();
                                   handleEditPost(post);
                                 }}
-                                className="text-gray-400 hover:text-cyan-400 transition-colors"
+                                disabled={isSaving || post.status === 'posted'}
+                                title={post.status === 'posted' ? 'Cannot edit posted content' : 'Edit post'}
+                                className={`transition-all duration-200 ${
+                                  post.status === 'posted' 
+                                    ? 'text-gray-600 cursor-not-allowed' 
+                                    : 'text-gray-400 hover:text-cyan-400 hover:scale-110 active:scale-95'
+                                }`}
                               >
                                 <FontAwesomeIcon icon={faEdit} className="text-xs" />
                               </button>
@@ -639,7 +720,13 @@ export default function SchedulingPage() {
                                   setSelectedPost(post);
                                   setShowDeleteModal(true);
                                 }}
-                                className="text-gray-400 hover:text-red-400 transition-colors"
+                                disabled={isDeleting || post.status === 'posted'}
+                                title={post.status === 'posted' ? 'Cannot delete posted content' : 'Delete post'}
+                                className={`transition-all duration-200 ${
+                                  post.status === 'posted' 
+                                    ? 'text-gray-600 cursor-not-allowed' 
+                                    : 'text-gray-400 hover:text-red-400 hover:scale-110 active:scale-95'
+                                }`}
                               >
                                 <FontAwesomeIcon icon={faTrash} className="text-xs" />
                               </button>
@@ -1039,16 +1126,35 @@ export default function SchedulingPage() {
                 {/* Action Buttons */}
                 <div className="flex space-x-4">
                   <button 
-                    onClick={() => setShowEditModal(false)}
-                    className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setSelectedPost(null);
+                      setEditingPost({
+                        content: '',
+                        platforms: { Twitter: false, LinkedIn: false, Medium: false },
+                        date: '',
+                        time: '',
+                        selectedImage: 0
+                      });
+                    }}
+                    disabled={isSaving}
+                    className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={handleSaveEdit}
-                    className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity"
+                    disabled={isSaving}
+                    className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
-                    Save Changes
+                    {isSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </button>
                 </div>
               </div>
@@ -1068,16 +1174,28 @@ export default function SchedulingPage() {
                 <p className="text-gray-400 mb-6">Are you sure you want to delete this scheduled post? This action cannot be undone.</p>
                 <div className="flex space-x-4">
                   <button 
-                    onClick={() => setShowDeleteModal(false)}
-                    className="flex-1 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white transition-colors"
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setSelectedPost(null);
+                    }}
+                    disabled={isDeleting}
+                    className="flex-1 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={handleDeletePost}
-                    className="flex-1 p-3 rounded-2xl bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    disabled={isDeleting}
+                    className="flex-1 p-3 rounded-2xl bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
-                    Delete
+                    {isDeleting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      'Delete'
+                    )}
                   </button>
                 </div>
               </div>
@@ -1098,6 +1216,25 @@ export default function SchedulingPage() {
                 </div>
                 <div className="text-gray-400 text-xs">
                   {successMessage.description}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {showErrorToast && (
+          <div className="fixed top-8 right-8 z-60 transform transition-transform duration-300">
+            <div className="glass-effect rounded-2xl p-4 border border-red-400/30 flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-red-400/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-400" />
+              </div>
+              <div>
+                <div className="text-white font-medium text-sm">
+                  {errorMessage.title}
+                </div>
+                <div className="text-gray-400 text-xs">
+                  {errorMessage.description}
                 </div>
               </div>
             </div>

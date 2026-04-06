@@ -1,4 +1,13 @@
 export default function UpcomingPosts({ posts = [], onPublish }) {
+  // Show all posts passed in, sorted by date, limited to 5
+  const upcomingPosts = (posts || [])
+    .sort((a, b) => {
+      const dateA = a.scheduleDate ? new Date(`${a.scheduleDate} ${a.scheduleTime || '00:00'}`) : new Date(a.createdAt || 0);
+      const dateB = b.scheduleDate ? new Date(`${b.scheduleDate} ${b.scheduleTime || '00:00'}`) : new Date(b.createdAt || 0);
+      return dateA - dateB;
+    })
+    .slice(0, 5); // Show only next 5 posts
+
   return (
     <div id="upcoming-posts-section" className="glass-effect rounded-3xl p-6 glow-card" style={{ opacity: 1, transform: "translateY(0px)", transition: "0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}>
       <div className="flex items-center justify-between mb-6">
@@ -7,16 +16,16 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
       </div>
 
       <div className="space-y-4">
-        {!posts || posts.length === 0 ? (
+        {!upcomingPosts || upcomingPosts.length === 0 ? (
           <p className="text-gray-400 text-sm">No upcoming posts yet</p>
         ) : (
-          posts.map((post) => {
+          upcomingPosts.map((post) => {
             // Handle both scheduledAt and scheduleDate/scheduleTime formats
             const formattedTime = post.scheduledAt
               ? new Date(post.scheduledAt).toLocaleString()
               : (post.scheduleDate && post.scheduleTime)
               ? new Date(`${post.scheduleDate} ${post.scheduleTime}`).toLocaleString()
-              : post.time || "TBD";
+              : "TBD";
 
             const statusStyle =
               post.status === "scheduled"
@@ -59,13 +68,13 @@ export default function UpcomingPosts({ posts = [], onPublish }) {
                 </div>
 
                 <div className="flex-1 ml-4">
-                  <div className="text-white font-medium mb-1">{post.title || post.idea || "Untitled post"}</div>
+                  <div className="text-white font-medium mb-1">{post.title || post.idea || post.content || "Untitled post"}</div>
                   <div className="text-gray-400 text-sm line-clamp-2">{post.desc || post.content || post.excerpt || "No description"}</div>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyle}`}>{post.status || "Draft"}</span>
-                  {post.status !== "Published" && onPublish && (
+                  {post.status !== "posted" && onPublish && (
                     <button
                       onClick={() => onPublish(post.id)}
                       className="text-sm text-cyan-400 hover:text-cyan-300"

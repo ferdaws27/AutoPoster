@@ -8,6 +8,40 @@ const calculateEngagementDisplay = (stats) => {
   return totalPosts > 0 ? totalPosts.toString() : '0';
 };
 
+// Helper to ensure user is authenticated
+const ensureAuthenticated = async () => {
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    // Auto login as guest if no token exists
+    try {
+      console.log('No token found, attempting guest login...');
+      const loginResponse = await fetch('http://127.0.0.1:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'guest@autoposter.tn',
+          password: 'guest'
+        })
+      });
+      
+      const data = await loginResponse.json();
+      if (data.access_token) {
+        localStorage.setItem('token', data.access_token);
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        console.log('✅ Guest login successful');
+        return data.access_token;
+      }
+    } catch (err) {
+      console.warn('Guest login failed:', err);
+    }
+  }
+  
+  return token;
+};
+
 export const usePosts = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,13 +58,27 @@ export const usePosts = () => {
     return !!localStorage.getItem('token');
   };
 
-  // Initialize posts from backend or localStorage
+  // Initialize posts from backend for authenticated user
   useEffect(() => {
-    if (isAuthenticated()) {
-      syncWithBackend();
-    } else {
-      syncWithLocalStorage();
-    }
+    const initPosts = async () => {
+      try {
+        const token = await ensureAuthenticated();
+        if (token) {
+          // ✅ Always fetch from backend for authenticated users
+          // Backend automatically filters posts by user_id from JWT
+          syncWithBackend();
+        } else {
+          console.warn('No authentication token available');
+          setError('Authentication required. Please log in.');
+          setPosts([]);
+        }
+      } catch (err) {
+        console.error('Init error:', err);
+        setPosts([]);
+      }
+    };
+
+    initPosts();
   }, []);
 
   // Update stats when posts change
@@ -68,41 +116,57 @@ export const usePosts = () => {
   const syncWithBackend = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Get posts
-      const postsResponse = await apiFetch('/api/posts/');
-      if (postsResponse.success) {
-        // Transform backend data to frontend format
-        const backendPosts = postsResponse.data.posts.map(post => ({
-          id: post._id,
-          content: post.content,
-          platforms: post.platforms,
-          status: post.status,
-          scheduleDate: post.schedule_date,
-          scheduleTime: post.schedule_time,
-          engagement: post.engagement,
-          createdAt: post.created_at,
-          updatedAt: post.updated_at
-        }));
-        setPosts(backendPosts);
+      // 🔒 Get authenticated user's posts from backend
+      // Backend filters by user_id from JWT token
+      let postsResponse;
+      try {
+        postsResponse = await apiFetch('/api/posts/getPosts');
+        if (postsResponse.success) {
+          // Transform backend data to frontend format
+          const backendPosts = postsResponse.data.posts.map(post => ({
+            id: post._id,
+            idea: post.content,
+            content: post.content,
+            platforms: post.platforms,
+            status: post.status,
+            scheduleDate: post.schedule_date,
+            scheduleTime: post.schedule_time,
+            engagement: post.engagement,
+            createdAt: post.created_at,
+            updatedAt: post.updated_at
+          }));
+          setPosts(backendPosts);
+          console.log(`✅ Loaded ${backendPosts.length} posts for authenticated user`);
+        }
+      } catch (err) {
+        console.error('Error fetching posts from backend:', err);
+        // 🔐 No fallback to localStorage for authenticated users
+        // Only authenticated users' data should be displayed
+        setPosts([]);
+        setError(`Failed to load posts: ${err.message}`);
+        setLoading(false);
+        return;
       }
 
       // Get stats
-      const statsResponse = await apiFetch('/api/posts/stats/summary');
-      if (statsResponse.success) {
-        const backendStats = statsResponse.data.stats;
-        setStats({
-          drafts: backendStats.draft || 0,
-          scheduled: backendStats.scheduled || 0,
-          published: backendStats.published || 0,
-          engagement: calculateEngagementDisplay(backendStats)
-        });
+      try {
+        const statsResponse = await apiFetch('/api/posts/stats/summary');
+        if (statsResponse.success) {
+          const backendStats = statsResponse.data;
+          setStats({
+            drafts: backendStats.draft || 0,
+            scheduled: backendStats.scheduled || 0,
+            published: backendStats.published || 0,
+            engagement: calculateEngagementDisplay(backendStats)
+          });
+        }
+      } catch (err) {
+        console.warn('Could not fetch stats:', err);
+        // Stats failed but posts are loaded - calculate stats from posts
+        updateStats();
       }
-    } catch (err) {
-      console.error('Error syncing posts from backend:', err);
-      setError(err.message);
-      // Fallback to localStorage if backend fails
-      syncWithLocalStorage();
     } finally {
       setLoading(false);
     }
@@ -130,11 +194,12 @@ export const usePosts = () => {
   const createPost = useCallback(async (postData) => {
     try {
       setLoading(true);
+      setError(null);
 
+      // For authenticated users, create posts via backend only
       if (isAuthenticated()) {
-        // Use backend API
         const backendData = {
-          content: postData.content,
+          content: postData.content || postData.idea,
           platforms: postData.platforms || {},
           status: postData.status || 'draft',
           schedule_date: postData.scheduleDate,
@@ -142,52 +207,45 @@ export const usePosts = () => {
           engagement: postData.engagement || {}
         };
 
-        const response = await apiFetch('/api/posts/', {
-          method: 'POST',
-          body: JSON.stringify(backendData)
-        });
+        try {
+          const response = await apiFetch('/api/posts/', {
+            method: 'POST',
+            body: JSON.stringify(backendData)
+          });
 
-        if (response.success) {
-          const newPost = {
-            id: response.data._id,
-            content: response.data.content,
-            platforms: response.data.platforms,
-            status: response.data.status,
-            scheduleDate: response.data.schedule_date,
-            scheduleTime: response.data.schedule_time,
-            engagement: response.data.engagement,
-            createdAt: response.data.created_at,
-            updatedAt: response.data.updated_at
-          };
+          if (response.success && response.data) {
+            const newPost = {
+              id: response.data._id,
+              idea: response.data.content,
+              content: response.data.content,
+              platforms: response.data.platforms,
+              status: response.data.status,
+              scheduleDate: response.data.schedule_date,
+              scheduleTime: response.data.schedule_time,
+              engagement: response.data.engagement,
+              createdAt: response.data.created_at,
+              updatedAt: response.data.updated_at
+            };
 
-          setPosts(prev => [newPost, ...prev]);
-          return newPost;
+            setPosts(prev => [newPost, ...prev]);
+            console.log('✅ Post created successfully on backend:', newPost.id);
+            return newPost;
+          } else {
+            const errorMsg = response.error || 'Failed to create post';
+            throw new Error(errorMsg);
+          }
+        } catch (apiErr) {
+          const errorMessage = apiErr.message || 'Failed to create post. Please check your authentication.';
+          console.error('❌ Backend post creation failed:', errorMessage);
+          setError(errorMessage);
+          throw new Error(errorMessage);
         }
       } else {
-        // Fallback to localStorage
-        const newPost = {
-          id: Date.now(),
-          createdAt: new Date().toISOString(),
-          ...postData
-        };
-
-        // Determine which storage bucket based on status
-        if (postData.status === 'draft') {
-          const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
-          drafts.push(newPost);
-          localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
-        } else if (postData.status === 'scheduled') {
-          const scheduled = JSON.parse(localStorage.getItem('autoposter_scheduled') || '[]');
-          scheduled.push(newPost);
-          localStorage.setItem('autoposter_scheduled', JSON.stringify(scheduled));
-        } else {
-          const published = JSON.parse(localStorage.getItem('autoposter_published') || '[]');
-          published.push(newPost);
-          localStorage.setItem('autoposter_published', JSON.stringify(published));
-        }
-
-        setPosts(prev => [newPost, ...prev]);
-        return newPost;
+        // Not authenticated
+        const errorMessage = 'Authentication required to create posts. Please log in.';
+        console.error('❌ ' + errorMessage);
+        setError(errorMessage);
+        throw new Error(errorMessage);
       }
     } catch (err) {
       console.error('Error creating post:', err);
@@ -201,60 +259,101 @@ export const usePosts = () => {
   const updatePost = useCallback(async (postId, postData) => {
     try {
       setLoading(true);
+      setError(null);
 
+      const backendData = {};
+      if (postData.content !== undefined) backendData.content = postData.content;
+      if (postData.idea !== undefined) backendData.content = postData.idea;
+      if (postData.platforms !== undefined) backendData.platforms = postData.platforms;
+      if (postData.status !== undefined) backendData.status = postData.status;
+      if (postData.scheduleDate !== undefined) backendData.schedule_date = postData.scheduleDate;
+      if (postData.scheduleTime !== undefined) backendData.schedule_time = postData.scheduleTime;
+      if (postData.engagement !== undefined) backendData.engagement = postData.engagement;
+
+      console.log('Updating post:', { postId, backendData });
+
+      let updateSucceeded = false;
+      let updatedPost = null;
+
+      // Try backend first if authenticated
       if (isAuthenticated()) {
-        // Use backend API
-        const backendData = {};
-        if (postData.content !== undefined) backendData.content = postData.content;
-        if (postData.platforms !== undefined) backendData.platforms = postData.platforms;
-        if (postData.status !== undefined) backendData.status = postData.status;
-        if (postData.scheduleDate !== undefined) backendData.schedule_date = postData.scheduleDate;
-        if (postData.scheduleTime !== undefined) backendData.schedule_time = postData.scheduleTime;
-        if (postData.engagement !== undefined) backendData.engagement = postData.engagement;
+        try {
+          const response = await apiFetch(`/api/posts/${postId}`, {
+            method: 'PUT',
+            body: JSON.stringify(backendData)
+          });
 
-        const response = await apiFetch(`/api/posts/${postId}`, {
-          method: 'PUT',
-          body: JSON.stringify(backendData)
-        });
-
-        if (response.success) {
-          const updatedPost = {
-            id: response.data._id,
-            content: response.data.content,
-            platforms: response.data.platforms,
-            status: response.data.status,
-            scheduleDate: response.data.schedule_date,
-            scheduleTime: response.data.schedule_time,
-            engagement: response.data.engagement,
-            createdAt: response.data.created_at,
-            updatedAt: response.data.updated_at
-          };
-
-          setPosts(prev => prev.map(p => p.id === postId ? updatedPost : p));
-          return updatedPost;
+          if (response.success && response.data) {
+            updatedPost = {
+              id: response.data._id,
+              idea: response.data.content,
+              content: response.data.content,
+              platforms: response.data.platforms,
+              status: response.data.status,
+              scheduleDate: response.data.schedule_date,
+              scheduleTime: response.data.schedule_time,
+              engagement: response.data.engagement,
+              createdAt: response.data.created_at,
+              updatedAt: response.data.updated_at
+            };
+            updateSucceeded = true;
+            console.log('Backend update successful:', updatedPost);
+          }
+        } catch (backendError) {
+          console.warn('Backend update failed:', backendError.message);
+          // Will try localStorage as fallback
         }
-      } else {
-        // Fallback to localStorage
+      }
+
+      // Fallback to localStorage if backend failed or not authenticated
+      if (!updateSucceeded) {
         const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
-        let updated = false;
+        let found = false;
 
         for (const key of storageKeys) {
           const items = JSON.parse(localStorage.getItem(key) || '[]');
           const index = items.findIndex(p => p.id === postId);
           if (index !== -1) {
-            items[index] = { ...items[index], ...postData, id: postId };
+            items[index] = {
+              ...items[index],
+              ...postData,
+              id: postId,
+              idea: postData.content || postData.idea || items[index].idea
+            };
             localStorage.setItem(key, JSON.stringify(items));
-            updated = true;
+            updatedPost = items[index];
+            updateSucceeded = true;
+            found = true;
+            console.log('localStorage update successful:', updatedPost);
             break;
           }
         }
 
-        if (!updated) {
-          throw new Error('Post not found');
+        // If not in localStorage, check if post exists in current state
+        if (!found) {
+          const existingPost = posts.find(p => p.id === postId);
+          if (existingPost) {
+            // Update in memory only (post was loaded from backend or memory)
+            updatedPost = {
+              ...existingPost,
+              ...postData,
+              id: postId,
+              content: postData.content || postData.idea || existingPost.content,
+              idea: postData.content || postData.idea || existingPost.idea
+            };
+            updateSucceeded = true;
+            console.log('State-only update successful:', updatedPost);
+          }
         }
-
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...postData } : p));
       }
+
+      // Update state if we succeeded
+      if (updateSucceeded && updatedPost) {
+        setPosts(prev => prev.map(p => p.id === postId ? updatedPost : p));
+        return updatedPost;
+      }
+
+      throw new Error('Post not found');
     } catch (err) {
       console.error('Error updating post:', err);
       setError(err.message);
@@ -262,7 +361,7 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [posts]);
 
   const deletePost = useCallback(async (postId) => {
     try {

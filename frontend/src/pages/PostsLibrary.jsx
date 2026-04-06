@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState , useEffect } from "react";
+import { data, useNavigate } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
 
 export default function PostsLibrary() {
   const navigate = useNavigate();
   const { posts, deletePost, updatePost, duplicatePost } = usePosts();
+  console.log('PostsLibrary posts:', posts);
   const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
@@ -125,6 +126,18 @@ export default function PostsLibrary() {
       showToastMessage("Failed to duplicate post");
     }
   };
+
+  const API_BASE_URL = "http://localhost:5000/api";
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
+  // Removed unused fetchPosts function as posts are handled by usePosts hook
+
+
 
   return (
     <div className="gradient-bg min-h-screen text-white">
