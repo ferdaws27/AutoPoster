@@ -32,14 +32,13 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
     }
   };
 
-  // Show all posts passed in, sorted by date, limited to 5
+  // Show all posts passed in, sorted by date
   const upcomingPosts = (posts || [])
     .sort((a, b) => {
       const dateA = a.scheduleDate ? new Date(`${a.scheduleDate}T${a.scheduleTime || '00:00'}`) : new Date(a.createdAt || 0);
       const dateB = b.scheduleDate ? new Date(`${b.scheduleDate}T${b.scheduleTime || '00:00'}`) : new Date(b.createdAt || 0);
       return dateA - dateB;
-    })
-    .slice(0, 5); // Show only next 5 posts
+    });
 
   return (
     <div id="upcoming-posts-section" className="glass-effect rounded-3xl p-6 glow-card" style={{ opacity: 1, transform: "translateY(0px)", transition: "0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}>
@@ -104,14 +103,6 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
 
                 <div className="flex flex-col items-end gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyle}`}>{post.status || "Draft"}</span>
-                  {post.status !== "posted" && onPublish && (
-                    <button
-                      onClick={() => onPublish(post.id)}
-                      className="text-sm text-cyan-400 hover:text-cyan-300"
-                    >
-                      Mark as Published
-                    </button>
-                  )}
                 </div>
               </div>
             );

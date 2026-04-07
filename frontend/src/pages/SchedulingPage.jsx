@@ -48,6 +48,7 @@ export default function SchedulingPage() {
     createPost, 
     updatePost, 
     deletePost, 
+    duplicatePost,
     getPostsByDateRange,
     syncWithLocalStorage 
   } = usePosts();
@@ -426,6 +427,24 @@ export default function SchedulingPage() {
     return `${engagement} engagements`;
   };
 
+  // Handle duplicate post
+  const handleDuplicatePost = async (post) => {
+    try {
+      await duplicatePost(post.id);
+      setSuccessMessage({ title: 'Post duplicated successfully', description: 'Your post has been duplicated' });
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to duplicate post:', error);
+      setErrorMessage({
+        title: '❌ Failed to Duplicate',
+        description: error.message || 'Could not duplicate post. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    }
+  };
+
   // Handle delete post
   const handleDeletePost = async () => {
     if (!selectedPost) return;
@@ -446,10 +465,8 @@ export default function SchedulingPage() {
     }
   };
 
-  // Handle navigate view
-  const navigateView = (direction) => {
+  const handleNavigateWeek = (direction) => {
     const newDate = new Date(currentWeek);
-    
     if (viewMode === 'week') {
       // Week navigation - move by 7 days
       newDate.setDate(currentWeek.getDate() + (direction === 'next' ? 7 : -7));

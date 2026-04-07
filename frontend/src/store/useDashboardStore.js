@@ -38,6 +38,7 @@ const useDashboardStore = create((set, get) => ({
   aiOptions: { optimize: true, images: true },
   aiSuggestion: "",
   aiIdeas: initialAIIdeas,
+  generationCount: 0,
 
   setContent: (content) => set({ content }),
   setUser: (user) => set({ user }),
@@ -134,34 +135,229 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  refreshAIIdeas: () => {
-    const newIdeas = [
-      {
-        id: Date.now(),
-        category: "Strategy",
-        platform: "twitter",
-        title: "How to Use AI for Smarter Content Repurposing",
-        desc: "Turn existing posts into 5 high-engagement formats in minutes.",
-        status: "Scheduled",
-      },
-      {
-        id: Date.now() + 1,
-        category: "Trend",
-        platform: "medium",
-        title: "AI Writing Prompts for LinkedIn Thought Leadership",
-        desc: "Capture industry attention with data-driven insights and practical examples.",
-        status: "Review",
-      },
-      {
-        id: Date.now() + 2,
-        category: "Growth",
-        platform: "linkedin",
-        title: "A 7-Day AI Newsletter Challenge",
-        desc: "Create daily micro-articles that drive subscribers and engagement.",
-        status: "Draft",
-      },
-    ];
-    set({ aiIdeas: newIdeas, aiSuggestion: "AI ideas rafraîchies !" });
+  refreshAIIdeas: async () => {
+    try {
+      set({ aiSuggestion: "Génération d'idées AI en cours..." });
+      
+      // Incrémenter le compteur de générations
+      const currentCount = get().generationCount + 1;
+      set({ generationCount: currentCount });
+      
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_OPENAI_API_KEY;
+      
+      // Debug: Vérifier si la clé API est chargée
+      console.log("=== AI IDEAS DEBUG ===");
+      console.log("API Key exists:", !!apiKey);
+      console.log("API Key length:", apiKey?.length);
+      console.log("API Key starts with:", apiKey?.substring(0, 10) + "...");
+      console.log("Génération numéro:", currentCount);
+      
+      if (!apiKey) {
+        throw new Error("Clé API OpenRouter non trouvée. Veuillez configurer VITE_OPENROUTER_API_KEY dans .env");
+      }
+      
+      // Adapter le contenu en fonction du numéro de génération
+      const generationThemes = [
+        {
+          phase: "découverte",
+          focus: "tendances émergentes et innovations récentes",
+          angle: "ce qui est nouveau et surprenant"
+        },
+        {
+          phase: "approfondissement", 
+          focus: "stratégies avancées et techniques concrètes",
+          angle: "comment appliquer et optimiser"
+        },
+        {
+          phase: "spécialisation",
+          focus: "niches spécifiques et expertises pointues", 
+          angle: "sujets techniques et avancés"
+        },
+        {
+          phase: "expérimentation",
+          focus: "approches non conventionnelles et tests",
+          angle: "essayer ce que les autres ne font pas"
+        },
+        {
+          phase: "domination",
+          focus: "stratégies de leadership et d'autorité",
+          angle: "devenir la référence dans son domaine"
+        }
+      ];
+      
+      const themeIndex = (currentCount - 1) % generationThemes.length;
+      const currentTheme = generationThemes[themeIndex];
+      
+      const prompt = `Tu es un expert en marketing digital et création de contenu. C'est la GÉNÉRATION ${currentCount}.
+
+CONTEXTE: ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+PHASE ACTUELLE: ${currentTheme.phase}
+FOCUS SPÉCIFIQUE: ${currentTheme.focus}
+ANGLE D'APPROCHE: ${currentTheme.angle}
+
+GÉNÈRE 5 idées de contenu UNIQUEMENT pour cette phase ${currentTheme.phase}. 
+Ces idées doivent être COMPLÈTEMENT DIFFÉRENTES des générations précédentes.
+
+FORMAT JSON EXACT:
+[
+  {
+    "category": "Trending|Insights|Growth|Strategy|Tips|Tech|Business",
+    "platform": "twitter|linkedin|medium", 
+    "title": "TITRE SPÉCIFIQUE (max 60 caractères)",
+    "desc": "Description avec VALEUR CONCRÈTE (max 150 caractères)",
+    "status": "Scheduled|Review|Draft"
+  }
+]
+
+EXEMPLES POUR CETTE PHASE:
+- Génération 1 (découverte): "Nouveaux outils IA qui sortent ce mois-ci"
+- Génération 2 (approfondissement): "Comment optimiser son workflow avec Notion IA"
+- Génération 3 (spécialisation): "Prompts avancés pour développeurs ChatGPT"
+- Génération 4 (expérimentation): "Test: 30 jours sans réseaux sociaux"
+- Génération 5 (domination): "Devenir l'expert IA référent sur LinkedIn"
+
+IMPORTANT: Sois SPÉCIFIQUE à cette phase. Retourne UNIQUEMENT le JSON valide avec 5 objets.`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "AutoPoster - AI Ideas Generator"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.9, // Plus de créativité et variété
+          max_tokens: 1000,
+          top_p: 0.95
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const aiContent = data.choices[0].message.content;
+      
+      // Debug: Voir la réponse brute de l'API
+      console.log("=== AI API RESPONSE ===");
+      console.log("Raw response:", aiContent);
+      console.log("Response type:", typeof aiContent);
+      
+      let ideas;
+      
+      try {
+        // Essayer de parser le JSON directement
+        ideas = JSON.parse(aiContent);
+      } catch (parseError) {
+        // Si le parsing échoue, essayer d'extraire le JSON du texte
+        const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          ideas = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("Format de réponse invalide");
+        }
+      }
+
+      // Ajouter des IDs uniques et formater les idées
+      const formattedIdeas = ideas.map((idea, index) => ({
+        id: Date.now() + index,
+        category: idea.category || "Strategy",
+        platform: idea.platform || "twitter",
+        title: idea.title || "Nouvelle idée",
+        desc: idea.desc || "Description à venir",
+        status: idea.status || "Draft"
+      }));
+
+      set({ 
+        aiIdeas: formattedIdeas, 
+        aiSuggestion: `✅ Génération ${currentCount} complétée : 5 nouvelles idées ${currentTheme.phase} !` 
+      });
+      
+    } catch (error) {
+      console.error("Erreur lors de la génération des idées AI:", error);
+      
+      // En cas d'erreur, générer des idées de fallback dynamiques basées sur la génération
+      const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long' });
+      const fallbackThemes = [
+        {
+          phase: "découverte",
+          topics: [
+            `IA ${currentMonth}: nouveautés à découvrir`,
+            `Tech émergentes: ce qui est nouveau`,
+            `Outils IA: dernières sorties`,
+            `Tendances: innovations récentes`,
+            `Découverte: technologies fraîches`
+          ]
+        },
+        {
+          phase: "approfondissement",
+          topics: [
+            `Productivité: optimiser 80% du travail`,
+            `Stratégies IA avancées`,
+            `Workflow: techniques concrètes`,
+            `Optimisation: méthodes éprouvées`,
+            `Performance: comment améliorer`
+          ]
+        },
+        {
+          phase: "spécialisation",
+          topics: [
+            `Prompts experts pour développeurs`,
+            `Niches techniques pointues`,
+            `Spécialisation: sujets avancés`,
+            `Expertise: compétences rares`,
+            `Maitrise: techniques pro`
+          ]
+        },
+        {
+          phase: "expérimentation",
+          topics: [
+            `Test: 30 jours sans réseaux sociaux`,
+            `Approches non conventionnelles`,
+            `Expérimentation: essayer l'inattendu`,
+            `Innovation: sortir du cadre`,
+            `Test: méthodes originales`
+          ]
+        },
+        {
+          phase: "domination",
+          topics: [
+            `Leadership: devenir référent IA`,
+            `Autorité: expertise LinkedIn`,
+            `Domination: stratégie market`,
+            `Influence: construire sa marque`,
+            `Excellence: leader du domaine`
+          ]
+        }
+      ];
+      
+      const themeIndex = (currentCount - 1) % fallbackThemes.length;
+      const currentFallbackTheme = fallbackThemes[themeIndex];
+      
+      const fallbackIdeas = currentFallbackTheme.topics.map((topic, index) => ({
+        id: Date.now() + index,
+        category: ["Strategy", "Trend", "Growth", "Tips", "Tech"][index],
+        platform: ["twitter", "linkedin", "medium", "twitter", "linkedin"][index],
+        title: topic,
+        desc: `Stratégie ${currentFallbackTheme.phase} pour ${currentMonth}.`,
+        status: ["Scheduled", "Review", "Draft", "Scheduled", "Review"][index],
+      }));
+      
+      set({ 
+        aiIdeas: fallbackIdeas, 
+        aiSuggestion: `⚠️ Erreur: ${error.message}` 
+      });
+    }
   },
 
   importPosts: (importedPosts) =>

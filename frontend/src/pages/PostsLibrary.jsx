@@ -16,10 +16,14 @@ export default function PostsLibrary() {
     sort: "newest",
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [postsPerPage] = useState(6);
   const [selectedPosts, setSelectedPosts] = useState(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const filteredPosts = posts
     .filter((post) => {
@@ -28,12 +32,28 @@ export default function PostsLibrary() {
       if (activeTab === "scheduled" && post.status !== "scheduled") return false;
       if (activeTab === "published" && post.status !== "posted") return false;
 
-      // Search filter
-      const searchTerm = search.toLowerCase();
-      const title = (post.idea || post.content || "").toLowerCase();
-      if (searchTerm && !title.includes(searchTerm)) return false;
+      // Enhanced search filter
+      const searchTerm = search.toLowerCase().trim();
+      if (searchTerm) {
+        const title = (post.idea || post.content || "").toLowerCase();
+        const content = (post.content || "").toLowerCase();
+        const platforms = post.platforms ? Object.keys(post.platforms).join(" ").toLowerCase() : "";
+        const status = post.status.toLowerCase();
+        const category = (post.category || "").toLowerCase();
+        
+        // Search in multiple fields
+        const matchesTitle = title.includes(searchTerm);
+        const matchesContent = content.includes(searchTerm);
+        const matchesPlatforms = platforms.includes(searchTerm);
+        const matchesStatus = status.includes(searchTerm);
+        const matchesCategory = category.includes(searchTerm);
+        
+        if (!matchesTitle && !matchesContent && !matchesPlatforms && !matchesStatus && !matchesCategory) {
+          return false;
+        }
+      }
 
-      // Platform filter
+      // Enhanced platform filter
       if (filters.platform && post.platforms) {
         const hasPlatform = Object.keys(post.platforms).some(p => 
           p.toLowerCase().includes(filters.platform.toLowerCase()) && post.platforms[p]
@@ -41,9 +61,9 @@ export default function PostsLibrary() {
         if (!hasPlatform) return false;
       }
 
-      // Date filter
+      // Enhanced date filter
       if (filters.date) {
-        const postDate = new Date(post.createdAt || post.scheduleDate);
+        const postDate = new Date(post.createdAt || post.scheduleDate || post.date);
         const today = new Date();
         const diffDays = (today - postDate) / (1000 * 60 * 60 * 24);
 
@@ -51,6 +71,24 @@ export default function PostsLibrary() {
         if (filters.date === "week" && diffDays > 7) return false;
         if (filters.date === "month" && diffDays > 30) return false;
         if (filters.date === "quarter" && diffDays > 90) return false;
+      }
+
+      // NEW: Performance filter implementation
+      if (filters.performance) {
+        const engagement = (post.engagement?.likes || 0) + (post.engagement?.shares || 0) + (post.engagement?.comments || 0);
+        const views = post.engagement?.views || 0;
+        
+        switch (filters.performance) {
+          case "high":
+            if (engagement < 100 || views < 1000) return false;
+            break;
+          case "medium":
+            if (engagement < 20 || engagement >= 100 || views < 200 || views >= 1000) return false;
+            break;
+          case "low":
+            if (engagement >= 20 || views >= 200) return false;
+            break;
+        }
       }
 
       return true;
@@ -72,6 +110,50 @@ export default function PostsLibrary() {
       }
       return 0;
     });
+
+  const generateSearchSuggestions = (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchSuggestions([]);
+      return;
+    }
+    
+    // Generate suggestions based on existing posts
+    const suggestions = new Set();
+    const term = searchTerm.toLowerCase();
+    
+    posts.forEach(post => {
+      const title = (post.idea || post.content || "").toLowerCase();
+      const content = (post.content || "").toLowerCase();
+      
+      // Extract words that match the search term
+      const titleWords = title.split(' ').filter(word => word.includes(term));
+      const contentWords = content.split(' ').filter(word => word.includes(term));
+      
+      titleWords.forEach(word => {
+        if (word.length > 2 && suggestions.size < 5) {
+          suggestions.add(word);
+        }
+      });
+      
+      contentWords.forEach(word => {
+        if (word.length > 2 && suggestions.size < 5) {
+          suggestions.add(word);
+        }
+      });
+    });
+    
+    setSearchSuggestions(Array.from(suggestions).slice(0, 5));
+  };
+
+  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
+  const startIndex = (currentPage - 1) * postsPerPage;
+  const endIndex = startIndex + postsPerPage;
+  const paginatedPosts = filteredPosts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -192,8 +274,33 @@ export default function PostsLibrary() {
                 type="text"
                 className="w-full bg-black/30 rounded-2xl pl-12 pr-4 py-3 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors"
                 placeholder="Search posts..."
-                onChange={(e) => setSearch(e.target.value.toLowerCase())}
+                value={search}
+                onChange={(e) => {
+                  const value = e.target.value.toLowerCase();
+                  setSearch(value);
+                  generateSearchSuggestions(value);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               />
+              
+              {/* Search suggestions dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-black/90 rounded-2xl border border-gray-600 max-h-48 overflow-y-auto z-50">
+                  {searchSuggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className="px-4 py-2 hover:bg-cyan-400/20 cursor-pointer text-white text-sm"
+                      onClick={() => {
+                        setSearch(suggestion);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Filters */}
@@ -225,8 +332,8 @@ export default function PostsLibrary() {
 
         {/* POSTS */}
         <div className={view === "grid" ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" : "space-y-4"}>
-          {filteredPosts.length > 0 ? (
-            filteredPosts.map((post, index) => (
+          {paginatedPosts.length > 0 ? (
+            paginatedPosts.map((post, index) => (
               <PostCard
                 key={post.id || index}
                 post={post}
@@ -245,8 +352,13 @@ export default function PostsLibrary() {
           )}
         </div>
 
-        {/* Pagination */}
-        <Pagination total={45} current={1} />
+        {/* Dynamic Pagination */}
+        <Pagination 
+          total={filteredPosts.length} 
+          current={currentPage} 
+          postsPerPage={postsPerPage}
+          onPageChange={handlePageChange}
+        />
 
         {/* Bulk Actions Bar */}
         {selectedPosts.size > 0 && (
@@ -426,27 +538,53 @@ function FilterSelect({ type, handleFilterChange }) {
   );
 }
 
-function Pagination({ total, current }) {
+function Pagination({ total, current, postsPerPage, onPageChange }) {
+  const totalPages = Math.ceil(total / postsPerPage);
+  const startItem = (current - 1) * postsPerPage + 1;
+  const endItem = Math.min(current * postsPerPage, total);
+
   return (
     <div id="pagination-section" className="flex items-center justify-between mt-12">
-      <div className="text-gray-400 text-sm">Showing 1-6 of {total} posts</div>
+      <div className="text-gray-400 text-sm">
+        Showing {startItem}-{endItem} of {total} posts
+      </div>
       <div className="flex items-center space-x-2">
-        <button className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+        <button 
+          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          onClick={() => onPageChange(current - 1)}
+          disabled={current === 1}
+        >
           <i className="fa-solid fa-chevron-left"></i>
         </button>
-        {[1, 2, 3].map((page) => (
-          <button
-            key={page}
-            className={`w-10 h-10 rounded-xl ${
-              page === current ? "bg-cyan-400/20 text-cyan-400" : "bg-black/30 text-gray-400 hover:text-white"
-            }`}
-          >
-            {page}
-          </button>
-        ))}
-        <span className="text-gray-400">...</span>
-        <button className="w-10 h-10 rounded-xl bg-black/30 text-gray-400 hover:text-white transition-colors">45</button>
-        <button className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+        
+        {/* Page numbers */}
+        {Array.from({ length: totalPages }, (_, index) => {
+          const page = index + 1;
+          const isActive = page === current;
+          const isEllipsis = page === '...';
+          
+          if (isEllipsis) {
+            return <span key={index} className="text-gray-400">...</span>;
+          }
+          
+          return (
+            <button
+              key={page}
+              className={`w-10 h-10 rounded-xl ${
+                isActive ? "bg-cyan-400/20 text-cyan-400" : "bg-black/30 text-gray-400 hover:text-white"
+              }`}
+              onClick={() => onPageChange(page)}
+            >
+              {page}
+            </button>
+          );
+        })}
+        
+        <button 
+          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          onClick={() => onPageChange(current + 1)}
+          disabled={current === totalPages}
+        >
           <i className="fa-solid fa-chevron-right"></i>
         </button>
       </div>
