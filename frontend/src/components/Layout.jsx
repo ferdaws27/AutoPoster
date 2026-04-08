@@ -21,9 +21,8 @@ export default function Layout() {
     ["fa-users", "Audience Analyzer", "audience-analyzer"],
   ];
 
-
-const [user, setUser] = useState(null);
-  const linkedinToken = localStorage.getItem("token"); // or however you store it
+  const [user, setUser] = useState(null);
+  const linkedinToken = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -38,9 +37,9 @@ const [user, setUser] = useState(null);
         );
 
         const data = await response.json();
-        console.log("ahaya data",data);
+
         setUser(data);
-        localStorage.setItem("user", JSON.stringify(data)); // Store user in localStorage
+        localStorage.setItem("user", JSON.stringify(data));
       } catch (error) {
         console.error("Error fetching user:", error);
       }
@@ -49,7 +48,7 @@ const [user, setUser] = useState(null);
     if (linkedinToken) {
       fetchUser();
     }
-  }, []);
+  }, [linkedinToken]);
 
   if (!user) return <p>Loading user...</p>;
 
@@ -70,7 +69,7 @@ const [user, setUser] = useState(null);
             <NavLink
               key={label}
               to={to}
-              end={to === ""} 
+              end={to === ""}
               className={({ isActive }) =>
                 `w-full flex items-center space-x-3 p-3 rounded-2xl border transition-colors ${
                   isActive
@@ -85,23 +84,30 @@ const [user, setUser] = useState(null);
           ))}
         </nav>
 
+        {/* USER */}
         <div className="p-6">
           <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect">
             <img
               src={user.profile_picture || ""}
+              onError={(e) => (e.target.src = "/default-avatar.png")}
               className="w-10 h-10 rounded-xl"
               alt="Profile"
             />
             <div>
-              <div className="text-white font-medium text-sm">{user.full_name}</div>
-              <div className="text-gray-400 text-xs">{user.role}</div>
+              <div className="text-white font-medium text-sm">
+                {user.full_name}
+              </div>
+              <div className="text-gray-400 text-xs">
+                {user.role || "LinkedIn User"}
+              </div>
             </div>
           </div>
         </div>
       </aside>
 
+      {/* PASS USER */}
       <main className="ml-64 p-8 min-h-screen text-white">
-        <Outlet />
+        <Outlet context={{ user }} />
       </main>
     </div>
   );

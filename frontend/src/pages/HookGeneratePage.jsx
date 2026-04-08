@@ -47,69 +47,31 @@ export default function HookGeneratorPage() {
     setHooks([]);
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      const API_BASE = "http://localhost:5000";
       
-      if (!apiKey) {
-        setLoading(false);
-        alert("API key not configured. Please set VITE_OPENAI_API_KEY in your environment variables.");
-        return;
-      }
-
-      console.log('Using API Key:', apiKey ? 'Configured' : 'Missing');
-
-      const prompt = `Generate exactly 5 powerful, engaging social media hooks for the following topic:
-
-Topic: "${topic}"
-
-Create diverse hooks that use different techniques:
-1. One bold/controversial statement
-2. One personal story hook ("I learned...", "Last week...")
-3. One question to make readers curious
-4. One statistic/number-based hook
-5. One urgency/time-sensitive hook
-
-Return ONLY a valid JSON array (no additional text) with exactly 5 objects. Each object must have:
-- "text": hook message (under 150 chars for Twitter compatibility)
-- "type": one of ["bold-statement", "personal-story", "question", "statistic", "urgency"]
-- "score": engagement prediction from 75 to 98
-
-Example format:
-[
-  {"text": "Here's uncomfortable truth about AI that nobody talks about:", "type": "bold-statement", "score": 94},
-  {"text": "I spent 3 years studying AI implementation, and this shocked me most:", "type": "personal-story", "score": 89}
-]
-
-Generate 5 hooks now:`;
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetch(`${API_BASE}/api/hook-generator/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App"
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 800
+          topic: topic,
+          platforms: selectedPlatforms,
+          language: "auto", // Auto-detect language
+          tone: "dynamic",
+          count: 5
         })
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", errorText);
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content.trim();
       
-      // Parse JSON response
-      const generatedHooks = JSON.parse(content);
-      
-      if (Array.isArray(generatedHooks) && generatedHooks.length > 0) {
-        setHooks(generatedHooks);
+      if (data.hooks && Array.isArray(data.hooks) && data.hooks.length > 0) {
+        setHooks(data.hooks);
       } else {
         throw new Error("Invalid response format");
       }
@@ -126,61 +88,38 @@ Generate 5 hooks now:`;
     setLoading(true);
     
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      const API_BASE = "http://localhost:5000";
+      const platform = selectedPlatforms[index % selectedPlatforms.length] || 'twitter';
       
-      if (!apiKey) {
-        alert("API key not configured.");
-        setLoading(false);
-        return;
-      }
-
-      const prompt = `Generate 1 unique, creative, and engaging social media hook for this topic:
-
-Topic: "${topic}"
-
-Make it completely different from this existing hook:
-"${hooks[index].text}"
-
-Create a hook that:
-- Is under 150 characters for Twitter compatibility
-- Uses one unique engagement technique (curiosity, surprise, humor, etc.)
-- Has high engagement potential
-
-Return ONLY a valid JSON object (no additional text) with this format:
-{"text": "the hook message", "type": "creative-variant", "score": 85}
-
-Generate hook now:`;
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetch(`${API_BASE}/api/hook-generator/regenerate-one`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App"
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 200
+          topic: topic,
+          platform: platform,
+          language: "auto", // Auto-detect language
+          tone: "dynamic"
         })
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", errorText);
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content.trim();
-      const newHook = JSON.parse(content);
       
-      const newHooks = [...hooks];
-      newHooks[index] = { ...newHook, score: Math.max(75, Math.min(98, newHook.score)) };
-      setHooks(newHooks);
-      
-      if (selectedHook?.index === index) setSelectedHook(null);
+      if (data.hook) {
+        const newHooks = [...hooks];
+        newHooks[index] = data.hook;
+        setHooks(newHooks);
+        
+        if (selectedHook?.index === index) setSelectedHook(null);
+      } else {
+        throw new Error("Invalid response format");
+      }
     } catch (error) {
       console.error("Error regenerating hook:", error);
       // Fallback to random sample

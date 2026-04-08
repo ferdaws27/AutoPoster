@@ -30,7 +30,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 
 export default function CreatePostPage() {
-  const { createPost } = usePosts();
+  const { createPost, posts, stats: hookStats } = usePosts();
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
@@ -72,16 +72,75 @@ export default function CreatePostPage() {
     },
   ]);
   const [generationCount, setGenerationCount] = useState(0);
-  const [stats, setStats] = useState({
-    drafts: 0,
-    scheduled: 0,
-    published: 0,
-    engagement: "0",
-    draftsTrend: "No recent drafts",
-    scheduledNext: "No scheduled posts",
-    publishedThisMonth: "None yet",
-    engagementTrend: "No data yet",
-  });
+
+  const calculateStats = () => {
+    const drafts = posts.filter((p) => p.status === "draft").length;
+    const scheduled = posts.filter((p) => p.status === "scheduled").length;
+    const published = posts.filter((p) => p.status === "posted").length;
+
+    // Calculate engagement
+    let totalEngagement = 0;
+    posts.forEach((post) => {
+      if (post.engagement) {
+        totalEngagement +=
+          (post.engagement.likes || 0) +
+          (post.engagement.shares || 0) +
+          (post.engagement.comments || 0);
+      }
+    });
+
+    let engagementDisplay = "0";
+    if (totalEngagement >= 1000) {
+      engagementDisplay = (totalEngagement / 1000).toFixed(1) + "k";
+    } else if (totalEngagement > 0) {
+      engagementDisplay = totalEngagement.toString();
+    }
+
+    // Calculate published this month
+    const publishedThisMonthCount = posts.filter((post) => {
+      if (post.status !== "posted") return false;
+      const postDate = new Date(post.createdAt);
+      const now = new Date();
+      return (
+        postDate.getMonth() === now.getMonth() &&
+        postDate.getFullYear() === now.getFullYear()
+      );
+    }).length;
+
+    // Get next scheduled post
+    const scheduledPosts = posts.filter((p) => p.status === "scheduled");
+    const nextScheduledPost = scheduledPosts.length > 0
+      ? scheduledPosts.sort((a, b) => new Date(a.scheduleDate) - new Date(b.scheduleDate))[0]
+      : null;
+
+    // Get next scheduled date
+    const nextScheduledDate = nextScheduledPost && nextScheduledPost.scheduleDate
+      ? new Date(nextScheduledPost.scheduleDate).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+    return {
+      drafts,
+      scheduled,
+      published,
+      engagement: engagementDisplay,
+      draftsTrend: drafts > 0 ? `${drafts} recent` : "No recent drafts",
+      scheduledNext: nextScheduledDate || "No scheduled",
+      publishedThisMonth: publishedThisMonthCount > 0
+        ? `${publishedThisMonthCount} this month`
+        : "None yet",
+      engagementTrend: totalEngagement > 0 ? "Tracking active" : "No data yet",
+    };
+  };
+
+  const [stats, setStats] = useState(calculateStats());
+
+  // Update stats when posts change
+  useEffect(() => {
+    setStats(calculateStats());
+  }, [posts]);
 
   const API_BASE_URL = "http://localhost:5000/api";
 
@@ -190,10 +249,9 @@ export default function CreatePostPage() {
     refreshStats();
   }, []);
 
-
   // Récupérer le hook depuis localStorage
   useEffect(() => {
-    const storedHook = localStorage.getItem('selectedHook');
+    const storedHook = localStorage.getItem("selectedHook");
     if (storedHook) {
       try {
         const hookData = JSON.parse(storedHook);
