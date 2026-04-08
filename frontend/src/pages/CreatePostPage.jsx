@@ -287,6 +287,61 @@ export default function CreatePostPage() {
     }
   }, []);
 
+  // Récupérer les données de tendance depuis Trendradar
+  useEffect(() => {
+    const storedTrend = localStorage.getItem("selectedTrend");
+    console.log('Checking localStorage for selectedTrend:', storedTrend);
+    
+    if (storedTrend) {
+      try {
+        const trendData = JSON.parse(storedTrend);
+        console.log('Trend data received from Trendradar:', trendData);
+        
+        // Pré-remplir le textarea avec SEULEMENT le contenu de la tendance
+        if (ideaRef.current && trendData.name) {
+          // Prendre uniquement le nom/titre comme contenu
+          let preFilledContent = trendData.name;
+          
+          // NE PAS ajouter de métadonnées, juste le contenu principal
+          console.log('Setting content ONLY (no metadata):', preFilledContent);
+          ideaRef.current.value = preFilledContent;
+          setCharCount(preFilledContent.length);
+          
+          // Configurer les plateformes selon la source
+          if (trendData.source) {
+            let platformConfig = { Twitter: true, LinkedIn: true, Medium: true };
+            
+            // Configuration spécifique selon la source
+            if (trendData.source.includes('Twitter')) {
+              platformConfig = { Twitter: true, LinkedIn: false, Medium: false };
+            } else if (trendData.source.includes('LinkedIn')) {
+              platformConfig = { Twitter: false, LinkedIn: true, Medium: false };
+            } else if (trendData.source.includes('Medium')) {
+              platformConfig = { Twitter: false, LinkedIn: false, Medium: true };
+            } else if (trendData.source.includes('Power Keywords')) {
+              platformConfig = { Twitter: true, LinkedIn: true, Medium: true };
+            } else if (trendData.source.includes('News')) {
+              platformConfig = { Twitter: true, LinkedIn: true, Medium: false };
+            }
+            
+            console.log('Setting platform config:', platformConfig);
+            setPublishTo(platformConfig);
+          }
+          
+          // Pas d'alerte - chargement silencieux du contenu
+        }
+        
+        // Nettoyer localStorage après utilisation
+        localStorage.removeItem('selectedTrend');
+      } catch (error) {
+        console.error('Erreur lors de la récupération de la tendance:', error);
+        alert('❌ Error loading trend data. Please try again.');
+      }
+    } else {
+      console.log('No trend data found in localStorage');
+    }
+  }, []);
+
   // Test API key loading immediately
   useEffect(() => {
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;

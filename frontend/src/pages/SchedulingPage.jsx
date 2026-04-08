@@ -478,6 +478,25 @@ export default function SchedulingPage() {
     setCurrentWeek(newDate);
   };
 
+  // Navigate to post details
+  const navigateToPost = (post) => {
+    // Select the post in Upcoming Posts section
+    setSelectedPost(post);
+    
+    // Scroll to the post in the Upcoming Posts panel
+    setTimeout(() => {
+      const postElement = document.querySelector(`[data-post-id="${post.id}"]`);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add highlight effect
+        postElement.classList.add('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        setTimeout(() => {
+          postElement.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        }, 2000);
+      }
+    }, 100);
+  };
+
   // Handle export calendar
   const handleExportCalendar = () => {
     // Get all posts with dates
@@ -675,6 +694,7 @@ export default function SchedulingPage() {
                 {filteredPosts.map((post, index) => (
                   <div 
                     key={post.id}
+                    data-post-id={post.id}
                     className="post-item bg-black/30 rounded-2xl p-4 border border-gray-700/50 hover:border-cyan-400/30 transition-all cursor-pointer"
                     onClick={() => setSelectedPost(post)}
                   >
@@ -758,28 +778,26 @@ export default function SchedulingPage() {
             </div>
           </div>
 
-          {/* Calendar View */}
+          {/* Calendar Section */}
           <div className="col-span-3">
-            <div className="glass-effect rounded-3xl p-6 h-[800px]">
-              
+            <div className="glass-effect rounded-3xl p-6 h-[800px] flex flex-col">
               {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <div className="flex items-center space-x-4">
                   <button 
-                    onClick={() => navigateView('prev')}
+                    onClick={() => handleNavigateWeek('prev')}
                     className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                   >
                     <FontAwesomeIcon icon={faChevronLeft} />
                   </button>
                   <h2 className="text-2xl font-bold text-white">{formatDate(currentWeek)}</h2>
                   <button 
-                    onClick={() => navigateView('next')}
+                    onClick={() => handleNavigateWeek('next')}
                     className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                   >
                     <FontAwesomeIcon icon={faChevronRight} />
                   </button>
                 </div>
-                
                 <div className="flex items-center space-x-4">
                   {/* Platform Legend */}
                   <div className="flex items-center space-x-4 text-sm">
@@ -801,7 +819,7 @@ export default function SchedulingPage() {
               </div>
 
               {/* Calendar Grid */}
-              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-hidden ${
+              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 ${
                 viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'
               }`}>
                 
@@ -836,12 +854,14 @@ export default function SchedulingPage() {
                         {dayPosts.map((post, postIndex) => (
                           <div 
                             key={post.id}
-                            className={`event-bar ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
+                            onClick={() => navigateToPost(post)}
+                            className={`event-bar cursor-pointer hover:scale-105 transition-transform ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
                             style={{ animationDelay: `${postIndex * 0.1}s` }}
+                            title={post.idea || post.content || 'No content'}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-white text-xs font-medium truncate">
-                                {(post.idea || post.content || '').substring(0, 15)}...
+                                {post.idea || post.content || 'No content'}
                               </span>
                               <div className="flex space-x-1">
                                 {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
@@ -855,6 +875,15 @@ export default function SchedulingPage() {
                             </div>
                             {post.scheduleTime && (
                               <div className="text-gray-300 text-xs">{formatTime(post.scheduleTime)}</div>
+                            )}
+                            {post.status && (
+                              <div className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
+                                post.status === 'scheduled' ? 'bg-yellow-400/20 text-yellow-400' :
+                                post.status === 'draft' ? 'bg-gray-400/20 text-gray-400' :
+                                'bg-green-400/20 text-green-400'
+                              }`}>
+                                {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                              </div>
                             )}
                           </div>
                         ))}
