@@ -168,17 +168,24 @@ export const usePosts = () => {
 
   const syncWithLocalStorage = useCallback(() => {
     try {
-      const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
-      const scheduled = JSON.parse(localStorage.getItem('autoposter_scheduled') || '[]');
-      const published = JSON.parse(localStorage.getItem('autoposter_published') || '[]');
+      // Get current user ID to isolate data by user
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user.id || user.email || 'guest';
+      
+      // Use user-specific keys to isolate data
+      const userPrefix = `autoposter_${userId}_`;
+      const drafts = JSON.parse(localStorage.getItem(userPrefix + 'drafts') || '[]');
+      const scheduled = JSON.parse(localStorage.getItem(userPrefix + 'scheduled') || '[]');
+      const published = JSON.parse(localStorage.getItem(userPrefix + 'published') || '[]');
 
       const allPosts = [
-        ...drafts.map(p => ({ ...p, status: 'draft' })),
-        ...scheduled.map(p => ({ ...p, status: 'scheduled' })),
-        ...published.map(p => ({ ...p, status: 'posted', engagement: p.engagement || { likes: 0, shares: 0, comments: 0 } }))
+        ...drafts.map(p => ({ ...p, status: 'draft', userId })),
+        ...scheduled.map(p => ({ ...p, status: 'scheduled', userId })),
+        ...published.map(p => ({ ...p, status: 'posted', engagement: p.engagement || { likes: 0, shares: 0, comments: 0 }, userId }))
       ];
 
       setPosts(allPosts);
+      console.log(`Loaded ${allPosts.length} posts for user: ${userId}`);
     } catch (err) {
       console.error('Error syncing posts from localStorage:', err);
       setError(err.message);
@@ -263,6 +270,7 @@ export const usePosts = () => {
       if (postData.scheduleDate !== undefined) backendData.schedule_date = postData.scheduleDate;
       if (postData.scheduleTime !== undefined) backendData.schedule_time = postData.scheduleTime;
       if (postData.engagement !== undefined) backendData.engagement = postData.engagement;
+      if (postData.selectedImages !== undefined) backendData.selectedImages = postData.selectedImages;
 
       console.log('Updating post:', { postId, backendData });
 
@@ -287,6 +295,7 @@ export const usePosts = () => {
               scheduleDate: response.data.schedule_date,
               scheduleTime: response.data.schedule_time,
               engagement: response.data.engagement,
+              selectedImages: response.data.selectedImages,
               createdAt: response.data.created_at,
               updatedAt: response.data.updated_at
             };
@@ -301,7 +310,11 @@ export const usePosts = () => {
 
       // Fallback to localStorage if backend failed or not authenticated
       if (!updateSucceeded) {
-        const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
+        // Get current user ID to isolate data
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const userId = user.id || user.email || 'guest';
+        const userPrefix = `autoposter_${userId}_`;
+        const storageKeys = [userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published'];
         let found = false;
 
         for (const key of storageKeys) {
@@ -312,13 +325,15 @@ export const usePosts = () => {
               ...items[index],
               ...postData,
               id: postId,
-              idea: postData.content || postData.idea || items[index].idea
+              idea: postData.content || postData.idea || items[index].idea,
+              selectedImages: postData.selectedImages !== undefined ? postData.selectedImages : items[index].selectedImages,
+              userId: userId
             };
             localStorage.setItem(key, JSON.stringify(items));
             updatedPost = items[index];
             updateSucceeded = true;
             found = true;
-            console.log('localStorage update successful:', updatedPost);
+            console.log(`localStorage update successful for user ${userId}:`, updatedPost);
             break;
           }
         }
@@ -333,7 +348,8 @@ export const usePosts = () => {
               ...postData,
               id: postId,
               content: postData.content || postData.idea || existingPost.content,
-              idea: postData.content || postData.idea || existingPost.idea
+              idea: postData.content || postData.idea || existingPost.idea,
+              selectedImages: postData.selectedImages !== undefined ? postData.selectedImages : existingPost.selectedImages
             };
             updateSucceeded = true;
             console.log('State-only update successful:', updatedPost);
@@ -371,14 +387,18 @@ export const usePosts = () => {
           setPosts(prev => prev.filter(p => p.id !== postId));
         }
       } else {
-        // Fallback to localStorage
-        const storageKeys = ['autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'];
+        // Fallback to localStorage with user-specific keys
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const userId = user.id || user.email || 'guest';
+        const userPrefix = `autoposter_${userId}_`;
+        const storageKeys = [userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published'];
 
         for (const key of storageKeys) {
           const items = JSON.parse(localStorage.getItem(key) || '[]');
           const filtered = items.filter(p => p.id !== postId);
           if (filtered.length !== items.length) {
             localStorage.setItem(key, JSON.stringify(filtered));
+            console.log(`Deleted post ${postId} from localStorage for user ${userId}`);
             break;
           }
         }
@@ -397,52 +417,69 @@ export const usePosts = () => {
   const duplicatePost = useCallback(async (postId) => {
     try {
       setLoading(true);
+      console.log('=== DUPLICATE POST DEBUG ===');
+      console.log('Post ID to duplicate:', postId);
 
-      if (isAuthenticated()) {
-        // Use backend API
-        const response = await apiFetch(`/api/posts/${postId}/duplicate`, {
-          method: 'POST'
-        });
+      // Try backend API first, but fallback to localStorage if it fails
+      try {
+        if (isAuthenticated()) {
+          console.log('Trying backend API...');
+          const response = await apiFetch(`/api/posts/${postId}/duplicate`, {
+            method: 'POST'
+          });
 
-        if (response.success) {
-          const newPost = {
-            id: response.data._id,
-            content: response.data.content,
-            platforms: response.data.platforms,
-            status: response.data.status,
-            scheduleDate: response.data.schedule_date,
-            scheduleTime: response.data.schedule_time,
-            engagement: response.data.engagement,
-            createdAt: response.data.created_at,
-            updatedAt: response.data.updated_at
-          };
+          console.log('API Response:', response);
 
-          setPosts(prev => [newPost, ...prev]);
-          return newPost;
+          if (response.success) {
+            console.log('Backend API duplicate successful');
+            const newPost = {
+              id: response.data._id,
+              content: response.data.content,
+              platforms: response.data.platforms,
+              status: response.data.status,
+              scheduleDate: response.data.schedule_date,
+              scheduleTime: response.data.schedule_time,
+              engagement: response.data.engagement,
+              createdAt: response.data.created_at,
+              updatedAt: response.data.updated_at
+            };
+
+            setPosts(prev => [newPost, ...prev]);
+            return newPost;
+          }
         }
-      } else {
-        // Fallback to localStorage - duplicate the post locally
-        const existingPost = posts.find(p => p.id === postId);
-        if (!existingPost) {
-          throw new Error('Post not found');
-        }
-
-        const duplicatedPost = {
-          ...existingPost,
-          id: Date.now(),
-          status: 'draft',
-          createdAt: new Date().toISOString(),
-          scheduleDate: null,
-          scheduleTime: null
-        };
-
-        const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
-        drafts.push(duplicatedPost);
-        localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
-
-        setPosts(prev => [duplicatedPost, ...prev]);
-        return duplicatedPost;
+      } catch (apiErr) {
+        console.log('Backend API failed, using localStorage fallback:', apiErr.message);
       }
+
+      // Fallback to localStorage - duplicate the post locally
+      console.log('Using localStorage fallback for duplication');
+      const existingPost = posts.find(p => p.id === postId);
+      if (!existingPost) {
+        throw new Error('Post not found');
+      }
+
+      const duplicatedPost = {
+        ...existingPost,
+        id: Date.now().toString(),
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        scheduleDate: null,
+        scheduleTime: null
+      };
+
+      console.log('Created duplicate post:', duplicatedPost);
+
+      // Save to localStorage
+      const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
+      drafts.push(duplicatedPost);
+      localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
+
+      // Update state
+      setPosts(prev => [duplicatedPost, ...prev]);
+      return duplicatedPost;
+
     } catch (err) {
       console.error('Error duplicating post:', err);
       setError(err.message);
