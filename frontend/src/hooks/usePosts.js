@@ -166,6 +166,21 @@ export const usePosts = () => {
     }
   }, []);
 
+  // 🔥 Fetch analytics data from backend (with real engagement data)
+  const fetchAnalyticsData = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/analytics');
+      if (response.success || Array.isArray(response)) {
+        const analyticsData = Array.isArray(response) ? response : response.data;
+        return analyticsData;
+      }
+      return [];
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+      return [];
+    }
+  }, []);
+
   const syncWithLocalStorage = useCallback(() => {
     try {
       const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
@@ -470,6 +485,7 @@ export const usePosts = () => {
     duplicatePost,
     getPostsByDateRange,
     syncWithLocalStorage,
-    syncWithBackend
+    syncWithBackend,
+    fetchAnalyticsData
   };
 };
