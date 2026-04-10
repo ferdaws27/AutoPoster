@@ -1,52 +1,83 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 
 export default function Integrations() {
-  const [platforms, setPlatforms] = useState({
-    twitter: {
-      connected: true,
-      username: "@dr_khalil_tech",
-      autoPost: true,
-      visibility: "Public",
-    },
-    linkedin: {
-      connected: true,
-      username: "Dr. Khalil Ahmed",
-      autoPost: false,
-      visibility: "Public",
-    },
-    medium: {
-      connected: false,
-      username: null,
-      autoPost: false,
-      visibility: "Public",
-    },
+  const { user } = useOutletContext();
+
+  // ✅ INIT STATE AVEC LOCALSTORAGE
+  const [platforms, setPlatforms] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem("platforms"));
+
+    return (
+      saved || {
+        twitter: {
+          connected: false,
+          username: null,
+          autoPost: false,
+          visibility: "Public",
+        },
+        linkedin: {
+          connected: false,
+          username: null,
+          profile_picture: null,
+          autoPost: false,
+          visibility: "Public",
+        },
+        medium: {
+          connected: false,
+          username: null,
+          autoPost: false,
+          visibility: "Public",
+        },
+      }
+    );
   });
 
   const [selectedPlatform, setSelectedPlatform] = useState(null);
 
+  // ✅ SYNC LINKEDIN AUTO
+  useEffect(() => {
+    if (user) {
+      setPlatforms((prev) => ({
+        ...prev,
+        linkedin: {
+          ...prev.linkedin,
+          connected: true,
+          username: user.full_name,
+          profile_picture: user.profile_picture,
+        },
+      }));
+    }
+  }, [user]);
+
+  // ✅ SAVE LOCALSTORAGE
+  useEffect(() => {
+    localStorage.setItem("platforms", JSON.stringify(platforms));
+  }, [platforms]);
+
+  // ✅ TOGGLE (TWITTER + MEDIUM SEULEMENT)
   const toggleConnection = (key) => {
+    if (key === "linkedin") return;
+
     setPlatforms((prev) => ({
       ...prev,
       [key]: {
         ...prev[key],
         connected: !prev[key].connected,
-        username: !prev[key].connected ? "New Account" : null,
+        username: !prev[key].connected
+          ? key === "twitter"
+            ? "@new_user"
+            : "MediumUser"
+          : null,
       },
     }));
   };
 
-  const updateSetting = (key, field, value) => {
-    setPlatforms((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: value,
-      },
-    }));
-  };
-
+  // ✅ CONNECT ACCOUNT
   const changeAccount = (key, newUsername) => {
+    if (key === "linkedin") return;
+
     setPlatforms((prev) => ({
       ...prev,
       [key]: {
@@ -68,18 +99,35 @@ export default function Integrations() {
         {/* LEFT */}
         <div>
           <h3 className="text-white font-semibold">{title}</h3>
-          <p className="text-gray-400 text-sm">
-            {platform.connected ? platform.username : "Not connected"}
-          </p>
+
+          {/* IMAGE + NAME */}
+          <div className="flex items-center space-x-3 mt-2">
+            {platform.connected && platform.profile_picture && (
+              <img
+                src={platform.profile_picture}
+                onError={(e) => (e.target.src = "/default-avatar.png")}
+                className="w-8 h-8 rounded-full"
+                alt="profile"
+              />
+            )}
+
+            <p className="text-gray-400 text-sm">
+              {platform.connected ? platform.username : "Not connected"}
+            </p>
+          </div>
+
           <div className="flex items-center space-x-2 mt-1">
             <div
               className={`w-2 h-2 ${
                 platform.connected ? "bg-green-400" : "bg-red-400"
               } rounded-full`}
             />
+
             <span
               className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                platform.connected ? "status-connected" : "status-disconnected"
+                platform.connected
+                  ? "status-connected"
+                  : "status-disconnected"
               }`}
             >
               {platform.connected ? "Connected" : "Disconnected"}
@@ -92,17 +140,19 @@ export default function Integrations() {
           {/* TOGGLE */}
           <div
             onClick={() => toggleConnection(key)}
-            className={`toggle-switch ${platform.connected ? "active" : ""} cursor-pointer`}
+            className={`toggle-switch ${
+              platform.connected ? "active" : ""
+            } cursor-pointer`}
           >
             <div className="toggle-knob" />
           </div>
 
-          {/* CONFIGURE BUTTON */}
+          {/* CONFIGURE */}
           <Dialog.Root>
             <Dialog.Trigger asChild>
               <button
                 onClick={() => setSelectedPlatform(key)}
-                className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white transition-colors text-sm"
+                className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white text-sm"
               >
                 Configure
               </button>
@@ -117,7 +167,6 @@ export default function Integrations() {
                     {title} Settings
                   </Dialog.Title>
 
-                  {/* -------------------- ACCOUNT MANAGEMENT -------------------- */}
                   <div className="mb-4 border-b border-gray-700 pb-4">
                     <h4 className="text-white text-sm font-semibold mb-2">
                       Account Management
@@ -125,28 +174,35 @@ export default function Integrations() {
 
                     {platform.connected ? (
                       <>
-                        <p className="text-gray-300 text-sm mb-2">
+                        <p className="text-gray-300 text-sm">
                           Connected as: {platform.username}
                         </p>
-                        <button
-                          onClick={() => changeAccount(key, "New_Account")}
-                          className="px-3 py-1 bg-blue-500 text-white rounded-xl text-sm"
-                        >
-                          Switch Account
-                        </button>
+
+                        {key !== "linkedin" && (
+                          <button
+                            onClick={() =>
+                              changeAccount(key, "New_Account")
+                            }
+                            className="px-3 py-1 bg-blue-500 text-white rounded-xl text-sm mt-2"
+                          >
+                            Switch Account
+                          </button>
+                        )}
                       </>
                     ) : (
-                      <button
-                        onClick={() => changeAccount(key, "New_Account")}
-                        className="px-3 py-1 bg-green-500 text-white rounded-xl text-sm"
-                      >
-                        Connect Account
-                      </button>
+                      key !== "linkedin" && (
+                        <button
+                          onClick={() =>
+                            changeAccount(key, "New_Account")
+                          }
+                          className="px-3 py-1 bg-green-500 text-white rounded-xl text-sm"
+                        >
+                          Connect Account
+                        </button>
+                      )
                     )}
                   </div>
 
-
-                  {/* -------------------- MODAL FOOTER -------------------- */}
                   <div className="flex justify-end mt-6">
                     <Dialog.Close asChild>
                       <button className="px-4 py-2 bg-violet-500 rounded-xl text-white text-sm">
@@ -169,9 +225,14 @@ export default function Integrations() {
         <div className="w-10 h-10 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
           <i className="fa-solid fa-plug text-cyan-400"></i>
         </div>
+
         <div>
-          <h2 className="text-2xl font-bold text-white">Platform Integrations</h2>
-          <p className="text-gray-400">Connect your social media accounts</p>
+          <h2 className="text-2xl font-bold text-white">
+            Platform Integrations
+          </h2>
+          <p className="text-gray-400">
+            Connect your social media accounts
+          </p>
         </div>
       </div>
 

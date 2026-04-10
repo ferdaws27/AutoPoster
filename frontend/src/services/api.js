@@ -1,13 +1,18 @@
 // src/services/api.js
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+export const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export async function apiFetch(path, options = {}) {
   const token = localStorage.getItem("token");
 
   const headers = {
-    "Content-Type": "application/json",
     ...(options.headers || {}),
   };
+
+  // Only add Content-Type for requests with a body (POST, PUT, PATCH)
+  if (options.body || options.method?.toUpperCase() === 'POST' || options.method?.toUpperCase() === 'PUT' || options.method?.toUpperCase() === 'PATCH') {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) headers.Authorization = `Bearer ${token}`;
 

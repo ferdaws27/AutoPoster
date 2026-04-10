@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 const sampleHooksData = [
@@ -16,6 +17,7 @@ const platformsList = [
 ];
 
 export default function HookGeneratorPage() {
+  const navigate = useNavigate();
   const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -37,33 +39,133 @@ export default function HookGeneratorPage() {
     setSelectedPlatforms(updated);
   };
 
-  const generateHooks = () => {
+  const generateHooks = async () => {
     if (!topic.trim()) return;
+
     setLoading(true);
     setSelectedHook(null);
-    setTimeout(() => {
-      setHooks([...sampleHooksData]); // Simuler API
+    setHooks([]);
+
+    try {
+      const API_BASE = "http://localhost:5000";
+      
+      const response = await fetch(`${API_BASE}/api/hook-generator/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: topic,
+          platforms: selectedPlatforms,
+          language: "auto", // Auto-detect language
+          tone: "dynamic",
+          count: 5
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.hooks && Array.isArray(data.hooks) && data.hooks.length > 0) {
+        setHooks(data.hooks);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (error) {
+      console.error("Error generating hooks:", error);
+      alert(`Error generating hooks: ${error.message}\n\nUsing sample hooks instead.`);
+      setHooks([...sampleHooksData]);
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
-  const regenerateHook = (index) => {
-    const newHooks = [...hooks];
-    const randomHooks = [
-      "Stop scrolling. This will change how you think about AI forever.",
-      "I made a $50K mistake with AI. Here's what I learned:",
-      "The AI trend everyone's talking about is actually dangerous. Here's why:",
-      "3 AI predictions that will seem obvious in 2025:",
-      "This AI breakthrough happened yesterday. No one noticed."
-    ];
-    const randIndex = Math.floor(Math.random() * randomHooks.length);
-    newHooks[index] = { text: randomHooks[randIndex], score: 85 + Math.floor(Math.random() * 15), type: 'regenerated' };
-    setHooks(newHooks);
-    if (selectedHook?.index === index) setSelectedHook(null);
+  const regenerateHook = async (index) => {
+    setLoading(true);
+    
+    try {
+      const API_BASE = "http://localhost:5000";
+      const platform = selectedPlatforms[index % selectedPlatforms.length] || 'twitter';
+      
+      const response = await fetch(`${API_BASE}/api/hook-generator/regenerate-one`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: topic,
+          platform: platform,
+          language: "auto", // Auto-detect language
+          tone: "dynamic"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.hook) {
+        const newHooks = [...hooks];
+        newHooks[index] = data.hook;
+        setHooks(newHooks);
+        
+        if (selectedHook?.index === index) setSelectedHook(null);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (error) {
+      console.error("Error regenerating hook:", error);
+      // Fallback to random sample
+      const newHooks = [...hooks];
+      const randomHooks = [
+        "Stop scrolling. This will change how you think about this forever.",
+        "I made a $50K mistake. Here's what I learned:",
+        "Everyone's talking about this, but nobody understands why it matters.",
+        "3 predictions that will seem obvious by next year:",
+        "This happened yesterday. Almost nobody noticed."
+      ];
+      const randIndex = Math.floor(Math.random() * randomHooks.length);
+      newHooks[index] = { ...newHooks[index], text: randomHooks[randIndex], score: 85 + Math.floor(Math.random() * 10) };
+      setHooks(newHooks);
+      if (selectedHook?.index === index) setSelectedHook(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectHook = (hook, index) => setSelectedHook({ ...hook, index });
-  const insertHook = () => { if (selectedHook) setSuccessOpen(true); };
+
+  const insertHook = () => {
+    if (selectedHook) {
+      // Stocker le hook sélectionné dans localStorage
+      const hookData = {
+        text: selectedHook.text,
+        platform: selectedPlatforms[0] || 'twitter', // Utiliser la première plateforme sélectionnée
+        score: selectedHook.score,
+        type: selectedHook.type,
+        reason: selectedHook.reason || 'High engagement potential',
+        originalTopic: topic,
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem('selectedHook', JSON.stringify(hookData));
+      
+      // Afficher la notification de succès
+      setSuccessOpen(true);
+      
+      // Navigation automatique après un court délai
+      setTimeout(() => {
+        navigate('/dashboard/CreatePostPage');
+      }, 2000);
+    }
+  };
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-[#0E1116] to-[#1A1F26] text-white">
@@ -170,15 +272,15 @@ export default function HookGeneratorPage() {
                       </div>
                       <span className="text-cyan-400 font-semibold">{hook.score}%</span>
                       <button
-  onClick={(e) => {
-    e.stopPropagation(); // empêche la sélection via le parent
-    selectHook(hook, idx); // optionnel, rend le hook visuellement sélectionné
-    insertHook();          // ouvre le modal de succès
-  }}
-  className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
->
-  <i className="fa-solid fa-pen mr-1"></i> Use
-</button>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectHook(hook, idx);
+                          insertHook();
+                        }}
+                        className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
+                      >
+                        <i className="fa-solid fa-pen mr-1"></i> Use
+                      </button>
 
                       <button onClick={(e) => { e.stopPropagation(); regenerateHook(idx); }} className="p-2 bg-black/30 border border-gray-600 rounded-xl text-gray-300 hover:text-white hover:border-cyan-400">
                         <i className="fa-solid fa-refresh"></i>
@@ -224,7 +326,7 @@ export default function HookGeneratorPage() {
   <div className="text-center mb-8">
     <button
       id="insert-hook-btn"
-      onClick={() => setSuccessOpen(true)}
+      onClick={insertHook}
       className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all"
     >
       <i className="fa-solid fa-pen mr-2"></i>

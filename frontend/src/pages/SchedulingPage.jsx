@@ -1,402 +1,1344 @@
-import { useState, useRef } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import interactionPlugin from "@fullcalendar/interaction";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faPlus, faChevronLeft, faChevronRight, faEdit, faTrash, faTimes, 
+  faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt,
+  faFileLines, faShareNodes, faCalendar, faCheckCircle, faInfoCircle, faSpinner, faSave
+} from '@fortawesome/free-solid-svg-icons';
+import { faTwitter, faLinkedin, faMedium, faXTwitter } from '@fortawesome/free-brands-svg-icons';
+import { usePosts } from '../hooks/usePosts';
 
 export default function SchedulingPage() {
-  const calendarRef = useRef(null);
+  const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState('week');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [posts, setPosts] = useState([]);
-  const [currentPost, setCurrentPost] = useState(null);
-  const [filter, setFilter] = useState("All");
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
-  const [draft, setDraft] = useState(false);
-  const navigateTo = useNavigate();
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(""), 3000);
-  };
-
-  const addPost = (newPost, isDraft = false) => {
-    setPosts([...posts, { id: Date.now(), ...newPost, draft: isDraft }]);
-    showToast(isDraft ? "Post saved as Draft" : "Post Scheduled");
-  };
-
-  const deletePost = (postId) => {
-    setPosts(posts.filter((p) => p.id !== postId));
-    showToast("Post Deleted");
-    setShowDeleteModal(false);
-  };
-
-  const getPlatformColor = (platform) => {
-    if (platform === "Twitter") return "#60a5fa";
-    if (platform === "LinkedIn") return "#a78bfa";
-    if (platform === "Medium") return "#34d399";
-    return "#64748b";
-  };
-
-  const getStatus = (p) => {
-    if (p.draft) return "Draft";
-    const postDate = new Date(`${p.date}T${p.time}`);
-    const now = new Date();
-    return postDate <= now ? "Posted" : "Scheduled";
-  };
-
-  const filteredPosts = posts.filter((p) => {
-    const postDate = new Date(`${p.date}T${p.time}`);
-    const today = new Date();
-    const weekEnd = new Date();
-    weekEnd.setDate(today.getDate() + 7);
-
-    if (filter === "Today") return postDate.toDateString() === today.toDateString();
-    if (filter === "This Week") return postDate >= today && postDate <= weekEnd;
-    return true;
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', description: '' });
+  const [errorMessage, setErrorMessage] = useState({ title: '', description: '' });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [filterTab, setFilterTab] = useState('all');
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [newPost, setNewPost] = useState({
+    content: '',
+    platforms: { Twitter: false, LinkedIn: true, Medium: false },
+    date: '',
+    time: '',
+    selectedImage: 0
+  });
+  const [editingPost, setEditingPost] = useState({
+    content: '',
+    platforms: { Twitter: false, LinkedIn: false, Medium: false },
+    date: '',
+    time: '',
+    selectedImage: 0
   });
 
-  const navigate = (action) => {
-    const calendarApi = calendarRef.current.getApi();
-    if (action === "prev") calendarApi.prev();
-    if (action === "next") calendarApi.next();
-    if (action === "today") calendarApi.today();
-    setCurrentDate(calendarApi.getDate());
+  // Use the centralized posts hook
+  const { 
+    posts, 
+    loading, 
+    error, 
+    stats, 
+    createPost, 
+    updatePost, 
+    deletePost, 
+    duplicatePost,
+    getPostsByDateRange,
+    syncWithLocalStorage 
+  } = usePosts();
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      setErrorMessage({
+        title: '⚠️ Error Loading Posts',
+        description: error
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    }
+  }, [error]);
+
+  // Generate days for current view
+  const generateViewDays = () => {
+    const days = [];
+    
+    if (viewMode === 'week') {
+      // Week view - generate 7 days
+      const startOfWeek = new Date(currentWeek);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        days.push(date);
+      }
+    } else {
+      // Day view - generate just current day
+      days.push(new Date(currentWeek));
+    }
+    
+    return days;
+  };
+
+  const viewDays = generateViewDays();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Filter posts based on selected tab
+  const filteredPosts = posts.filter(post => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Use scheduleDate for scheduled posts, createdAt for others
+    const postDate = post.scheduleDate ? new Date(post.scheduleDate) : new Date(post.createdAt);
+    postDate.setHours(0, 0, 0, 0);
+    
+    if (filterTab === 'all') return true;
+    if (filterTab === 'today') {
+      return postDate.toDateString() === today.toDateString();
+    }
+    if (filterTab === 'week') {
+      // Start of current week (Monday)
+      const weekStart = new Date(today);
+      const day = weekStart.getDay();
+      const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+      weekStart.setDate(diff);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      // End of current week (Sunday)
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      return postDate >= weekStart && postDate <= weekEnd;
+    }
+    return true;
+  }).sort((a, b) => {
+    // Sort by date/time (most recent first)
+    const dateA = new Date(`${a.scheduleDate || a.createdAt} ${a.scheduleTime || '00:00'}`);
+    const dateB = new Date(`${b.scheduleDate || b.createdAt} ${b.scheduleTime || '00:00'}`);
+    return dateB - dateA;
+  });
+
+  // Get posts for specific day
+  const getPostsForDay = (date) => {
+    return filteredPosts.filter(post => {
+      // Use scheduleDate for scheduled posts, createdAt for others
+      const postDate = post.scheduleDate ? new Date(post.scheduleDate) : new Date(post.createdAt);
+      postDate.setHours(0, 0, 0, 0);
+      
+      const compareDate = new Date(date);
+      compareDate.setHours(0, 0, 0, 0);
+      
+      return postDate.toDateString() === compareDate.toDateString();
+    });
+  };
+
+  // Format date for display
+  const formatDate = (date) => {
+    const options = { month: 'long', year: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  // Format time for display
+  const formatTime = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  // Format date and time for display in posts
+  const formatPostDateTime = (post) => {
+    if (post.scheduleDate && post.scheduleTime) {
+      const date = new Date(post.scheduleDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const postDate = new Date(post.scheduleDate);
+      postDate.setHours(0, 0, 0, 0);
+      
+      const dayDiff = Math.floor((postDate - today) / (1000 * 60 * 60 * 24));
+      
+      let dateText = '';
+      if (dayDiff === 0) {
+        dateText = 'Today';
+      } else if (dayDiff === 1) {
+        dateText = 'Tomorrow';
+      } else if (dayDiff === -1) {
+        dateText = 'Yesterday';
+      } else if (dayDiff > 0 && dayDiff <= 7) {
+        dateText = postDate.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      } else {
+        dateText = postDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      
+      return `${dateText}, ${formatTime(post.scheduleTime)}`;
+    }
+    return 'No date set';
+  };
+
+  // Handle schedule post
+  const handleSchedulePost = async () => {
+    // Validate form
+    if (!newPost.content.trim()) {
+      setErrorMessage({
+        title: '⚠️ Missing Content',
+        description: 'Please enter post content'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+    
+    if (!newPost.date || !newPost.time) {
+      setErrorMessage({
+        title: '⚠️ Missing Schedule',
+        description: 'Please select both date and time'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    const selectedPlatformsList = Object.keys(newPost.platforms).filter(p => newPost.platforms[p]);
+    if (selectedPlatformsList.length === 0) {
+      setErrorMessage({
+        title: '⚠️ No Platform Selected',
+        description: 'Please select at least one platform'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    // Debug logging
+    console.log('Scheduling post with date:', newPost.date, 'time:', newPost.time);
+    console.log('Selected platforms:', selectedPlatformsList);
+
+    try {
+      setIsSaving(true);
+      // Create scheduled posts for each selected platform using the hook
+      const scheduledPosts = await Promise.all(
+        selectedPlatformsList.map(platform => 
+          createPost({
+            idea: newPost.content,
+            content: newPost.content,
+            platforms: { [platform]: true },
+            selectedImages: newPost.selectedImage,
+            scheduleDate: newPost.date,
+            scheduleTime: newPost.time,
+            status: 'scheduled'
+          })
+        )
+      );
+
+      console.log('Created posts:', scheduledPosts);
+
+      // Update UI
+      setShowAddModal(false);
+      setSuccessMessage({ title: 'Post scheduled successfully', description: 'Your content will be published as planned' });
+      setShowSuccessToast(true);
+      
+      // Reset form
+      setNewPost({
+        content: '',
+        platforms: { Twitter: false, LinkedIn: true, Medium: false },
+        date: '',
+        time: '',
+        selectedImage: 0
+      });
+
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to schedule post:', error);
+      setErrorMessage({
+        title: '❌ Failed to Schedule',
+        description: error.message || 'Could not create the post. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle save as draft
+  // Handle save draft
+  const handleSaveDraft = async () => {
+    // Validate form
+    if (!newPost.content.trim()) {
+      setErrorMessage({
+        title: '⚠️ Missing Content',
+        description: 'Please enter post content'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    const selectedPlatformsList = Object.keys(newPost.platforms).filter(p => newPost.platforms[p]);
+    if (selectedPlatformsList.length === 0) {
+      setErrorMessage({
+        title: '⚠️ No Platform Selected',
+        description: 'Please select at least one platform'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      // Create draft posts for each selected platform using the hook
+      const draftPosts = await Promise.all(
+        selectedPlatformsList.map(platform => 
+          createPost({
+            name: `Draft - ${new Date().toLocaleDateString()}`,
+            idea: newPost.content,
+            content: newPost.content,
+            variations: {},
+            selectedImages: {},
+            publishTo: { [platform]: true },
+            platforms: { [platform]: true },
+            status: 'draft'
+          })
+        )
+      );
+
+      // Update UI
+      setShowAddModal(false);
+      setSuccessMessage({ title: 'Draft saved successfully', description: 'Your draft has been saved for later' });
+      setShowSuccessToast(true);
+      
+      // Reset form
+      setNewPost({
+        content: '',
+        platforms: { Twitter: false, LinkedIn: true, Medium: false },
+        date: '',
+        time: '',
+        selectedImage: 0
+      });
+
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to save draft:', error);
+      setErrorMessage({
+        title: '❌ Failed to Save Draft',
+        description: error.message || 'Could not save the draft. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle edit post
+  const handleEditPost = (post) => {
+    if (!post || post.status === 'posted') return; // Don't allow editing posted content
+    
+    setSelectedPost(post);
+    setEditingPost({
+      content: post.idea || post.content || '',
+      platforms: post.platforms || { Twitter: false, LinkedIn: false, Medium: false },
+      date: post.scheduleDate || '',
+      time: post.scheduleTime || '',
+      selectedImage: post.selectedImages || 0
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle save edited post
+  const handleSaveEdit = async () => {
+    if (!selectedPost) return;
+    
+    // Validate form
+    if (!editingPost.content.trim()) {
+      alert('Please enter post content');
+      return;
+    }
+
+    const selectedPlatformsList = Object.keys(editingPost.platforms).filter(p => editingPost.platforms[p]);
+    if (selectedPlatformsList.length === 0) {
+      alert('Please select at least one platform');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log('Saving edited post:', {
+        postId: selectedPost.id,
+        editingPost
+      });
+
+      // Update post using the hook
+      await updatePost(selectedPost.id, {
+        idea: editingPost.content,
+        content: editingPost.content,
+        platforms: editingPost.platforms,
+        selectedImages: editingPost.selectedImage,
+        scheduleDate: editingPost.date,
+        scheduleTime: editingPost.time
+      });
+
+      // Update UI
+      setShowEditModal(false);
+      setSelectedPost(null);
+      setEditingPost({
+        content: '',
+        platforms: { Twitter: false, LinkedIn: false, Medium: false },
+        date: '',
+        time: '',
+        selectedImage: 0
+      });
+      setSuccessMessage({ title: 'Post updated successfully', description: 'Your changes have been saved' });
+      setShowSuccessToast(true);
+      
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      const errorMessage = error?.message || 'Failed to update post. Please try again.';
+      alert(errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const calculateEngagement = (post) => {
+    if (!post.engagement) return 0;
+    return (post.engagement.likes || 0) + (post.engagement.shares || 0) + (post.engagement.comments || 0);
+  };
+
+  // Format engagement display
+  const formatEngagement = (engagement) => {
+    if (engagement >= 1000) {
+      return `${(engagement / 1000).toFixed(1)}k engagements`;
+    }
+    return `${engagement} engagements`;
+  };
+
+  // Handle duplicate post
+  const handleDuplicatePost = async (post) => {
+    try {
+      await duplicatePost(post.id);
+      setSuccessMessage({ title: 'Post duplicated successfully', description: 'Your post has been duplicated' });
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to duplicate post:', error);
+      setErrorMessage({
+        title: '❌ Failed to Duplicate',
+        description: error.message || 'Could not duplicate post. Please try again.'
+      });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+    }
+  };
+
+  // Handle delete post
+  const handleDeletePost = async () => {
+    if (!selectedPost) return;
+
+    setIsDeleting(true);
+    try {
+      await deletePost(selectedPost.id);
+      setShowDeleteModal(false);
+      setSelectedPost(null);
+      setSuccessMessage({ title: 'Post deleted successfully', description: 'Your post has been deleted' });
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      alert('Failed to delete post. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleNavigateWeek = (direction) => {
+    const newDate = new Date(currentWeek);
+    if (viewMode === 'week') {
+      // Week navigation - move by 7 days
+      newDate.setDate(currentWeek.getDate() + (direction === 'next' ? 7 : -7));
+    } else {
+      // Day navigation - move by 1 day
+      newDate.setDate(currentWeek.getDate() + (direction === 'next' ? 1 : -1));
+    }
+    
+    setCurrentWeek(newDate);
+  };
+
+  // Navigate to post details
+  const navigateToPost = (post) => {
+    // Select the post in Upcoming Posts section
+    setSelectedPost(post);
+    
+    // Scroll to the post in the Upcoming Posts panel
+    setTimeout(() => {
+      const postElement = document.querySelector(`[data-post-id="${post.id}"]`);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add highlight effect
+        postElement.classList.add('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        setTimeout(() => {
+          postElement.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        }, 2000);
+      }
+    }, 100);
+  };
+
+  // Handle export calendar
+  const handleExportCalendar = () => {
+    // Get all posts with dates
+    const postsWithDates = posts.filter(post => post.scheduleDate);
+    
+    if (postsWithDates.length === 0) {
+      alert('No scheduled posts to export');
+      return;
+    }
+
+    // Create calendar data
+    const calendarEvents = postsWithDates.map(post => {
+      const startDate = new Date(`${post.scheduleDate} ${post.scheduleTime || '12:00'}`);
+      const endDate = new Date(startDate);
+      endDate.setHours(endDate.getHours() + 1); // 1 hour event
+      
+      const platforms = post.platforms ? Object.keys(post.platforms).filter(p => post.platforms[p]).join(', ') : 'Unknown';
+      
+      return {
+        summary: `${platforms}: ${post.idea || post.content || 'No content'}`.substring(0, 50),
+        description: `Platform: ${platforms}\nContent: ${post.idea || post.content || 'No content'}\nStatus: ${post.status}`,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        location: 'AutoPoster App'
+      };
+    });
+
+    // Create iCal format
+    let icalContent = 'BEGIN:VCALENDAR\r\n';
+    icalContent += 'VERSION:2.0\r\n';
+    icalContent += 'PRODID:-//AutoPoster//Calendar Export//EN\r\n';
+    icalContent += 'CALSCALE:GREGORIAN\r\n';
+    
+    calendarEvents.forEach(event => {
+      icalContent += 'BEGIN:VEVENT\r\n';
+      icalContent += `DTSTART:${formatDateForICal(event.start)}\r\n`;
+      icalContent += `DTEND:${formatDateForICal(event.end)}\r\n`;
+      icalContent += `SUMMARY:${event.summary}\r\n`;
+      icalContent += `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}\r\n`;
+      icalContent += `LOCATION:${event.location}\r\n`;
+      icalContent += 'END:VEVENT\r\n';
+    });
+    
+    icalContent += 'END:VCALENDAR\r\n';
+
+    // Download file
+    const blob = new Blob([icalContent], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `autoposter-calendar-${new Date().toISOString().split('T')[0]}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // Show success message
+    setSuccessMessage({ 
+      title: 'Calendar exported successfully', 
+      description: `Exported ${calendarEvents.length} events to your calendar file` 
+    });
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  };
+
+  // Format date for iCal format
+  const formatDateForICal = (dateString) => {
+    const date = new Date(dateString);
+    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('Z', '');
+  };
+
+  // Handle sync all
+ const handleSyncAll = async () => {
+  setIsSyncing(true);
+  try {
+    // Utiliser la fonction du hook au lieu de setPosts
+    syncWithLocalStorage();
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    setSuccessMessage({
+      title: 'Sync completed successfully',
+      description: `Synchronized ${posts.length} posts`
+    });
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  } catch (error) {
+    console.error('Sync failed:', error);
+    alert('Sync failed. Please try again.');
+  } finally {
+    setIsSyncing(false);
+  }
+};
+  const platformColors = {
+    Twitter: 'bg-blue-400',
+    LinkedIn: 'bg-violet-400', 
+    Medium: 'bg-teal-400'
+  };
+
+  const platformTextColors = {
+    Twitter: 'text-blue-400',
+    LinkedIn: 'text-violet-400',
+    Medium: 'text-teal-400'
   };
 
   return (
-    <div className="flex text-white gradient-bg min-h-screen">
-
-      {/* MAIN */}
-      <div className=" p-8 w-full">
-        <div className="flex justify-between items-center mb-6">
+    <div className="min-h-screen bg-[#0B1220] text-white">
+      <div className="gradient-bg min-h-screen text-white p-8">
+        
+        {/* Header Section */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Content Scheduler</h1>
-            <p className="text-gray-400">
-              Plan and schedule your content across all platforms
-            </p>
+            <h1 className="text-3xl font-bold text-white mb-2">Content Scheduler</h1>
+            <p className="text-gray-400">Plan and schedule your content across all platforms</p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 gradient-accent rounded-2xl font-medium hover:opacity-90 transition"
-          >
-            + Add Schedule
-          </button>
-        </div>
-
-        <div className="flex gap-6 h-[80vh]">
-          {/* UPCOMING POSTS */}
-          <div className="glass-effect rounded-3xl p-6 w-80 h-full overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-6">Upcoming Posts</h2>
-
-            <div className="flex space-x-2 mb-6">
-              {["All", "Today", "This Week"].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded-xl text-sm ${
-                    filter === f
-                      ? "bg-cyan-400/20 text-cyan-400"
-                      : "text-gray-400 hover:text-white transition-colors"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
+          
+          <div className="flex items-center space-x-4">
+            {/* View Toggle */}
+            <div className="flex items-center bg-black/30 rounded-2xl p-1">
+              <button 
+                onClick={() => setViewMode('week')}
+                className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
+                  viewMode === 'week' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Week
+              </button>
+              <button 
+                onClick={() => setViewMode('day')}
+                className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
+                  viewMode === 'day' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Day
+              </button>
             </div>
-
-            {filteredPosts.map((p) => {
-              const status = getStatus(p);
-              return (
-                <div
-                  key={p.id}
-                  className="bg-black/30 p-4 rounded-2xl mb-4 border border-white/5 relative hover:border-cyan-400/30 transition"
-                >
-                  <div className="absolute top-2 right-2 flex space-x-2 text-gray-400 text-sm">
-                    <i
-                      className="fa-solid fa-pen cursor-pointer hover:text-cyan-400"
-                      onClick={() => setShowAddModal(true)}
-                    ></i>
-                    <i
-                      className="fa-solid fa-trash cursor-pointer hover:text-red-400"
-                      onClick={() => {
-                        setCurrentPost(p.id);
-                        setShowDeleteModal(true);
-                      }}
-                    ></i>
-                  </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        status === "Scheduled"
-                          ? "bg-cyan-400/20 text-cyan-400"
-                          : status === "Posted"
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-yellow-400/20 text-yellow-400"
-                      }`}
-                    >
-                      {status}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium mb-1 truncate">{p.content}</p>
-                  <p className="text-xs text-gray-400">
-                    {p.platform} — {p.date} {p.time}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* CALENDAR */}
-          <div className="flex-1 glass-effect rounded-3xl p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex space-x-4">
-                {[{ name: "LinkedIn", color: "#a78bfa" },
-                  { name: "Twitter", color: "#60a5fa" },
-                  { name: "Medium", color: "#34d399" }]
-                  .map((p) => (
-                    <div key={p.name} className="flex items-center space-x-1 text-sm">
-                      <div
-                        style={{ backgroundColor: p.color }}
-                        className="w-4 h-4 rounded-full"
-                      ></div>
-                      <span>{p.name}</span>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => navigate("prev")}
-                  className="px-3 py-2 bg-black/30 rounded-xl hover:bg-black/50"
-                >
-                  <i className="fa-solid fa-chevron-left"></i>
-                </button>
-                <span className="px-4 py-2 bg-black/30 rounded-xl">
-                  {currentDate.toLocaleDateString("en-US", {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-                <button
-                  onClick={() => navigate("next")}
-                  className="px-3 py-2 bg-black/30 rounded-xl hover:bg-black/50"
-                >
-                  <i className="fa-solid fa-chevron-right"></i>
-                </button>
-                <button
-                  onClick={() => navigate("today")}
-                  className="px-3 py-2 bg-cyan-400/20 rounded-xl hover:bg-cyan-400/30"
-                >
-                  Today
-                </button>
-              </div>
-            </div>
-
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, interactionPlugin]}
-              initialView="dayGridWeek"
-              headerToolbar={false}
-              height={200}
-              editable={false}
-              events={posts.map((p) => ({
-                id: p.id,
-                title: `${p.platform}: ${p.content}`,
-                start: `${p.date}T${p.time}`,
-                backgroundColor: getPlatformColor(p.platform),
-                allDay: false,
-              }))}
-              eventContent={(arg) => (
-                <div
-                  className="text-white p-2 rounded-md font-semibold text-sm truncate"
-                  style={{
-                    backgroundColor: arg.event.backgroundColor,
-                    margin: "2px 0",
-                  }}
-                >
-                  {arg.event.title}
-                </div>
-              )}
-              eventClick={(info) => {
-                setCurrentPost(info.event.id);
-                setShowDeleteModal(true);
+            
+            {/* Add Schedule Button */}
+            <button 
+              onClick={() => {
+                console.log('Add Schedule clicked, showing modal');
+                setShowAddModal(true);
               }}
-            />
+              className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              <span>Add Schedule</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* ADD MODAL */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="glass-effect rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30 relative overflow-hidden">
-            <div className="absolute inset-0 gradient-accent opacity-5 rounded-3xl"></div>
+        {/* Calendar and Posts Layout */}
+        <div className="grid grid-cols-4 gap-8">
+          
+          {/* Upcoming Posts Panel */}
+          <div className="col-span-1">
+            <div className="glass-effect rounded-3xl p-6 h-[800px] overflow-y-auto">
+              <h2 className="text-xl font-semibold text-white mb-6">Upcoming Posts</h2>
+              
+              {/* Filter Tabs */}
+              <div className="flex space-x-2 mb-6">
+                {['all', 'today', 'week'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setFilterTab(tab)}
+                    className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                      filterTab === tab 
+                        ? 'bg-cyan-400/20 text-cyan-400' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
+              </div>
 
-            <div className="relative z-10">
+              {/* Posts List */}
+              <div className="space-y-4">
+                {loading && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-8 h-8 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin mb-3"></div>
+                    <p className="text-gray-400 text-sm">Loading your posts...</p>
+                  </div>
+                )}
+                
+                {!loading && filteredPosts.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-600 text-3xl mb-3" />
+                    <p className="text-gray-400 text-sm">
+                      {posts.length === 0 ? 'No posts yet. Create one to get started!' : 'No posts match this filter'}
+                    </p>
+                  </div>
+                )}
+                
+                {filteredPosts.map((post, index) => (
+                  <div 
+                    key={post.id}
+                    data-post-id={post.id}
+                    className="post-item bg-black/30 rounded-2xl p-4 border border-gray-700/50 hover:border-cyan-400/30 transition-all cursor-pointer"
+                    onClick={() => setSelectedPost(post)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <img 
+                        className="w-12 h-12 rounded-xl object-cover flex-shrink-0" 
+                        src={`https://picsum.photos/100/100?random=${post.id}`}
+                        alt="Post preview" 
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                            post.status === 'scheduled' ? 'status-scheduled' :
+                            post.status === 'draft' ? 'status-draft' :
+                            'status-posted'
+                          }`}>
+                            {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                          </span>
+                          <span className="text-gray-400 text-xs">
+                            {formatPostDateTime(post)}
+                          </span>
+                        </div>
+                        <p className="text-white text-sm font-medium mb-2 line-clamp-2">
+                          {post.idea || post.content || 'No content'}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1">
+                            {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
+                              <FontAwesomeIcon 
+                                key={platform}
+                                icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
+                                className={`${platformTextColors[platform]} text-xs`}
+                              />
+                            ))}
+                          </div>
+                          {post.status === 'posted' ? (
+                            <span className="text-green-400 text-xs">
+                              {formatEngagement(calculateEngagement(post))}
+                            </span>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditPost(post);
+                                }}
+                                disabled={isSaving || post.status === 'posted'}
+                                title={post.status === 'posted' ? 'Cannot edit posted content' : 'Edit post'}
+                                className={`transition-all duration-200 ${
+                                  post.status === 'posted' 
+                                    ? 'text-gray-600 cursor-not-allowed' 
+                                    : 'text-gray-400 hover:text-cyan-400 hover:scale-110 active:scale-95'
+                                }`}
+                              >
+                                <FontAwesomeIcon icon={faEdit} className="text-xs" />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPost(post);
+                                  setShowDeleteModal(true);
+                                }}
+                                disabled={isDeleting || post.status === 'posted'}
+                                title={post.status === 'posted' ? 'Cannot delete posted content' : 'Delete post'}
+                                className={`transition-all duration-200 ${
+                                  post.status === 'posted' 
+                                    ? 'text-gray-600 cursor-not-allowed' 
+                                    : 'text-gray-400 hover:text-red-400 hover:scale-110 active:scale-95'
+                                }`}
+                              >
+                                <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Section */}
+          <div className="col-span-3">
+            <div className="glass-effect rounded-3xl p-6 h-[800px] flex flex-col">
+              {/* Calendar Header */}
+              <div className="flex items-center justify-between mb-6 flex-shrink-0">
+                <div className="flex items-center space-x-4">
+                  <button 
+                    onClick={() => handleNavigateWeek('prev')}
+                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faChevronLeft} />
+                  </button>
+                  <h2 className="text-2xl font-bold text-white">{formatDate(currentWeek)}</h2>
+                  <button 
+                    onClick={() => handleNavigateWeek('next')}
+                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faChevronRight} />
+                  </button>
+                </div>
+                <div className="flex items-center space-x-4">
+                  {/* Platform Legend */}
+                  <div className="flex items-center space-x-4 text-sm">
+                    {Object.keys(platformColors).map(platform => (
+                      <div key={platform} className="flex items-center space-x-2">
+                        <div className={`w-3 h-3 ${platformColors[platform]} rounded`}></div>
+                        <span className="text-gray-300">{platform}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setCurrentWeek(new Date())}
+                    className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white text-sm transition-colors"
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
+
+              {/* Calendar Grid */}
+              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 ${
+                viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'
+              }`}>
+                
+                {/* Day Headers */}
+                {viewDays.map((day, index) => {
+                  const isToday = day.toDateString() === today.toDateString();
+                  return (
+                    <div key={index} className={`bg-black/20 p-4 text-center ${isToday ? 'border-2 border-cyan-400/30 rounded-lg' : ''}`}>
+                      <div className={`text-sm font-medium mb-1 ${isToday ? 'text-cyan-400' : 'text-gray-400'}`}>
+                        {viewMode === 'week' 
+                          ? day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+                          : day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()
+                        }
+                        {isToday && <span className="ml-1">TODAY</span>}
+                      </div>
+                      <div className={`text-lg font-semibold ${isToday ? 'text-cyan-400' : 'text-white'}`}>
+                        {day.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Calendar Cells */}
+                {viewDays.map((day, index) => {
+                  const dayPosts = getPostsForDay(day);
+                  const isToday = day.toDateString() === today.toDateString();
+                  
+                  return (
+                    <div key={index} className={`bg-black/10 p-3 relative ${viewMode === 'week' ? 'min-h-[120px]' : 'min-h-[400px]'} ${isToday ? 'border-2 border-cyan-400/20 rounded-lg' : ''}`}>
+                      {/* Events for this day */}
+                      <div className="space-y-2">
+                        {dayPosts.map((post, postIndex) => (
+                          <div 
+                            key={post.id}
+                            onClick={() => navigateToPost(post)}
+                            className={`event-bar cursor-pointer hover:scale-105 transition-transform ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
+                            style={{ animationDelay: `${postIndex * 0.1}s` }}
+                            title={post.idea || post.content || 'No content'}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-white text-xs font-medium truncate">
+                                {post.idea || post.content || 'No content'}
+                              </span>
+                              <div className="flex space-x-1">
+                                {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
+                                  <FontAwesomeIcon 
+                                    key={platform}
+                                    icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
+                                    className={`${platformTextColors[platform]} text-xs`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            {post.scheduleTime && (
+                              <div className="text-gray-300 text-xs">{formatTime(post.scheduleTime)}</div>
+                            )}
+                            {post.status && (
+                              <div className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
+                                post.status === 'scheduled' ? 'bg-yellow-400/20 text-yellow-400' :
+                                post.status === 'draft' ? 'bg-gray-400/20 text-gray-400' :
+                                'bg-green-400/20 text-green-400'
+                              }`}>
+                                {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center justify-between mt-6">
+                <div className="flex items-center space-x-4">
+                  <button 
+                    onClick={handleExportCalendar}
+                    className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faDownload} className="text-sm" />
+                    <span className="text-sm">Export Calendar</span>
+                  </button>
+                  <button 
+                    onClick={handleSyncAll}
+                    disabled={isSyncing}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm transition-colors ${
+                      isSyncing 
+                        ? 'bg-cyan-400/20 text-cyan-400 cursor-not-allowed' 
+                        : 'bg-black/30 text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    <FontAwesomeIcon 
+                      icon={faSync} 
+                      className={`text-sm ${isSyncing ? 'animate-spin' : ''}`} 
+                    />
+                    <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync All'}</span>
+                  </button>
+                </div>
+                
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <FontAwesomeIcon icon={faClock} />
+                  <span>Last updated: {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Schedule Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+            <div className="glass-effect rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30 relative overflow-hidden">
+              <div className="absolute inset-0 gradient-accent opacity-5 rounded-3xl"></div>
+              
+              <div className="relative z-10">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">Schedule New Post</h2>
+                  <button 
+                    onClick={() => setShowAddModal(false)}
+                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
+
+                {/* Post Content */}
+                <div className="mb-6">
+                  <label className="block text-gray-300 font-medium mb-3">Post Content</label>
+                  <textarea 
+                    value={newPost.content}
+                    onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                    className="w-full h-32 bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors resize-none" 
+                    placeholder="What's on your mind? Write your post here..."
+                  />
+                </div>
+
+                {/* Platform Selection */}
+                <div className="mb-6">
+                  <label className="block text-gray-300 font-medium mb-3">Select Platforms</label>
+                  <div className="grid grid-cols-3 gap-4">
+                    {Object.keys(newPost.platforms).map(platform => (
+                      <label key={platform} className="flex items-center space-x-3 p-4 rounded-2xl border border-gray-600 hover:border-cyan-400 cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={newPost.platforms[platform]}
+                          onChange={(e) => setNewPost(prev => ({
+                            ...prev,
+                            platforms: { ...prev.platforms, [platform]: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded bg-black/30 border-gray-600 text-cyan-400 focus:ring-cyan-400 focus:ring-2" 
+                        />
+                        <div className="flex items-center space-x-2">
+                          <FontAwesomeIcon 
+                            icon={platform === 'Twitter' ? faXTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
+                            className={platformTextColors[platform]}
+                          />
+                          <span className="text-white">{platform}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Date and Time */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-gray-300 font-medium mb-3">Date</label>
+                    <input 
+                      type="date" 
+                      value={newPost.date}
+                      onChange={(e) => setNewPost(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 font-medium mb-3">Time</label>
+                    <input 
+                      type="time" 
+                      value={newPost.time}
+                      onChange={(e) => setNewPost(prev => ({ ...prev, time: e.target.value }))}
+                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+
+                {/* AI Image Suggestions */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-gray-300 font-medium">AI Image Suggestions</label>
+                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
+                      Generate New
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map(index => (
+                      <div 
+                        key={index}
+                        onClick={() => setNewPost(prev => ({ ...prev, selectedImage: index }))}
+                        className={`relative group cursor-pointer ${
+                          newPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
+                        }`}
+                      >
+                        <img 
+                          className="w-full h-24 rounded-xl object-cover" 
+                          src={`https://picsum.photos/200/150?random=${index + 100}`}
+                          alt={`Image suggestion ${index + 1}`}
+                        />
+                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          {newPost.selectedImage === index && (
+                            <FontAwesomeIcon icon={faCheck} className="text-white text-xl" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-4">
+                  <button 
+                    onClick={handleSaveDraft}
+                    className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all"
+                  >
+                    Save as Draft
+                  </button>
+                  <button 
+                    onClick={handleSchedulePost}
+                    className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Schedule Post
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Schedule New Post</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Edit Post</h2>
+                  <p className="text-gray-400 text-sm">Modify your content and scheduling preferences</p>
+                </div>
                 <button
-                  onClick={() => setShowAddModal(false)}
-                  className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  onClick={() => setShowEditModal(false)}
+                  className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
                 >
                   <i className="fa-solid fa-times"></i>
                 </button>
               </div>
-
-              <div className="mb-6">
-                <label className="block text-gray-300 font-medium mb-3">Post Content</label>
-                <textarea
-                  id="modalPostContent"
-                  className="w-full h-32 bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors resize-none"
-                  placeholder="What's on your mind? Write your post here..."
-                ></textarea>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-gray-300 font-medium mb-3">Select Platforms</label>
-                <div className="grid grid-cols-3 gap-4">
-                  {["Twitter", "LinkedIn", "Medium"].map((p) => (
-                    <label
-                      key={p}
-                      className="flex items-center space-x-2 p-4 rounded-2xl border border-gray-600 hover:border-blue-400 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPlatforms.includes(p)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedPlatforms([...selectedPlatforms, p]);
-                          } else {
-                            setSelectedPlatforms(selectedPlatforms.filter((pl) => pl !== p));
-                          }
-                        }}
-                        className="w-5 h-5 rounded bg-black/30 border-gray-600 text-blue-400 focus:ring-blue-400 focus:ring-2"
-                      />
-                      <i
-                        className={`fa-brands fa-${p.toLowerCase()} text-xl`}
-                        style={{ color: getPlatformColor(p) }}
-                      ></i>
-                      <span className="text-white">{p}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-gray-300 font-medium mb-3">Date</label>
-                  <input
-                    type="date"
-                    id="modalPostDate"
-                    className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-3">Time</label>
-                  <input
-                    type="time"
-                    id="modalPostTime"
-                    className="w-full bg-black/30 rounded-2xl p-4 text-white border border-gray-600 focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* --- IMAGE SUGGESTIONS --- */}
-              <div className="mb-6">
-                <label className="block text-gray-300 font-medium mb-3">Image Suggestions</label>
-                <div className="flex space-x-3 overflow-x-auto">
-                  {["image1.png","image2.png","image3.png"].map((img, i) => (
-                    <img
-                      key={i}
-                      src={`/path/to/${img}`}
-                      alt={`Suggestion ${i + 1}`}
-                      className="w-20 h-20 object-cover rounded-xl cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => document.getElementById("modalPostContent").value += ` [Image: ${img}]`}
+              
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                {/* Content Section */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-file-text mr-2"></i>Content
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                      placeholder="Write your post content here..."
+                      value={editingPost.content}
+                      onChange={(e) => setEditingPost(prev => ({ ...prev, content: e.target.value }))}
                     />
-                  ))}
+                    <div className="absolute bottom-4 right-4">
+                      <span className="text-gray-500 text-sm">
+                        {editingPost.content.length} characters
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex space-x-4">
 
-                {/* SAVE AS DRAFT */}
-                <button
-                  className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all"
-                  onClick={() => {
-                    const content = document.getElementById("modalPostContent").value;
-                    const date = document.getElementById("modalPostDate").value;
-                    const time = document.getElementById("modalPostTime").value;
+                {/* Platforms Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-share-nodes mr-2"></i>Publish To
+                  </label>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { name: 'Twitter', icon: 'fa-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin', color: 'text-blue-400' },
+                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
+                    ].map(platform => (
+                      <label
+                        key={platform.name}
+                        className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${
+                          editingPost.platforms[platform.name]
+                            ? 'bg-cyan-400/10 border-cyan-400/50'
+                            : 'bg-gray-800/30 border-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingPost.platforms[platform.name] || false}
+                          onChange={(e) => setEditingPost(prev => ({
+                            ...prev,
+                            platforms: {
+                              ...prev.platforms,
+                              [platform.name]: e.target.checked
+                            }
+                          }))}
+                          className="sr-only"
+                        />
+                        <div className="flex flex-col items-center space-y-2">
+                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
+                          <span className="text-sm font-medium text-white">{platform.name}</span>
+                          {editingPost.platforms[platform.name] && (
+                            <div className="absolute top-2 right-2">
+                              <i className="fa-solid fa-check-circle text-cyan-400 text-xs"></i>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                    if (!content || !date || !time)
-                      return showToast("Fill all fields");
-                    if (selectedPlatforms.length === 0)
-                      return showToast("Select at least one platform");
+                {/* Scheduling Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-clock mr-2"></i>Schedule (Optional)
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                      <input
+                        type="date"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.date}
+                        onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
+                      />
+                      <i className="fa-solid fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.time}
+                        onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
+                      />
+                      <i className="fa-solid fa-clock absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
+                  </div>
+                  {editingPost.date && editingPost.time && (
+                    <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
+                      <p className="text-green-400 text-sm">
+                        <i className="fa-solid fa-check-circle mr-2"></i>
+                        Scheduled for {new Date(editingPost.date).toLocaleDateString()} at {editingPost.time}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-                    selectedPlatforms.forEach((platform) =>
-                      addPost({ content, date, time, platform }, true)
-                    );
+                {/* AI Image Suggestions */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-gray-300 font-medium">AI Image Suggestions</label>
+                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
+                      Generate New
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map(index => (
+                      <div 
+                        key={index}
+                        onClick={() => setEditingPost(prev => ({ ...prev, selectedImage: index }))}
+                        className={`relative group cursor-pointer ${
+                          editingPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
+                        }`}
+                      >
+                        <img 
+                          className="w-full h-24 rounded-xl object-cover" 
+                          src={`https://picsum.photos/200/150?random=${index + 200}`}
+                          alt={`Image suggestion ${index + 1}`}
+                        />
+                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          {editingPost.selectedImage === index && (
+                            <i className="fa-solid fa-check text-white text-xl"></i>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                    setSelectedPlatforms([]);
-                    setDraft(false);
-                    setShowAddModal(false);
-                  }}
-                >
-                  Save as Draft
-                </button>
-                            
-                {/* SCHEDULE POST */}
-                <button
-                  className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity"
-                  onClick={() => {
-                    const content = document.getElementById("modalPostContent").value;
-                    const date = document.getElementById("modalPostDate").value;
-                    const time = document.getElementById("modalPostTime").value;
-
-                    if (!content || !date || !time)
-                      return showToast("Fill all fields");
-                    if (selectedPlatforms.length === 0)
-                      return showToast("Select at least one platform");
-
-                    selectedPlatforms.forEach((platform) =>
-                      addPost({ content, date, time, platform }, false)
-                    );
-
-                    setSelectedPlatforms([]);
-                    setDraft(false);
-                    setShowAddModal(false);
-                  }}
-                >
-                  Schedule Post
-                </button>
+                {/* Action Buttons */}
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
+                  <div className="text-sm text-gray-400">
+                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    Changes will be saved immediately
+                  </div>
+                  <div className="flex space-x-3">
+                    <button 
+                      className="px-6 py-3 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all flex items-center space-x-2"
+                      onClick={() => {
+                        setShowEditModal(false);
+                        setSelectedPost(null);
+                        setEditingPost({
+                          content: '',
+                          platforms: { Twitter: false, LinkedIn: false, Medium: false },
+                          date: '',
+                          time: '',
+                          selectedImage: 0
+                        });
+                      }}
+                      disabled={isSaving}
+                    >
+                      <i className="fa-solid fa-times"></i>
+                      <span>Cancel</span>
+                    </button>
+                    <button 
+                      className="px-6 py-3 rounded-xl gradient-accent text-white hover:shadow-lg hover:shadow-cyan-400/25 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <i className="fa-solid fa-spinner fa-spin"></i>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fa-solid fa-save"></i>
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* DELETE MODAL */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="glass-effect p-6 rounded-2xl text-center">
-            <h3 className="text-xl mb-4">Delete Post?</h3>
-            <button
-              onClick={() => deletePost(currentPost)}
-              className="bg-red-500 px-4 py-2 rounded-xl hover:bg-red-600"
-            >
-              Delete
-            </button>
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+            <div className="glass-effect rounded-3xl p-8 max-w-md w-full border border-red-400/30">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-400/20 flex items-center justify-center">
+                  <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-400 text-2xl" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Delete Post</h3>
+                <p className="text-gray-400 mb-6">Are you sure you want to delete this scheduled post? This action cannot be undone.</p>
+                <div className="flex space-x-4">
+                  <button 
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setSelectedPost(null);
+                    }}
+                    disabled={isDeleting}
+                    className="flex-1 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleDeletePost}
+                    disabled={isDeleting}
+                    className="flex-1 p-3 rounded-2xl bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      'Delete'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TOAST */}
-      {toastMessage && (
-        <div className="fixed top-5 right-5 glass-effect p-3 rounded-xl">
-          {toastMessage}
-        </div>
-      )}
+        {/* Success Toast */}
+        {showSuccessToast && (
+          <div className="fixed top-8 right-8 z-60 transform transition-transform duration-300">
+            <div className="glass-effect rounded-2xl p-4 border border-green-400/30 flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-green-400/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faCheck} className="text-green-400" />
+              </div>
+              <div>
+                <div className="text-white font-medium text-sm">
+                  {successMessage.title}
+                </div>
+                <div className="text-gray-400 text-xs">
+                  {successMessage.description}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {showErrorToast && (
+          <div className="fixed top-8 right-8 z-60 transform transition-transform duration-300">
+            <div className="glass-effect rounded-2xl p-4 border border-red-400/30 flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-red-400/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-400" />
+              </div>
+              <div>
+                <div className="text-white font-medium text-sm">
+                  {errorMessage.title}
+                </div>
+                <div className="text-gray-400 text-xs">
+                  {errorMessage.description}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

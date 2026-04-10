@@ -9,7 +9,7 @@ import {
   faRocket,
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
-import { faXTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
+import { faTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import * as Toast from "@radix-ui/react-toast";
 
 export default function Login() {
@@ -219,7 +219,7 @@ export default function Login() {
           <div className="bg-black/30 rounded-2xl p-6 mb-6">
             <h3 className="text-xl font-semibold text-white mb-4">Choose Your Platforms</h3>
             <div className="grid grid-cols-3 gap-4">
-              <Platform icon={faXTwitter} label="Twitter / X" />
+              <Platform icon={faTwitter} label="Twitter / X" />
               <Platform icon={faLinkedin} label="LinkedIn" />
               <Platform icon={faMedium} label="Medium" />
             </div>
@@ -296,9 +296,12 @@ export default function Login() {
     }, 2000);
   };
   const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
-const connectLinkedIn = () => {
-  window.location.href = `${API}/api/oauth/linkedin/start`;
-};
+  const connectTwitter = () => {
+    window.location.href = `${API}/api/oauth/twitter/start`;
+  };
+  const connectLinkedIn = () => {
+    window.location.href = `${API}/api/oauth/linkedin/start`;
+  };
 
   /* ================== RETURN ================== */
   return (
@@ -341,7 +344,7 @@ const connectLinkedIn = () => {
                 <p className="text-gray-400">Connect your social platforms to get started with AI-powered content distribution</p>
               </div>
               <div className="space-y-4 mb-8">
-                <OAuthButton icon={faXTwitter} label="Connect X (Twitter)" onClick={connect} />
+                <OAuthButton icon={faTwitter} label="Connect X (Twitter)" onClick={connectTwitter} />
                 <OAuthButton icon={faLinkedinIn} label="Connect LinkedIn" onClick={connectLinkedIn} />
                 <OAuthButton icon={faMedium} label="Connect Medium" onClick={connect} />
               </div>
@@ -399,7 +402,7 @@ const connectLinkedIn = () => {
     <div className="flex space-x-2">
       {/* X / Twitter */}
       <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-        <FontAwesomeIcon icon={faXTwitter} className="text-white text-xs" />
+        <FontAwesomeIcon icon={faTwitter} className="text-white text-xs" />
       </div>
 
       {/* LinkedIn */}
