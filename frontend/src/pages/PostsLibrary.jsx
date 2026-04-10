@@ -25,6 +25,23 @@ export default function PostsLibrary() {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Edit and delete states like SchedulingPage
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [editingPost, setEditingPost] = useState({
+    content: '',
+    platforms: { Twitter: false, LinkedIn: false, Medium: false },
+    date: '',
+    time: '',
+    selectedImage: 0
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', description: '' });
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState({ title: '', description: '' });
+  const [showErrorToast, setShowErrorToast] = useState(false);
+
   const filteredPosts = posts
     .filter((post) => {
       // Filter by tab
@@ -195,17 +212,118 @@ export default function PostsLibrary() {
   };
 
   const handleEditPost = (post) => {
-    // Navigate to create post page with post data for editing
-    navigate("/dashboard/CreatePostPage", { state: { editPost: post } });
+    // Handle edit like SchedulingPage - open modal instead of navigation
+    setSelectedPost(post);
+    
+    // Format date for HTML5 input (YYYY-MM-DD)
+    const formattedDate = post.scheduleDate ? 
+      new Date(post.scheduleDate).toISOString().split('T')[0] : '';
+    
+    setEditingPost({
+      content: post.idea || post.content || '',
+      platforms: post.platforms || { Twitter: false, LinkedIn: false, Medium: false },
+      date: formattedDate,
+      time: post.scheduleTime || '',
+      selectedImage: post.selectedImages || 0
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle save edited post (like SchedulingPage)
+  const handleSaveEdit = async () => {
+    if (!selectedPost) return;
+    
+    // Validate form
+    if (!editingPost.content.trim()) {
+      setErrorMessage({ title: 'Validation Error', description: 'Please enter post content' });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    const selectedPlatformsList = Object.keys(editingPost.platforms).filter(p => editingPost.platforms[p]);
+    if (selectedPlatformsList.length === 0) {
+      setErrorMessage({ title: 'Validation Error', description: 'Please select at least one platform' });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log('Saving edited post:', {
+        postId: selectedPost.id,
+        editingPost
+      });
+
+      // Update post using the hook
+      await updatePost(selectedPost.id, {
+        idea: editingPost.content,
+        content: editingPost.content,
+        platforms: editingPost.platforms,
+        selectedImages: editingPost.selectedImage,
+        scheduleDate: editingPost.date,
+        scheduleTime: editingPost.time
+      });
+
+      // Update UI
+      setShowEditModal(false);
+      setSelectedPost(null);
+      setEditingPost({
+        content: '',
+        platforms: { Twitter: false, LinkedIn: false, Medium: false },
+        date: '',
+        time: '',
+        selectedImage: 0
+      });
+      setSuccessMessage({ title: 'Post updated successfully', description: 'Your changes have been saved' });
+      setShowSuccessToast(true);
+      
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      const errorMessage = error?.message || 'Failed to update post. Please try again.';
+      setErrorMessage({ title: 'Update Failed', description: errorMessage });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle delete post (like SchedulingPage)
+  const handleDeletePost = async () => {
+    if (!selectedPost) return;
+
+    setIsDeleting(true);
+    try {
+      await deletePost(selectedPost.id);
+      setShowDeleteModal(false);
+      setSelectedPost(null);
+      setSuccessMessage({ title: 'Post deleted successfully', description: 'Your post has been deleted' });
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      setErrorMessage({ title: 'Delete Failed', description: 'Failed to delete post. Please try again.' });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleDuplicatePost = async (post) => {
     try {
       await duplicatePost(post.id);
-      showToastMessage("Post duplicated successfully");
+      setSuccessMessage({ title: 'Post duplicated successfully', description: 'Your post has been duplicated' });
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
       console.error('Failed to duplicate post:', error);
-      showToastMessage("Failed to duplicate post");
+      setErrorMessage({ title: 'Duplicate Failed', description: 'Failed to duplicate post. Please try again.' });
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
     }
   };
 
@@ -341,6 +459,10 @@ export default function PostsLibrary() {
                 toggleSelect={() => toggleSelectPost(post.id)}
                 onEdit={() => handleEditPost(post)}
                 onDuplicate={() => handleDuplicatePost(post)}
+                onDelete={() => {
+                  setSelectedPost(post);
+                  setShowDeleteModal(true);
+                }}
               />
             ))
           ) : (
@@ -370,8 +492,217 @@ export default function PostsLibrary() {
           />
         )}
 
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Edit Post</h2>
+                  <p className="text-gray-400 text-sm">Modify your content and scheduling preferences</p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
+                >
+                  <i className="fa-solid fa-times"></i>
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                {/* Content Section */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-file-text mr-2"></i>Content
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl p-6 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                      placeholder="Write your post content here..."
+                      value={editingPost.content}
+                      onChange={(e) => setEditingPost({...editingPost, content: e.target.value})}
+                    />
+                    <div className="absolute bottom-4 right-4">
+                      <span className="text-gray-500 text-sm">
+                        {editingPost.content.length} characters
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platforms Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-share-nodes mr-2"></i>Publish To
+                  </label>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { name: 'Twitter', icon: 'fa-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin', color: 'text-blue-400' },
+                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
+                    ].map(platform => (
+                      <label
+                        key={platform.name}
+                        className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${
+                          editingPost.platforms[platform.name]
+                            ? 'bg-cyan-400/10 border-cyan-400/50'
+                            : 'bg-gray-800/30 border-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingPost.platforms[platform.name] || false}
+                          onChange={(e) => setEditingPost({
+                            ...editingPost,
+                            platforms: {
+                              ...editingPost.platforms,
+                              [platform.name]: e.target.checked
+                            }
+                          })}
+                          className="sr-only"
+                        />
+                        <div className="flex flex-col items-center space-y-2">
+                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
+                          <span className="text-sm font-medium text-white">{platform.name}</span>
+                          {editingPost.platforms[platform.name] && (
+                            <div className="absolute top-2 right-2">
+                              <i className="fa-solid fa-check-circle text-cyan-400 text-xs"></i>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Scheduling Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-clock mr-2"></i>Schedule (Optional)
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                      <input
+                        type="date"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.date}
+                        onChange={(e) => setEditingPost({...editingPost, date: e.target.value})}
+                      />
+                      <i className="fa-solid fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.time}
+                        onChange={(e) => setEditingPost({...editingPost, time: e.target.value})}
+                      />
+                      <i className="fa-solid fa-clock absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
+                  </div>
+                  {editingPost.date && editingPost.time && (
+                    <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
+                      <p className="text-green-400 text-sm">
+                        <i className="fa-solid fa-check-circle mr-2"></i>
+                        Scheduled for {new Date(editingPost.date).toLocaleDateString()} at {editingPost.time}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Image Suggestions */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-gray-300 font-medium">AI Image Suggestions</label>
+                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
+                      Generate New
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map(index => (
+                      <div 
+                        key={index}
+                        onClick={() => setEditingPost(prev => ({ ...prev, selectedImage: index }))}
+                        className={`relative group cursor-pointer ${
+                          editingPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
+                        }`}
+                      >
+                        <img 
+                          className="w-full h-24 rounded-xl object-cover" 
+                          src={`https://picsum.photos/200/150?random=${index + 300}`}
+                          alt={`Image suggestion ${index + 1}`}
+                        />
+                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          {editingPost.selectedImage === index && (
+                            <i className="fa-solid fa-check text-white text-xl"></i>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
+                  <div className="text-sm text-gray-400">
+                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    Changes will be saved immediately
+                  </div>
+                  <div className="flex space-x-3">
+                    <button 
+                      className="px-6 py-3 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all flex items-center space-x-2"
+                      onClick={() => setShowEditModal(false)}
+                      disabled={isSaving}
+                    >
+                      <i className="fa-solid fa-times"></i>
+                      <span>Cancel</span>
+                    </button>
+                    <button 
+                      className="px-6 py-3 rounded-xl gradient-accent text-white hover:shadow-lg hover:shadow-cyan-400/25 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <i className="fa-solid fa-spinner fa-spin"></i>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fa-solid fa-save"></i>
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delete Modal */}
-        {showDeleteModal && <DeleteModal cancel={cancelDelete} confirm={confirmDelete} />}
+        {showDeleteModal && <DeleteModal cancel={cancelDelete} confirm={handleDeletePost} />}
+
+        {/* Success Toast */}
+        {showSuccessToast && (
+          <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-xl animate-fade-in-out z-50">
+            <div className="text-center">
+              <div className="font-semibold">{successMessage.title}</div>
+              <div className="text-sm">{successMessage.description}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {showErrorToast && (
+          <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-xl animate-fade-in-out z-50">
+            <div className="text-center">
+              <div className="font-semibold">{errorMessage.title}</div>
+              <div className="text-sm">{errorMessage.description}</div>
+            </div>
+          </div>
+        )}
 
         {/* Toast */}
         {showToast && <Toast message={toastMessage} />}
@@ -382,7 +713,7 @@ export default function PostsLibrary() {
 
 // ------------------- COMPONENTS -------------------
 
-function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate }) {
+function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelete }) {
   const statusColor =
     post.status === "draft"
       ? "status-draft"
@@ -408,6 +739,12 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate }) {
     if (!dateString) return "No date";
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Handle delete with modal
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete();
   };
 
   return (
@@ -444,7 +781,7 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate }) {
             <i className="fa-solid fa-copy text-xs"></i>
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); toggleSelect(); }}
+            onClick={(e) => { e.stopPropagation(); handleDelete(e); }}
             className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
           >
             <i className="fa-solid fa-trash text-xs"></i>
@@ -613,16 +950,28 @@ function BulkActions({ selectedCount, handleEdit, handleDuplicate, handleDelete 
 
 function DeleteModal({ cancel, confirm }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-black/80 p-6 rounded-3xl text-white w-96">
-        <h2 className="text-xl font-bold mb-4">Are you sure you want to delete?</h2>
-        <div className="flex justify-end space-x-4">
-          <button className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600" onClick={cancel}>
-            Cancel
-          </button>
-          <button className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600" onClick={confirm}>
-            Delete
-          </button>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+      <div className="glass-effect rounded-3xl p-8 max-w-md w-full border border-red-400/30">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-400/20 flex items-center justify-center">
+            <i className="fa-solid fa-exclamation-triangle text-red-400 text-2xl"></i>
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Delete Post</h3>
+          <p className="text-gray-400 mb-6">Are you sure you want to delete this post? This action cannot be undone.</p>
+          <div className="flex space-x-4">
+            <button 
+              onClick={cancel}
+              className="flex-1 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={confirm}
+              className="flex-1 p-3 rounded-2xl bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>

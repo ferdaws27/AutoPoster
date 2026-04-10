@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faChevronLeft, faChevronRight, faEdit, faTrash, faTimes, 
-  faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt
+  faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt,
+  faFileLines, faShareNodes, faCalendar, faCheckCircle, faInfoCircle, faSpinner, faSave
 } from '@fortawesome/free-solid-svg-icons';
 import { faTwitter, faLinkedin, faMedium, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import { usePosts } from '../hooks/usePosts';
@@ -478,6 +479,25 @@ export default function SchedulingPage() {
     setCurrentWeek(newDate);
   };
 
+  // Navigate to post details
+  const navigateToPost = (post) => {
+    // Select the post in Upcoming Posts section
+    setSelectedPost(post);
+    
+    // Scroll to the post in the Upcoming Posts panel
+    setTimeout(() => {
+      const postElement = document.querySelector(`[data-post-id="${post.id}"]`);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add highlight effect
+        postElement.classList.add('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        setTimeout(() => {
+          postElement.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        }, 2000);
+      }
+    }, 100);
+  };
+
   // Handle export calendar
   const handleExportCalendar = () => {
     // Get all posts with dates
@@ -675,6 +695,7 @@ export default function SchedulingPage() {
                 {filteredPosts.map((post, index) => (
                   <div 
                     key={post.id}
+                    data-post-id={post.id}
                     className="post-item bg-black/30 rounded-2xl p-4 border border-gray-700/50 hover:border-cyan-400/30 transition-all cursor-pointer"
                     onClick={() => setSelectedPost(post)}
                   >
@@ -758,28 +779,26 @@ export default function SchedulingPage() {
             </div>
           </div>
 
-          {/* Calendar View */}
+          {/* Calendar Section */}
           <div className="col-span-3">
-            <div className="glass-effect rounded-3xl p-6 h-[800px]">
-              
+            <div className="glass-effect rounded-3xl p-6 h-[800px] flex flex-col">
               {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <div className="flex items-center space-x-4">
                   <button 
-                    onClick={() => navigateView('prev')}
+                    onClick={() => handleNavigateWeek('prev')}
                     className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                   >
                     <FontAwesomeIcon icon={faChevronLeft} />
                   </button>
                   <h2 className="text-2xl font-bold text-white">{formatDate(currentWeek)}</h2>
                   <button 
-                    onClick={() => navigateView('next')}
+                    onClick={() => handleNavigateWeek('next')}
                     className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                   >
                     <FontAwesomeIcon icon={faChevronRight} />
                   </button>
                 </div>
-                
                 <div className="flex items-center space-x-4">
                   {/* Platform Legend */}
                   <div className="flex items-center space-x-4 text-sm">
@@ -801,7 +820,7 @@ export default function SchedulingPage() {
               </div>
 
               {/* Calendar Grid */}
-              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-hidden ${
+              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 ${
                 viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'
               }`}>
                 
@@ -836,12 +855,14 @@ export default function SchedulingPage() {
                         {dayPosts.map((post, postIndex) => (
                           <div 
                             key={post.id}
-                            className={`event-bar ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
+                            onClick={() => navigateToPost(post)}
+                            className={`event-bar cursor-pointer hover:scale-105 transition-transform ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
                             style={{ animationDelay: `${postIndex * 0.1}s` }}
+                            title={post.idea || post.content || 'No content'}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-white text-xs font-medium truncate">
-                                {(post.idea || post.content || '').substring(0, 15)}...
+                                {post.idea || post.content || 'No content'}
                               </span>
                               <div className="flex space-x-1">
                                 {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
@@ -855,6 +876,15 @@ export default function SchedulingPage() {
                             </div>
                             {post.scheduleTime && (
                               <div className="text-gray-300 text-xs">{formatTime(post.scheduleTime)}</div>
+                            )}
+                            {post.status && (
+                              <div className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
+                                post.status === 'scheduled' ? 'bg-yellow-400/20 text-yellow-400' :
+                                post.status === 'draft' ? 'bg-gray-400/20 text-gray-400' :
+                                'bg-green-400/20 text-green-400'
+                              }`}>
+                                {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1030,82 +1060,122 @@ export default function SchedulingPage() {
           </div>
         )}
 
-        {/* Edit Schedule Modal */}
+        {/* Edit Modal */}
         {showEditModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-            <div className="glass-effect rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30 relative overflow-hidden">
-              <div className="absolute inset-0 gradient-accent opacity-5 rounded-3xl"></div>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Edit Post</h2>
+                  <p className="text-gray-400 text-sm">Modify your content and scheduling preferences</p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
+                >
+                  <i className="fa-solid fa-times"></i>
+                </button>
+              </div>
               
-              <div className="relative z-10">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">Edit Post</h2>
-                  <button 
-                    onClick={() => setShowEditModal(false)}
-                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                  >
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                {/* Content Section */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-file-text mr-2"></i>Content
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                      placeholder="Write your post content here..."
+                      value={editingPost.content}
+                      onChange={(e) => setEditingPost(prev => ({ ...prev, content: e.target.value }))}
+                    />
+                    <div className="absolute bottom-4 right-4">
+                      <span className="text-gray-500 text-sm">
+                        {editingPost.content.length} characters
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Post Content */}
-                <div className="mb-6">
-                  <label className="block text-gray-300 font-medium mb-3">Post Content</label>
-                  <textarea 
-                    value={editingPost.content}
-                    onChange={(e) => setEditingPost(prev => ({ ...prev, content: e.target.value }))}
-                    className="w-full h-32 bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors resize-none" 
-                    placeholder="What's on your mind? Write your post here..."
-                  />
-                </div>
-
-                {/* Platform Selection */}
-                <div className="mb-6">
-                  <label className="block text-gray-300 font-medium mb-3">Select Platforms</label>
+                {/* Platforms Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-share-nodes mr-2"></i>Publish To
+                  </label>
                   <div className="grid grid-cols-3 gap-4">
-                    {Object.keys(editingPost.platforms).map(platform => (
-                      <label key={platform} className="flex items-center space-x-3 p-4 rounded-2xl border border-gray-600 hover:border-cyan-400 cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={editingPost.platforms[platform]}
+                    {[
+                      { name: 'Twitter', icon: 'fa-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin', color: 'text-blue-400' },
+                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
+                    ].map(platform => (
+                      <label
+                        key={platform.name}
+                        className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${
+                          editingPost.platforms[platform.name]
+                            ? 'bg-cyan-400/10 border-cyan-400/50'
+                            : 'bg-gray-800/30 border-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingPost.platforms[platform.name] || false}
                           onChange={(e) => setEditingPost(prev => ({
                             ...prev,
-                            platforms: { ...prev.platforms, [platform]: e.target.checked }
+                            platforms: {
+                              ...prev.platforms,
+                              [platform.name]: e.target.checked
+                            }
                           }))}
-                          className="w-5 h-5 rounded bg-black/30 border-gray-600 text-cyan-400 focus:ring-cyan-400 focus:ring-2" 
+                          className="sr-only"
                         />
-                        <div className="flex items-center space-x-2">
-                          <FontAwesomeIcon 
-                            icon={platform === 'Twitter' ? faXTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
-                            className={platformTextColors[platform]}
-                          />
-                          <span className="text-white">{platform}</span>
+                        <div className="flex flex-col items-center space-y-2">
+                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
+                          <span className="text-sm font-medium text-white">{platform.name}</span>
+                          {editingPost.platforms[platform.name] && (
+                            <div className="absolute top-2 right-2">
+                              <i className="fa-solid fa-check-circle text-cyan-400 text-xs"></i>
+                            </div>
+                          )}
                         </div>
                       </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-gray-300 font-medium mb-3">Date</label>
-                    <input 
-                      type="date" 
-                      value={editingPost.date}
-                      onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
-                    />
+                {/* Scheduling Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <i className="fa-solid fa-clock mr-2"></i>Schedule (Optional)
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                      <input
+                        type="date"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.date}
+                        onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
+                      />
+                      <i className="fa-solid fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={editingPost.time}
+                        onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
+                      />
+                      <i className="fa-solid fa-clock absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-300 font-medium mb-3">Time</label>
-                    <input 
-                      type="time" 
-                      value={editingPost.time}
-                      onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
-                    />
-                  </div>
+                  {editingPost.date && editingPost.time && (
+                    <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
+                      <p className="text-green-400 text-sm">
+                        <i className="fa-solid fa-check-circle mr-2"></i>
+                        Scheduled for {new Date(editingPost.date).toLocaleDateString()} at {editingPost.time}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* AI Image Suggestions */}
@@ -1132,7 +1202,7 @@ export default function SchedulingPage() {
                         />
                         <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           {editingPost.selectedImage === index && (
-                            <FontAwesomeIcon icon={faCheck} className="text-white text-xl" />
+                            <i className="fa-solid fa-check text-white text-xl"></i>
                           )}
                         </div>
                       </div>
@@ -1141,38 +1211,48 @@ export default function SchedulingPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex space-x-4">
-                  <button 
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setSelectedPost(null);
-                      setEditingPost({
-                        content: '',
-                        platforms: { Twitter: false, LinkedIn: false, Medium: false },
-                        date: '',
-                        time: '',
-                        selectedImage: 0
-                      });
-                    }}
-                    disabled={isSaving}
-                    className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={handleSaveEdit}
-                    disabled={isSaving}
-                    className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      'Save Changes'
-                    )}
-                  </button>
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
+                  <div className="text-sm text-gray-400">
+                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    Changes will be saved immediately
+                  </div>
+                  <div className="flex space-x-3">
+                    <button 
+                      className="px-6 py-3 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all flex items-center space-x-2"
+                      onClick={() => {
+                        setShowEditModal(false);
+                        setSelectedPost(null);
+                        setEditingPost({
+                          content: '',
+                          platforms: { Twitter: false, LinkedIn: false, Medium: false },
+                          date: '',
+                          time: '',
+                          selectedImage: 0
+                        });
+                      }}
+                      disabled={isSaving}
+                    >
+                      <i className="fa-solid fa-times"></i>
+                      <span>Cancel</span>
+                    </button>
+                    <button 
+                      className="px-6 py-3 rounded-xl gradient-accent text-white hover:shadow-lg hover:shadow-cyan-400/25 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <i className="fa-solid fa-spinner fa-spin"></i>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fa-solid fa-save"></i>
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
