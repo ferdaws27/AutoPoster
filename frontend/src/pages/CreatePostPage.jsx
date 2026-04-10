@@ -804,15 +804,22 @@ const saveDraft = async () => {
   if (!draftName.trim()) return alert("Please enter a draft name");
 
   try {
-    await createPost({
-      idea,
-      content: idea,
-      platforms: publishTo,
-      status: "draft",
-      engagement: {}
-    });
+    // Créer un post pour chaque plateforme sélectionnée avec son contenu généré
+    const selectedPlatforms = Object.keys(publishTo).filter(platform => publishTo[platform]);
+    
+    for (const platform of selectedPlatforms) {
+      const platformContent = variations[platform] || idea; // Utiliser le contenu généré ou l'idée originale
+      
+      await createPost({
+        idea,
+        content: platformContent,
+        platforms: { [platform]: true },
+        status: "draft",
+        engagement: {}
+      });
+    }
 
-    alert("Draft saved successfully!");
+    alert(`Draft saved successfully for ${selectedPlatforms.length} platform(s)!`);
     setShowSaveDraftModal(false);
     setDraftName("");
 
@@ -823,43 +830,48 @@ const saveDraft = async () => {
   }
 };
 
-const schedulePosts = async () => {
-  const idea = ideaRef.current.value.trim();
+  const schedulePosts = async () => {
+    const idea = ideaRef.current.value.trim();
 
-  if (!idea) return alert("Please enter an idea first");
-  if (!scheduleDate || !scheduleTime)
-    return alert("Please select both date and time");
+    if (!idea) return alert("Please enter an idea first");
+    if (!scheduleDate || !scheduleTime)
+      return alert("Please select both date and time");
 
-  const scheduledPlatforms = Object.keys(publishTo).filter(
-    (p) => publishTo[p]
-  );
+    const scheduledPlatforms = Object.keys(publishTo).filter(
+      (p) => publishTo[p]
+    );
 
-  if (scheduledPlatforms.length === 0) {
-    return alert("Please select at least one platform to schedule");
-  }
+    if (scheduledPlatforms.length === 0) {
+      return alert("Please select at least one platform to schedule");
+    }
 
-  try {
-    await createPost({
-      idea,
-      content: idea,
-      platforms: publishTo,
-      status: "scheduled",
-      scheduleDate: scheduleDate,
-      scheduleTime: scheduleTime,
-      engagement: {},
-    });
+    try {
+      // Créer un post pour chaque plateforme sélectionnée avec son contenu généré
+      for (const platform of scheduledPlatforms) {
+        const platformContent = variations[platform] || idea; // Utiliser le contenu généré ou l'idée originale
+        
+        await createPost({
+          idea,
+          content: platformContent,
+          platforms: { [platform]: true },
+          status: "scheduled",
+          scheduleDate: scheduleDate,
+          scheduleTime: scheduleTime,
+          engagement: {},
+        });
+      }
 
-    alert("Post scheduled successfully!");
-    setShowScheduleModal(false);
-    setScheduleDate("");
-    setScheduleTime("");
+      alert(`Post scheduled successfully for ${scheduledPlatforms.length} platform(s)!`);
+      setShowScheduleModal(false);
+      setScheduleDate("");
+      setScheduleTime("");
 
-    await refreshStats();
-  } catch (err) {
-    console.error("SCHEDULE ERROR:", err);
-    alert(err.message);
-  }
-};
+      await refreshStats();
+    } catch (err) {
+      console.error("SCHEDULE ERROR:", err);
+      alert(err.message);
+    }
+  };
 
   const getMoreTips = async () => {
     const idea = ideaRef.current.value.trim();
