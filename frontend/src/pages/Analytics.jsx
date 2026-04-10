@@ -12,7 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { faLinkedin, faMedium, faTwitter } from "@fortawesome/free-brands-svg-icons";
 
-// ✅ Map platform name → icône FontAwesome
+// Platform icons mapping
 const PLATFORM_ICONS = {
   Twitter: faTwitter,
   LinkedIn: faLinkedin,
@@ -48,86 +48,50 @@ export default function PostsLibrary() {
         totalLikes: currentAnalytics.totalLikes,
         totalComments: currentAnalytics.totalComments,
         totalShares: currentAnalytics.totalShares,
+        engagementTrend: currentAnalytics.engagementTrend,
+        postsPerDay: currentAnalytics.postsPerDay,
         estimatedReach: currentAnalytics.estimatedReach,
-        postsCount: analyticsData.filter(p => new Date(p.createdAt) >= cutoffDate).length,
-        engagementRate: parseFloat(currentAnalytics.engagementPerPost),
-        engagementTrend: currentAnalytics.engagementTrend
+        followerGrowthPercent: currentAnalytics.followerGrowthPercent,
+        reachGrowthPercent: currentAnalytics.reachGrowthPercent,
+        engagementPerPost: currentAnalytics.engagementPerPost,
       },
-      platformBreakdown: {
-        Twitter: currentAnalytics.platformPercentages.Twitter,
-        LinkedIn: currentAnalytics.platformPercentages.LinkedIn,
-        Medium: currentAnalytics.platformPercentages.Medium
-      },
-      topPosts: currentAnalytics.topPosts.map(p => ({
-        rank: p.rank,
-        title: p.title,
-        engagement: p.engagement,
-        reach: p.reach,
-        date: p.date
-      })),
-      contentType: currentAnalytics.contentPerformance.map(c => ({
-        type: c.label,
-        performance: c.value,
-        posts: c.posts,
-        avgEngagement: c.avgEngagement
-      }))
+      platformBreakdown: currentAnalytics.platformEngagement,
+      topPosts: currentAnalytics.topPosts,
+      bestTimes: currentAnalytics.bestTimes,
+      contentPerformance: currentAnalytics.contentPerformance,
     };
 
-    if (exportFormat === "json") {
-      downloadJSON(reportData);
-    } else {
-      downloadCSV(reportData);
+    if (exportFormat === 'json') {
+      const dataStr = JSON.stringify(reportData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `analytics-report-${now.toISOString().split('T')[0]}.json`;
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    } else if (exportFormat === 'csv') {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Metric,Value\n";
+      csvContent += `Total Engagement,${reportData.summary.totalEngagement}\n`;
+      csvContent += `Total Likes,${reportData.summary.totalLikes}\n`;
+      csvContent += `Total Comments,${reportData.summary.totalComments}\n`;
+      csvContent += `Total Shares,${reportData.summary.totalShares}\n`;
+      csvContent += `Engagement Trend,${reportData.summary.engagementTrend}%\n`;
+      csvContent += `Posts Per Day,${reportData.summary.postsPerDay}\n`;
+      csvContent += `Estimated Reach,${reportData.summary.estimatedReach}\n`;
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `analytics-report-${now.toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
-  const downloadJSON = (data) => {
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const exportFileDefaultName = `analytics-report-${new Date().toISOString().split('T')[0]}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
-  const downloadCSV = (data) => {
-    let csv = "Analytics Report\n";
-    csv += `Generated: ${data.generatedAt}\n`;
-    csv += `Period: ${data.period}\n\n`;
-    csv += "SUMMARY\n";
-    csv += `Total Engagement,${data.summary.totalEngagement}\n`;
-    csv += `Total Likes,${data.summary.totalLikes}\n`;
-    csv += `Total Comments,${data.summary.totalComments}\n`;
-    csv += `Total Shares,${data.summary.totalShares}\n`;
-    csv += `Estimated Reach,${data.summary.estimatedReach}\n`;
-    csv += `Posts Count,${data.summary.postsCount}\n`;
-    csv += `Engagement Rate,${data.summary.engagementRate}\n`;
-    csv += `Engagement Trend,${data.summary.engagementTrend}%\n\n`;
-    csv += "PLATFORM BREAKDOWN\n";
-    csv += "Platform,Percentage\n";
-    csv += `Twitter,${data.platformBreakdown.Twitter}%\n`;
-    csv += `LinkedIn,${data.platformBreakdown.LinkedIn}%\n`;
-    csv += `Medium,${data.platformBreakdown.Medium}%\n\n`;
-    csv += "TOP POSTS\n";
-    csv += "Rank,Title,Engagement,Reach,Date\n";
-    data.topPosts.forEach(p => {
-      csv += `${p.rank},"${p.title}",${p.engagement},${p.reach},${p.date}\n`;
-    });
-    csv += "\nCONTENT TYPE PERFORMANCE\n";
-    csv += "Type,Performance,Posts,Avg Engagement\n";
-    data.contentType.forEach(c => {
-      csv += `${c.type},${c.performance}%,${c.posts},${c.avgEngagement}\n`;
-    });
-    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-    const exportFileDefaultName = `analytics-report-${new Date().toISOString().split('T')[0]}.csv`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
   const handleViewAllPosts = () => {
-    navigate('/posts-library');
+    navigate("/posts");
   };
 
   useEffect(() => {
@@ -153,11 +117,13 @@ export default function PostsLibrary() {
     const previousCutoffDate = new Date(cutoffDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
     const postsInRange = analyticsData.filter(post => {
+      if (!post.createdAt) return false;
       const postDate = new Date(post.createdAt);
       return !isNaN(postDate) && postDate >= cutoffDate;
     });
 
     const postsInPreviousRange = analyticsData.filter(post => {
+      if (!post.createdAt) return false;
       const postDate = new Date(post.createdAt);
       return !isNaN(postDate) && postDate >= previousCutoffDate && postDate < cutoffDate;
     });
@@ -183,7 +149,6 @@ export default function PostsLibrary() {
       }
     });
 
-    // ✅ BUG FIX : stocker comme number, pas string
     const engagementTrend = previousEngagement > 0
       ? parseFloat(((totalEngagement - previousEngagement) / previousEngagement * 100).toFixed(1))
       : (totalEngagement > 0 ? 100 : 0);
@@ -207,7 +172,6 @@ export default function PostsLibrary() {
 
     const estimatedReach = totalEngagement * 15;
 
-    // ✅ BUG FIX : platforms est un objet { Twitter: true/false }, pas un tableau d'icônes
     const topPosts = [...analyticsData]
       .sort((a, b) => (b.totalEngagement || 0) - (a.totalEngagement || 0))
       .slice(0, 5)
@@ -219,14 +183,13 @@ export default function PostsLibrary() {
           ? Math.round(((post.totalEngagement - avgEngagement) / avgEngagement) * 100)
           : 0;
 
-        // ✅ Convertir les noms de plateformes actives en icônes FontAwesome
         const platformIcons = post.platforms
           ? Object.keys(post.platforms)
               .filter(p => post.platforms[p] && PLATFORM_ICONS[p])
               .map(p => PLATFORM_ICONS[p])
           : [];
 
-        const postDate = new Date(post.createdAt);
+        const postDate = post.createdAt ? new Date(post.createdAt) : new Date();
 
         return {
           rank: index + 1,
@@ -236,10 +199,9 @@ export default function PostsLibrary() {
           engagement: (post.totalEngagement || 0).toLocaleString(),
           growth: growthPercent >= 0 ? `+${growthPercent}% vs avg` : `${growthPercent}% vs avg`,
           reach: ((post.totalEngagement || 0) * 15).toLocaleString(),
-          // ✅ BUG FIX : date invalide → fallback "—"
           date: !isNaN(postDate)
             ? postDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-            : '—'
+            : '---'
         };
       });
 
@@ -273,8 +235,9 @@ export default function PostsLibrary() {
 
     const hourlyPerformance = {};
     postsInRange.forEach(post => {
+      if (!post.createdAt) return;
       const date = new Date(post.createdAt);
-      if (isNaN(date)) return; // ✅ ignorer dates invalides
+      if (isNaN(date)) return;
       const hour = date.getHours();
       if (!hourlyPerformance[hour]) {
         hourlyPerformance[hour] = { totalEngagement: 0, count: 0 };
@@ -372,115 +335,210 @@ export default function PostsLibrary() {
   const analytics = calculateAnalytics();
 
   useEffect(() => {
-    const generateDateCategories = () => {
-      const categories = [];
-      const now = new Date();
-      const daysAgo = parseInt(activeRange.replace('D', ''));
-      for (let i = daysAgo; i >= 0; i -= Math.ceil(daysAgo / 6)) {
-        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        categories.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    console.log('Chart effect triggered, data length:', analyticsData.length);
+    
+    const timer = setTimeout(() => {
+      const engagementContainer = document.getElementById("engagement-chart");
+      const platformContainer = document.getElementById("platform-chart");
+      
+      console.log('Containers found:', {
+        engagement: !!engagementContainer,
+        platform: !!platformContainer
+      });
+      
+      if (!engagementContainer || !platformContainer) {
+        console.log('Chart containers not ready yet');
+        return;
       }
-      return categories;
-    };
 
-    const generateChartData = () => {
-      const categories = generateDateCategories();
-      const daysAgo = parseInt(activeRange.replace('D', ''));
-      const now = new Date();
-      const timeBuckets = categories.map(() => ({ likes: 0, comments: 0, shares: 0, count: 0 }));
-
-      analyticsData.forEach(post => {
-        if (post.engagement) {
-          const postDate = new Date(post.createdAt);
-          if (isNaN(postDate)) return; // ✅ ignorer dates invalides
-          const daysDiff = Math.floor((now - postDate) / (24 * 60 * 60 * 1000));
-          if (daysDiff <= daysAgo) {
-            const bucketIndex = Math.min(
-              Math.floor((daysDiff / daysAgo) * categories.length),
-              categories.length - 1
-            );
-            timeBuckets[bucketIndex].likes += post.engagement.likes || 0;
-            timeBuckets[bucketIndex].comments += post.engagement.comments || 0;
-            timeBuckets[bucketIndex].shares += post.engagement.shares || 0;
-            timeBuckets[bucketIndex].count += 1;
-          }
+      // Clear existing charts
+      Highcharts.charts.forEach(chart => {
+        if (chart && chart.renderTo) {
+          chart.destroy();
         }
       });
 
-      return {
-        likesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.likes / b.count) : 0),
-        commentsData: timeBuckets.map(b => b.count > 0 ? Math.round(b.comments / b.count) : 0),
-        sharesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.shares / b.count) : 0),
+      console.log('Creating engagement chart...');
+
+      const generateDateCategories = () => {
+        const categories = [];
+        const now = new Date();
+        const daysAgo = parseInt(activeRange.replace('D', ''));
+        for (let i = daysAgo; i >= 0; i -= Math.ceil(daysAgo / 6)) {
+          const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+          categories.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
+        return categories;
       };
-    };
 
-    const chartData = generateChartData();
+      const generateChartData = () => {
+        const categories = generateDateCategories();
+        const daysAgo = parseInt(activeRange.replace('D', ''));
+        const now = new Date();
+        const timeBuckets = categories.map(() => ({ likes: 0, comments: 0, shares: 0, count: 0 }));
 
-    Highcharts.chart("engagement-chart", {
-      chart: { type: "line", backgroundColor: "transparent", height: 320 },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: { categories: generateDateCategories(), lineColor: "rgba(255,255,255,0.1)", tickColor: "rgba(255,255,255,0.1)", labels: { style: { color: "#9CA3AF", fontSize: "12px" } } },
-      yAxis: { title: { text: null }, gridLineColor: "rgba(255,255,255,0.1)", labels: { style: { color: "#9CA3AF", fontSize: "12px" } } },
-      legend: { enabled: false },
-      plotOptions: { line: { marker: { radius: 6, symbol: "circle" }, lineWidth: 3 } },
-      series: [
-        { name: "Likes", data: chartData.likesData, color: "#00C2FF", marker: { fillColor: "#00C2FF", lineColor: "#00C2FF", lineWidth: 2 } },
-        { name: "Comments", data: chartData.commentsData, color: "#7B61FF", marker: { fillColor: "#7B61FF", lineColor: "#7B61FF", lineWidth: 2 } },
-        { name: "Shares", data: chartData.sharesData, color: "#00E09D", marker: { fillColor: "#00E09D", lineColor: "#00E09D", lineWidth: 2 } }
-      ]
-    });
-
-    const platformEngagement = { Twitter: 0, LinkedIn: 0, Medium: 0 };
-    analyticsData.forEach(post => {
-      if (post.platforms) {
-        Object.keys(post.platforms).forEach(platform => {
-          if (post.platforms[platform] && platformEngagement.hasOwnProperty(platform)) {
-            platformEngagement[platform] += post.totalEngagement || 0;
+        analyticsData.forEach(post => {
+          try {
+            if (post.engagement && post.createdAt && typeof post.engagement === 'object') {
+              const postDate = new Date(post.createdAt);
+              if (isNaN(postDate)) return;
+              const daysDiff = Math.floor((now - postDate) / (24 * 60 * 60 * 1000));
+              if (daysDiff <= daysAgo) {
+                const bucketIndex = Math.min(
+                  Math.floor((daysDiff / daysAgo) * categories.length),
+                  categories.length - 1
+                );
+                
+                if (bucketIndex >= 0 && bucketIndex < timeBuckets.length) {
+                  const engagement = post.engagement;
+                  const likes = typeof engagement.likes === 'number' ? engagement.likes : (typeof engagement.likes === 'undefined' ? 0 : Number(engagement.likes) || 0);
+                  const comments = typeof engagement.comments === 'number' ? engagement.comments : (typeof engagement.comments === 'undefined' ? 0 : Number(engagement.comments) || 0);
+                  const shares = typeof engagement.shares === 'number' ? engagement.shares : (typeof engagement.shares === 'undefined' ? 0 : Number(engagement.shares) || 0);
+                  
+                  timeBuckets[bucketIndex].likes += likes;
+                  timeBuckets[bucketIndex].comments += comments;
+                  timeBuckets[bucketIndex].shares += shares;
+                  timeBuckets[bucketIndex].count += 1;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('Error processing post:', error);
           }
         });
+
+        return {
+          likesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.likes / b.count) : 0),
+          commentsData: timeBuckets.map(b => b.count > 0 ? Math.round(b.comments / b.count) : 0),
+          sharesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.shares / b.count) : 0),
+        };
+      };
+
+      const chartData = generateChartData();
+      console.log('Chart data generated:', chartData, 'Posts:', analyticsData.length);
+      
+      // Clear container completely
+      engagementContainer.innerHTML = '';
+      engagementContainer.className = 'h-80 w-full bg-black/20 rounded-xl';
+      
+      const hasData = chartData.likesData.some(val => val > 0) || 
+                     chartData.commentsData.some(val => val > 0) || 
+                     chartData.sharesData.some(val => val > 0);
+      
+      console.log('Has data:', hasData, 'Analytics data length:', analyticsData.length);
+      
+      if (!hasData || analyticsData.length === 0) {
+        console.log('No data available, showing message');
+        engagementContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No engagement data available</div>';
+      } else {
+        console.log('Creating Highcharts chart with data:', chartData);
+        try {
+          const chart = Highcharts.chart("engagement-chart", {
+            chart: { 
+              type: "line", 
+              backgroundColor: "transparent", 
+              height: 320,
+              style: { fontFamily: 'system-ui' }
+            },
+            title: { text: null },
+            credits: { enabled: false },
+            accessibility: { enabled: false },
+            xAxis: { 
+              categories: generateDateCategories(), 
+              lineColor: "rgba(255,255,255,0.1)", 
+              tickColor: "rgba(255,255,255,0.1)", 
+              labels: { style: { color: "#9CA3AF", fontSize: "12px" } } 
+            },
+            yAxis: { 
+              title: { text: null }, 
+              gridLineColor: "rgba(255,255,255,0.1)", 
+              labels: { style: { color: "#9CA3AF", fontSize: "12px" } } 
+            },
+            legend: { 
+              enabled: true,
+              itemStyle: { color: "#9CA3AF" }
+            },
+            plotOptions: { 
+              line: { 
+                marker: { radius: 6, symbol: "circle" }, 
+                lineWidth: 3 
+              } 
+            },
+            series: [
+              { name: "Likes", data: chartData.likesData, color: "#00C2FF" },
+              { name: "Comments", data: chartData.commentsData, color: "#7B61FF" },
+              { name: "Shares", data: chartData.sharesData, color: "#00E09D" }
+            ]
+          });
+          console.log('✅ Engagement chart created successfully:', chart);
+        } catch (err) {
+          console.error('❌ Chart error:', err);
+          engagementContainer.innerHTML = '<div class="flex items-center justify-center h-full text-red-500">Chart error: ' + err.message + '</div>';
+        }
       }
-    });
 
-    const totalPlatformEngagement = Object.values(platformEngagement).reduce((sum, val) => sum + val, 0);
-    const platformChartData = totalPlatformEngagement > 0 ? [
-      { name: "Twitter", y: (platformEngagement.Twitter / totalPlatformEngagement * 100), color: "#1D9BF0" },
-      { name: "LinkedIn", y: (platformEngagement.LinkedIn / totalPlatformEngagement * 100), color: "#7B61FF" },
-      { name: "Medium", y: (platformEngagement.Medium / totalPlatformEngagement * 100), color: "#00E09D" }
-    ] : [{ name: "No Data", y: 100, color: "#4B5563" }];
+      const platformEngagement = { Twitter: 0, LinkedIn: 0, Medium: 0 };
+      analyticsData.forEach(post => {
+        if (post.platforms) {
+          Object.keys(post.platforms).forEach(platform => {
+            if (post.platforms[platform] && platformEngagement.hasOwnProperty(platform)) {
+              platformEngagement[platform] += post.totalEngagement || 0;
+            }
+          });
+        }
+      });
 
-    Highcharts.chart("platform-chart", {
-      chart: { type: "pie", backgroundColor: "transparent", height: 260 },
-      title: { text: null },
-      credits: { enabled: false },
-      tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
-      plotOptions: { pie: { allowPointSelect: true, cursor: "pointer", dataLabels: { enabled: false }, innerSize: "40%", borderWidth: 0 } },
-      series: [{ name: "Engagement", colorByPoint: true, data: platformChartData }]
-    });
+      const total = Object.values(platformEngagement).reduce((a, b) => a + b, 0);
+      const data = total > 0 ? [
+        { name: "Twitter", y: (platformEngagement.Twitter / total * 100), color: "#1D9BF0" },
+        { name: "LinkedIn", y: (platformEngagement.LinkedIn / total * 100), color: "#7B61FF" },
+        { name: "Medium", y: (platformEngagement.Medium / total * 100), color: "#00E09D" }
+      ] : [{ name: "No Data", y: 100, color: "#4B5563" }];
 
-    const metricCards = document.querySelectorAll(".metric-card");
-    metricCards.forEach((card, index) => {
-      card.style.opacity = "0";
-      card.style.transform = "translateY(20px)";
-      setTimeout(() => {
-        card.style.transition = "all 0.6s cubic-bezier(0.4,0,0.2,1)";
-        card.style.opacity = "1";
-        card.style.transform = "translateY(0)";
-      }, index * 100);
-    });
+      Highcharts.chart("platform-chart", {
+        chart: { type: "pie", backgroundColor: "transparent", height: 260 },
+        title: { text: null },
+        credits: { enabled: false },
+        accessibility: { enabled: false },
+        tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
+        plotOptions: { 
+          pie: { 
+            allowPointSelect: true, 
+            cursor: "pointer", 
+            dataLabels: { enabled: false }, 
+            innerSize: "40%", 
+            borderWidth: 0 
+          } 
+        },
+        series: [{ name: "Engagement", colorByPoint: true, data }]
+      });
 
-    const tableRows = document.querySelectorAll("tbody tr");
-    tableRows.forEach((row, index) => {
-      row.style.opacity = "0";
-      row.style.transform = "translateX(-20px)";
-      setTimeout(() => {
-        row.style.transition = "all 0.4s ease-out";
-        row.style.opacity = "1";
-        row.style.transform = "translateX(0)";
-      }, (index * 100) + 1000);
-    });
+      const metricCards = document.querySelectorAll(".metric-card");
+      metricCards.forEach((card, index) => {
+        card.style.opacity = "0";
+        card.style.transform = "translateY(20px)";
+        setTimeout(() => {
+          card.style.transition = "all 0.6s cubic-bezier(0.4,0,0.2,1)";
+          card.style.opacity = "1";
+          card.style.transform = "translateY(0)";
+        }, index * 100);
+      });
 
-  }, [analyticsData, activeRange, analytics]);
+      const tableRows = document.querySelectorAll("tbody tr");
+      tableRows.forEach((row, index) => {
+        row.style.opacity = "0";
+        row.style.transform = "translateX(-20px)";
+        setTimeout(() => {
+          row.style.transition = "all 0.4s ease-out";
+          row.style.opacity = "1";
+          row.style.transform = "translateX(0)";
+        }, (index * 100) + 1000);
+      });
+
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [analyticsData, activeRange]);
 
   const contentPerformance = analytics.contentPerformance;
   const bestTimes = analytics.bestTimes;
@@ -488,7 +546,6 @@ export default function PostsLibrary() {
 
   return (
     <div id="main-content" className="p-8">
-
       <div id="header-section" className="flex items-center justify-between mb-8 animate-fade-in">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
@@ -522,7 +579,6 @@ export default function PostsLibrary() {
               <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
                 <FontAwesomeIcon icon={faHeart} className="text-cyan-400 text-xl" />
               </div>
-              {/* ✅ engagementTrend est maintenant un number */}
               <div className={`flex items-center space-x-1 text-sm font-medium ${analytics.engagementTrend >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <FontAwesomeIcon icon={analytics.engagementTrend >= 0 ? faArrowUp : faArrowDown} className="text-xs" />
                 <span>{Math.abs(analytics.engagementTrend)}%</span>
@@ -591,7 +647,7 @@ export default function PostsLibrary() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div id="engagement-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <div id="engagement-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.2s", minHeight: "400px" }}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold text-white mb-1">Engagement Over Time</h2>
@@ -603,7 +659,9 @@ export default function PostsLibrary() {
               <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-teal-400 rounded-full glow-point" /><span className="text-gray-300">Shares</span></div>
             </div>
           </div>
-          <div id="engagement-chart" className="h-80"></div>
+          <div id="engagement-chart" className="h-80 w-full bg-black/20 rounded-xl flex items-center justify-center">
+            <div className="text-gray-500 text-sm">Loading chart...</div>
+          </div>
         </div>
 
         <div id="platform-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.4s" }}>
@@ -697,7 +755,7 @@ export default function PostsLibrary() {
                     <FontAwesomeIcon icon={content.icon} className={`${content.color}`} />
                     <div>
                       <span className="text-gray-300">{content.label}</span>
-                      <div className="text-gray-500 text-xs">{content.posts} posts • avg {content.avgEngagement} eng</div>
+                      <div className="text-gray-500 text-xs">{content.posts} posts {content.avgEngagement} eng</div>
                     </div>
                   </div>
                   <span className="text-white font-medium text-sm">{content.value}%</span>
@@ -746,7 +804,6 @@ export default function PostsLibrary() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
-                      {/* ✅ BUG FIX : post.img n'existe pas → fallback placeholder */}
                       <div className="w-10 h-10 rounded-xl bg-gray-700 flex items-center justify-center text-gray-400 text-xs">
                         {post.rank}
                       </div>
@@ -758,7 +815,6 @@ export default function PostsLibrary() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      {/* ✅ post.platforms est maintenant un tableau d'icônes FontAwesome */}
                       {post.platforms.map((icon, idx) => (
                         <FontAwesomeIcon key={idx} icon={icon} className="px-2 py-1 rounded-lg text-xs text-gray-300" />
                       ))}
@@ -833,7 +889,6 @@ export default function PostsLibrary() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
