@@ -116,11 +116,28 @@ export default function PostsLibrary() {
     const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
     const previousCutoffDate = new Date(cutoffDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
+    console.log('=== DEBUG ANALYTICS ===');
+    console.log('Total posts in analyticsData:', analyticsData.length);
+    console.log('Active range:', activeRange);
+    console.log('Days ago:', daysAgo);
+    console.log('Cutoff date:', cutoffDate.toLocaleDateString());
+    console.log('Now:', now.toLocaleDateString());
+    console.log('Sample posts:', analyticsData.slice(0, 3).map(p => ({ 
+      content: p.content?.substring(0, 50), 
+      createdAt: p.createdAt, 
+      platforms: p.platforms,
+      totalEngagement: p.totalEngagement 
+    })));
+
     const postsInRange = analyticsData.filter(post => {
       if (!post.createdAt) return false;
       const postDate = new Date(post.createdAt);
-      return !isNaN(postDate) && postDate >= cutoffDate;
+      const inRange = !isNaN(postDate) && postDate >= cutoffDate;
+      console.log(`Post: ${post.content?.substring(0, 30)}... | Date: ${post.createdAt} | Valid: ${!isNaN(postDate)} | In range: ${inRange}`);
+      return inRange;
     });
+
+    console.log('Posts in range:', postsInRange.length);
 
     const postsInPreviousRange = analyticsData.filter(post => {
       if (!post.createdAt) return false;
@@ -227,10 +244,12 @@ export default function PostsLibrary() {
 
     const totalAvgEngagement = Object.values(platformAvgEngagement).reduce((sum, val) => sum + val, 0);
 
+    const totalPlatformEngagement = Object.values(platformEngagement).reduce((sum, val) => sum + val, 0);
+    
     const platformPercentages = {
-      Twitter: totalAvgEngagement > 0 ? parseFloat((platformAvgEngagement.Twitter / totalAvgEngagement * 100).toFixed(1)) : 0,
-      LinkedIn: totalAvgEngagement > 0 ? parseFloat((platformAvgEngagement.LinkedIn / totalAvgEngagement * 100).toFixed(1)) : 0,
-      Medium: totalAvgEngagement > 0 ? parseFloat((platformAvgEngagement.Medium / totalAvgEngagement * 100).toFixed(1)) : 0
+      Twitter: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.Twitter / totalPlatformEngagement * 100).toFixed(1)) : 0,
+      LinkedIn: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.LinkedIn / totalPlatformEngagement * 100).toFixed(1)) : 0,
+      Medium: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.Medium / totalPlatformEngagement * 100).toFixed(1)) : 0
     };
 
     const hourlyPerformance = {};
@@ -324,6 +343,7 @@ export default function PostsLibrary() {
       estimatedReach: Math.round(estimatedReach),
       platformEngagement,
       platformPercentages,
+      platformPostCount,
       topPosts,
       contentPerformance,
       bestTimes,
@@ -688,7 +708,7 @@ export default function PostsLibrary() {
                       style={{ width: `${analytics.platformPercentages[platform]}%` }} />
                   </div>
                   <div className="text-xs text-gray-500 flex justify-between">
-                    <span>{analyticsData.filter(p => p.platforms?.[platform]).length} posts</span>
+                    <span>{analytics.platformPostCount?.[platform] || 0} posts</span>
                     <span>{(analytics.platformEngagement[platform] || 0).toLocaleString()} engagement</span>
                   </div>
                 </div>

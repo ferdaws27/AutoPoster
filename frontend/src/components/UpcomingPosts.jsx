@@ -1,4 +1,14 @@
+import { useNavigate } from "react-router-dom";
+
 export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) {
+  const navigate = useNavigate();
+  // Truncate content to show only a preview
+  const truncateContent = (content, maxLength = 80) => {
+    if (!content) return "No description";
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + "...";
+  };
+
   // Format date in a logical and dynamic way
   const formatScheduleDate = (scheduleDate, scheduleTime) => {
     if (!scheduleDate || !scheduleTime) return "TBD";
@@ -44,7 +54,7 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
     <div id="upcoming-posts-section" className="glass-effect rounded-3xl p-6 glow-card" style={{ opacity: 1, transform: "translateY(0px)", transition: "0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white">Upcoming Posts</h2>
-        <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">View all</button>
+        <button onClick={() => navigate("/dashboard/scheduling")} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">View all</button>
       </div>
 
       <div className="space-y-4">
@@ -97,8 +107,8 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
                 </div>
 
                 <div className="flex-1 ml-4">
-                  <div className="text-white font-medium mb-1">{post.title || post.idea || post.content || "Untitled post"}</div>
-                  <div className="text-gray-400 text-sm line-clamp-2">{post.desc || post.content || post.excerpt || "No description"}</div>
+                  <div className="text-white font-medium mb-1">{truncateContent(post.title || post.idea || "Untitled post", 60)}</div>
+                  <div className="text-gray-400 text-sm">{truncateContent(post.desc || post.content || post.excerpt || "No description", 80)}</div>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">

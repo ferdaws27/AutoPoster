@@ -360,6 +360,22 @@ export default function CreatePostPage() {
     return () => textarea.removeEventListener("input", handler);
   }, []);
 
+  // Récupérer les paramètres URL pour pré-remplir le contenu
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const content = params.get('content');
+    const description = params.get('description');
+    
+    if (content || description) {
+      const textarea = ideaRef.current;
+      if (textarea) {
+        const fullContent = content && description ? `${content}\n\n${description}` : content || description || '';
+        textarea.value = fullContent;
+        setCharCount(fullContent.length);
+      }
+    }
+  }, []);
+
   const togglePublish = (platform) => {
     setPublishTo((prev) => ({ ...prev, [platform]: !prev[platform] }));
   };

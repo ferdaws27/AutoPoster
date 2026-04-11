@@ -95,7 +95,19 @@ export default function Dashboard() {
     return dateA - dateB;
   });
 
-  const scheduledPosts = allPosts; // Show all posts in upcoming
+  // Filter and sort upcoming posts - only show scheduled and future posts
+  const scheduledPosts = allPosts.filter(post => {
+    if (post.status !== 'scheduled') return false;
+    if (!post.scheduleDate || !post.scheduleTime) return false;
+    
+    const postDateTime = new Date(`${post.scheduleDate} ${post.scheduleTime}`);
+    const now = new Date();
+    return postDateTime > now; // Only show future posts
+  }).sort((a, b) => {
+    const dateA = new Date(`${a.scheduleDate} ${a.scheduleTime}`);
+    const dateB = new Date(`${b.scheduleDate} ${b.scheduleTime}`);
+    return dateA - dateB; // Sort by earliest first
+  });
 
   const totalPosts = normalizedPosts.length;
   const scheduledCount = stats.scheduled || 0;
@@ -223,20 +235,77 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <section className="grid grid-cols-3 gap-6 mb-8">
-          <StatCard icon="fa-file-lines" color="cyan" value={loading ? "..." : totalPosts} label="Total Posts" />
-          <StatCard
-            icon="fa-heart"
-            color="violet"
-            value={loading ? "..." : `${Math.min(100, (scheduledCount + publishedCount) * 4)}%`}
-            label="Engagement"
-          />
-          <StatCard icon="fa-clock" color="green" value={loading ? "..." : nextPost} label="Next Post" />
-        </section>
+        {/* Quick Stats Cards */}
+        <div className="grid grid-cols-3 gap-6 mb-8">
+          {/* Total Posts Card */}
+          <div className="glass-effect rounded-3xl p-6 card-hover glow-card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
+                <i className="fa-solid fa-file-lines text-cyan-400 text-xl"></i>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{loading ? "..." : totalPosts}</div>
+                <div className="text-sm text-gray-400">This week</div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-1">Total Posts</h3>
+              <div className="flex items-center text-sm">
+                <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
+                <span className="text-green-400">+18%</span>
+                <span className="text-gray-400 ml-1">vs last week</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Average Engagement Card */}
+          <div className="glass-effect rounded-3xl p-6 card-hover glow-card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center">
+                <i className="fa-solid fa-heart text-violet-400 text-xl"></i>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{loading ? "..." : `${Math.min(100, (scheduledCount + publishedCount) * 4)}%`}</div>
+                <div className="text-sm text-gray-400">Avg rate</div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-1">Engagement</h3>
+              <div className="flex items-center text-sm">
+                <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
+                <span className="text-green-400">+2.1%</span>
+                <span className="text-gray-400 ml-1">vs last week</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Next Scheduled Post Card */}
+          <div className="glass-effect rounded-3xl p-6 card-hover glow-card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-green-400/20 flex items-center justify-center">
+                <i className="fa-solid fa-clock text-green-400 text-xl"></i>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{loading ? "..." : nextPostTime ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : "No post"}</div>
+                <div className="text-sm text-gray-400">{nextPostTime ? "Today" : "Scheduled"}</div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-1">Next Post</h3>
+              <div className="flex items-center text-sm">
+                <div className="flex space-x-1 mr-2">
+                  <i className="fa-brands fa-x-twitter text-white text-xs"></i>
+                  <i className="fa-brands fa-linkedin text-blue-400 text-xs"></i>
+                </div>
+                <span className="text-gray-400">2 platforms</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <section className="grid grid-cols-2 gap-8">
           <UpcomingPosts posts={scheduledPosts} onPublish={handleMarkPublished} onScheduleNew={handleScheduleNew} />
-          <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} onGenerateMore={handleGenerateMoreIdeas} />
+          <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} onGenerateMore={handleGenerateMoreIdeas} navigate={navigate} />
         </section>
 
         <section className="mt-8">
@@ -248,6 +317,7 @@ export default function Dashboard() {
               avgRating,
             }}
             posts={normalizedPosts}
+            navigate={navigate}
           />
         </section>
 
@@ -514,7 +584,7 @@ const IconButton = ({ icon }) => (
   </button>
 );
 
-const RecentActivity = ({ stats, posts }) => {
+const RecentActivity = ({ stats, posts, navigate }) => {
   // Calculer les métriques dynamiques basées sur les posts réels
   const calculateMetrics = (posts, period = '7days') => {
     const now = new Date();
@@ -598,10 +668,6 @@ const RecentActivity = ({ stats, posts }) => {
             <option value="30days">Last 30 days</option>
             <option value="90days">Last 90 days</option>
           </select>
-
-          <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">
-            View all
-          </button>
         </div>
       </div>
 
@@ -655,12 +721,12 @@ const ActivityItem = ({ icon, value, label, color, growth }) => (
   </div>
 );
 
-const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore }) => (
-  <div id="ai-ideas-section" className="glass-effect rounded-3xl p-6 glow-card" style={{ opacity: 1, transform: "translateY(0px)", transition: "0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore, navigate }) => (
+  <div id="ai-ideas-section" className="glass-effect rounded-3xl p-6 glow-card">
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center">
         <div className="w-8 h-8 rounded-xl gradient-accent flex items-center justify-center mr-3">
-          <i className="text-white text-sm fa-solid fa-lightbulb" />
+          <i className="fa-solid fa-lightbulb text-white text-sm"></i>
         </div>
         <h2 className="text-xl font-bold text-white">AI Ideas</h2>
       </div>
@@ -668,60 +734,54 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore }) => (
     </div>
 
     <div className="space-y-4 mb-6">
-      {ideas.length === 0 && (
+      {ideas.length === 0 ? (
         <p className="text-gray-400 text-sm">No AI ideas available.</p>
-      )}
-      {ideas.map((idea) => {
-        const badgeStyle =
-          idea.status === "Scheduled"
-            ? "bg-green-400/20 text-green-400"
-            : idea.status === "Review"
-            ? "bg-yellow-400/20 text-yellow-400"
-            : "bg-cyan-400/20 text-cyan-400";
+      ) : (
+        ideas.slice(0, 3).map((idea, index) => {
+          const gradients = [
+            'from-cyan-400/10 to-violet-400/10 border-cyan-400/20 hover:border-cyan-400/40',
+            'from-violet-400/10 to-pink-400/10 border-violet-400/20 hover:border-violet-400/40',
+            'from-green-400/10 to-blue-400/10 border-green-400/20 hover:border-green-400/40'
+          ];
+          
+          const colors = ['cyan', 'violet', 'green'];
+          const color = colors[index % 3];
 
-        const platformIcon =
-          idea.platform === "twitter"
-            ? "fa-twitter"
-            : idea.platform === "linkedin"
-            ? "fa-linkedin-in"
-            : "fa-medium";
-
-        return (
-          <div key={idea.id} className="p-4 rounded-2xl bg-gradient-to-br from-cyan-400/10 to-violet-400/10 border border-cyan-400/20 hover:border-cyan-400/40 transition-colors">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center">
-                <div className="w-6 h-6 rounded-lg bg-cyan-400/20 flex items-center justify-center mr-2">
-                  <i className="text-cyan-400 text-xs fa-solid fa-rocket" />
+          return (
+            <div key={idea.id || index} className={`p-4 rounded-2xl bg-gradient-to-br ${gradients[index % 3]} border transition-colors`}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center">
+                  <div className={`w-6 h-6 rounded-lg bg-${color}-400/20 flex items-center justify-center mr-2`}>
+                    <i className={`fa-solid fa-${['rocket', 'brain', 'chart-line'][index % 3]} text-${color}-400 text-xs`}></i>
+                  </div>
+                  <span className={`text-xs font-medium text-${color}-400 uppercase tracking-wide`}>{idea.category || 'Trending'}</span>
                 </div>
-                <span className="text-xs font-medium text-cyan-400 uppercase tracking-wide">{idea.category}</span>
-              </div>
-              <div className="flex space-x-1">
-                <div className="w-4 h-4 bg-black rounded flex items-center justify-center">
-                  <i className={`text-white text-xs fa-brands ${platformIcon}`} />
+                <div className="flex space-x-1">
+                  <div className="w-4 h-4 bg-black rounded flex items-center justify-center">
+                    <i className="fa-brands fa-x-twitter text-white text-xs"></i>
+                  </div>
+                  <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center">
+                    <i className="fa-brands fa-linkedin-in text-white text-xs"></i>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <h3 className="text-white font-semibold mb-2">{idea.title}</h3>
-            <p className="text-gray-300 text-sm mb-3">{idea.desc}</p>
-
-            <div className="flex items-center justify-between">
-              <span className={`px-2 py-1 text-xs rounded-full ${badgeStyle}`}>{idea.status}</span>
-              <button
-                onClick={() => onUseIdea && onUseIdea(idea)}
-                className="px-3 py-2 rounded-xl gradient-accent text-white text-sm font-medium hover:opacity-90 transition-opacity"
+              <h3 className="text-white font-semibold mb-2">{idea.title}</h3>
+              <p className="text-gray-300 text-sm mb-3">{idea.desc}</p>
+              <button 
+                onClick={() => navigate(`/dashboard/CreatePostPage?content=${encodeURIComponent(idea.title)}&description=${encodeURIComponent(idea.desc)}`)}
+                className={`w-full p-2 rounded-xl ${index === 0 ? 'gradient-accent' : index === 1 ? 'gradient-accent-reverse' : 'bg-gradient-to-r from-green-400 to-blue-400'} text-white text-sm font-medium hover:opacity-90 transition-opacity`}
               >
                 Generate Post
               </button>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </div>
 
     <div className="pt-4 border-t border-gray-700/50">
       <button onClick={onGenerateMore} className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 transition-all text-sm font-medium">
-        <i className="fa-solid fa-wand-magic-sparkles mr-2" />
+        <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
         Generate More Ideas
       </button>
     </div>

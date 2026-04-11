@@ -14,10 +14,10 @@ export default function Layout() {
     ["fa-magic", "Hook Generator", "HookGeneratorPage "],
     ["fa-photo-video", "Media Companion", "MediaCompanion"],
     ["fa-flask", "AB Tester", "ABTesterPage"],
-    ["fa-flask", "Trendradar", "Trendradar"],
+    ["fa-satellite-dish", "Trendradar", "Trendradar"],
     ["fa-clone", "Clone", "Clone"],
     ["fa-star", "AI Reputation", "AIReputationPage"],
-    ["fa-star", "Quote Template Generator", "QuoteTemplateGenerator"],
+    ["fa-quote-left", "Quote Template Generator", "QuoteTemplateGenerator"],
     ["fa-users", "Audience Analyzer", "audience-analyzer"],
   ];
 
