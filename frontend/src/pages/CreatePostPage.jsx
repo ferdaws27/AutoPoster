@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
+import useSettings from "../hooks/useSettings";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHistory,
@@ -31,14 +32,15 @@ import {
 
 export default function CreatePostPage() {
   const { createPost, posts, stats: hookStats } = usePosts();
+  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile } = useSettings();
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
   const [charCount, setCharCount] = useState(0);
   const [publishTo, setPublishTo] = useState({
-    Twitter: true,
-    LinkedIn: true,
-    Medium: true,
+    Twitter: connectedPlatforms.twitter,
+    LinkedIn: connectedPlatforms.linkedin,
+    Medium: connectedPlatforms.medium,
   });
   const [variations, setVariations] = useState({});
   const [loading, setLoading] = useState(false);
@@ -142,113 +144,6 @@ export default function CreatePostPage() {
     setStats(calculateStats());
   }, [posts]);
 
-  const API_BASE_URL = "http://localhost:5000/api";
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  };
-
-  const savePostToMongo = async ({
-    content,
-    status = "draft",
-    platforms = {},
-    schedule_date = null,
-    schedule_time = null,
-    engagement = {},
-  }) => {
-    const res = await fetch(`${API_BASE_URL}/posts/`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        content,
-        status,
-        platforms,
-        schedule_date,
-        schedule_time,
-        engagement,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || "Erreur lors de l'enregistrement du post");
-    }
-
-    return data.data;
-  };
-
-  const fetchStatsFromMongo = async () => {
-    const res = await fetch(`${API_BASE_URL}/posts/stats/summary`, {
-      method: "GET",
-      headers: getAuthHeaders(),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || "Erreur lors du chargement des stats");
-    }
-
-    const statsData = data.data?.stats || {};
-    const recentPosts = data.data?.recent_posts || [];
-
-    const publishedThisMonthCount = recentPosts.filter((post) => {
-      if (post.status !== "published") return false;
-      const postDate = new Date(post.created_at);
-      const now = new Date();
-      return (
-        postDate.getMonth() === now.getMonth() &&
-        postDate.getFullYear() === now.getFullYear()
-      );
-    }).length;
-
-    const nextScheduledPost = recentPosts
-      .filter((post) => post.status === "scheduled")
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
-
-    return {
-      drafts: statsData.draft || 0,
-      scheduled: statsData.scheduled || 0,
-      published: statsData.published || 0,
-      engagement: "0",
-      draftsTrend: statsData.draft > 0 ? `${statsData.draft} draft(s)` : "No recent drafts",
-      scheduledNext: nextScheduledPost ? "Scheduled post available" : "No scheduled posts",
-      publishedThisMonth:
-        publishedThisMonthCount > 0
-          ? `This month (${publishedThisMonthCount})`
-          : "None yet",
-      engagementTrend: "No data yet",
-    };
-  };
-
-  const refreshStats = async () => {
-    try {
-      const mongoStats = await fetchStatsFromMongo();
-      setStats(mongoStats);
-    } catch (err) {
-      console.error("Error loading stats:", err);
-      setStats({
-        drafts: 0,
-        scheduled: 0,
-        published: 0,
-        engagement: "0",
-        draftsTrend: "No recent drafts",
-        scheduledNext: "No scheduled posts",
-        publishedThisMonth: "None yet",
-        engagementTrend: "No data yet",
-      });
-    }
-  };
-
-  useEffect(() => {
-    refreshStats();
-  }, []);
-
   // Récupérer le hook depuis localStorage
   useEffect(() => {
     const storedHook = localStorage.getItem("selectedHook");
@@ -344,11 +239,10 @@ export default function CreatePostPage() {
 
   // Test API key loading immediately
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     console.log("=== API KEY TEST ===");
-    console.log("API Key exists:", !!apiKey);
-    console.log("API Key length:", apiKey?.length);
-  }, []);
+    console.log("API Key exists:", !!openRouterKey);
+    console.log("API Key length:", openRouterKey?.length);
+  }, [openRouterKey]);
 
   useEffect(() => {
     const textarea = ideaRef.current;
@@ -402,14 +296,24 @@ export default function CreatePostPage() {
       return alert("Select at least one platform");
     }
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
       setLoading(false);
-      return alert("OpenAI API key not found. Please set VITE_OPENAI_API_KEY.");
+      return alert("API key not found. Set it in Settings > API Keys.");
     }
 
     const newVariations = {};
     const currentCount = generationCount + 1;
+
+    // Build voice style instruction from trained profile
+    const voiceInstruction = voiceProfile
+      ? `\nIMPORTANT - Match this writing style:
+- Tone: ${voiceProfile.tone} / ${voiceProfile.sentiment}
+- Style: ${voiceProfile.writingStyle}
+- Theme: ${voiceProfile.primaryTheme}
+- Keywords to weave in: ${(voiceProfile.keywords || []).slice(0, 5).join(", ")}
+`
+      : "";
 
     try {
       for (const platform of platforms) {
@@ -443,6 +347,8 @@ export default function CreatePostPage() {
 - This is generation attempt ${currentCount}, offer a unique angle`;
         }
 
+        prompt += voiceInstruction;
+
         try {
           const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -453,7 +359,7 @@ export default function CreatePostPage() {
               "X-Title": "AutoPoster App",
             },
             body: JSON.stringify({
-              model: "openai/gpt-3.5-turbo",
+              model: modelId,
               messages: [{ role: "user", content: prompt }],
               max_tokens: platform === "Twitter" ? 100 : 300,
             }),
@@ -487,7 +393,7 @@ export default function CreatePostPage() {
   };
 
   const generateAIidea = async () => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) return null;
 
     try {
@@ -503,7 +409,7 @@ export default function CreatePostPage() {
           "X-Title": "AutoPoster App",
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
+          model: modelId,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 50,
         }),
@@ -520,7 +426,7 @@ export default function CreatePostPage() {
   };
 
   const generateMockContent = async (platform, idea, count) => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
       return `AI content generation unavailable for ${platform}.`;
     }
@@ -544,7 +450,7 @@ export default function CreatePostPage() {
           "X-Title": "AutoPoster App",
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
+          model: modelId,
           messages: [{ role: "user", content: prompt }],
           max_tokens: platform === "Twitter" ? 100 : 300,
         }),
@@ -571,9 +477,9 @@ export default function CreatePostPage() {
     if (platforms.length === 0) return alert("Select at least one platform");
 
     setLoading(true);
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
-      alert("OpenAI API key not found.");
+      alert("API key not found. Set it in Settings > API Keys.");
       setLoading(false);
       return;
     }
@@ -590,7 +496,7 @@ export default function CreatePostPage() {
             "X-Title": "AutoPoster App",
           },
           body: JSON.stringify({
-            model: "openai/gpt-3.5-turbo",
+            model: modelId,
             messages: [
               {
                 role: "user",
@@ -693,7 +599,7 @@ Return valid JSON array only like:
 
     setLoading(true);
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
       setLoading(false);
       return alert("Missing API key");
@@ -720,7 +626,7 @@ Return valid JSON array only like:
             "X-Title": "AutoPoster App",
           },
           body: JSON.stringify({
-            model: "openai/gpt-3.5-turbo",
+            model: modelId,
             messages: [{ role: "user", content: prompt }],
             max_tokens: platform === "Twitter" ? 100 : 300,
           }),
@@ -774,9 +680,9 @@ Return valid JSON array only like:
     if (!idea) return alert("Enter your idea first");
 
     setLoading(true);
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
-      alert("OpenAI API key not found.");
+      alert("API key not found. Set it in Settings > API Keys.");
       setLoading(false);
       return;
     }
@@ -793,7 +699,7 @@ Return valid JSON array only like:
           "X-Title": "AutoPoster App",
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
+          model: modelId,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 150,
         }),
@@ -838,8 +744,6 @@ const saveDraft = async () => {
     alert(`Draft saved successfully for ${selectedPlatforms.length} platform(s)!`);
     setShowSaveDraftModal(false);
     setDraftName("");
-
-    await refreshStats(); // update stats
   } catch (err) {
     console.error("SAVE DRAFT ERROR:", err);
     alert(err.message);
@@ -881,8 +785,6 @@ const saveDraft = async () => {
       setShowScheduleModal(false);
       setScheduleDate("");
       setScheduleTime("");
-
-      await refreshStats();
     } catch (err) {
       console.error("SCHEDULE ERROR:", err);
       alert(err.message);
@@ -894,7 +796,7 @@ const saveDraft = async () => {
     if (!idea) return alert("Enter your idea first");
 
     setLoading(true);
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = openRouterKey;
     if (!apiKey) {
       setLoading(false);
       return;
@@ -912,7 +814,7 @@ const saveDraft = async () => {
           "X-Title": "AutoPoster App",
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
+          model: modelId,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 250,
         }),
@@ -1406,7 +1308,10 @@ The AI will adapt your content for each platform's unique style and audience.`}
 
         <div className="px-8 pb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="card-bg rounded-2xl p-6 border border-gray-700">
+            <div
+              onClick={() => navigate("/dashboard/PostsLibrary?filter=draft")}
+              className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-green-400/50 hover:bg-green-400/5 transition-all"
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-400 text-sm">Drafts</span>
                 <FontAwesomeIcon icon={faFileText} className="text-gray-400" />
@@ -1415,7 +1320,10 @@ The AI will adapt your content for each platform's unique style and audience.`}
               <div className="text-green-400 text-xs">{stats.draftsTrend}</div>
             </div>
 
-            <div className="card-bg rounded-2xl p-6 border border-gray-700">
+            <div
+              onClick={() => navigate("/dashboard/scheduling")}
+              className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-all"
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-400 text-sm">Scheduled</span>
                 <FontAwesomeIcon icon={faCalendar} className="text-gray-400" />
@@ -1424,7 +1332,10 @@ The AI will adapt your content for each platform's unique style and audience.`}
               <div className="text-cyan-400 text-xs">{stats.scheduledNext}</div>
             </div>
 
-            <div className="card-bg rounded-2xl p-6 border border-gray-700">
+            <div
+              onClick={() => navigate("/dashboard/PostsLibrary?filter=posted")}
+              className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-violet-400/50 hover:bg-violet-400/5 transition-all"
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-400 text-sm">Published</span>
                 <FontAwesomeIcon icon={faCheckCircle} className="text-gray-400" />
@@ -1435,7 +1346,10 @@ The AI will adapt your content for each platform's unique style and audience.`}
               </div>
             </div>
 
-            <div className="card-bg rounded-2xl p-6 border border-gray-700">
+            <div
+              onClick={() => navigate("/dashboard/analytics")}
+              className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-green-400/50 hover:bg-green-400/5 transition-all"
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-400 text-sm">Engagement</span>
                 <FontAwesomeIcon icon={faHeart} className="text-gray-400" />

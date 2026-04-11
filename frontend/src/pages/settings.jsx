@@ -1,24 +1,31 @@
-import { useRef, useState } from "react";
-import * as Toast from "@radix-ui/react-toast";
+import { useRef, useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
 import Integrations from "../components/Integrations";
 import AiPreferences from "../components/AiPreferences";
 import PostingPreferences from "../components/PostingPreferences";
 import ApiKeysStorage from "../components/ApiKeysStorage";
 import ExportDanger from "../components/ExportDanger";
+import { apiFetch } from "../services/api";
+import useSettings from "../hooks/useSettings";
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState("integrations");
+  const { user } = useOutletContext();
+  const { updateSettings } = useSettings();
 
-  // États des enfants
+  // Child states
   const [integrationData, setIntegrationData] = useState(null);
   const [aiData, setAiData] = useState(null);
   const [postingData, setPostingData] = useState(null);
   const [apiData, setApiData] = useState(null);
   const [dangerData, setDangerData] = useState(null);
 
-  // Toast Radix
-  const [toastOpen, setToastOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  // Global state
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+
 
   const integrationsRef = useRef(null);
   const aiRef = useRef(null);
@@ -26,30 +33,135 @@ export default function SettingsPage() {
   const apiRef = useRef(null);
   const dangerRef = useRef(null);
 
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = () => {
+    try {
+      // Load from localStorage or backend
+      const saved = localStorage.getItem("userSettings");
+      if (saved) {
+        const settings = JSON.parse(saved);
+        setIntegrationData(settings.integrations || null);
+        setAiData(settings.ai || null);
+        setPostingData(settings.posting || null);
+        setApiData(settings.api || null);
+        setDangerData(settings.danger || null);
+      }
+    } catch (error) {
+      console.error("Error loading settings:", error);
+      showToast("Failed to load settings", "error");
+    }
+  };
+
   const handleCategoryClick = (key, ref) => {
     setActiveCategory(key);
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleSaveSettings = () => {
-    const payload = {
-      integrations: integrationData,
-      ai: aiData,
-      posting: postingData,
-      api: apiData,
-      danger: dangerData,
-    };
-    console.log("Saving settings...", payload);
-
-    // Affiche le toast sans changer le design
-    setToastMessage("Settings saved ✅");
-    setToastOpen(true);
+  const handleSettingChange = (category, data) => {
+    setHasChanges(true);
+    switch (category) {
+      case "integrations":
+        setIntegrationData(data);
+        break;
+      case "ai":
+        setAiData(data);
+        break;
+      case "posting":
+        setPostingData(data);
+        break;
+      case "api":
+        setApiData(data);
+        break;
+      case "danger":
+        setDangerData(data);
+        break;
+      default:
+        break;
+    }
   };
 
-  const handleSyncSettings = () => {
-    console.log("Syncing settings...");
-    setToastMessage("Settings synced 🔄");
-    setToastOpen(true);
+  const handleSaveSettings = async () => {
+    if (!hasChanges) {
+      showToast("No changes to save", "warning");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        integrations: integrationData,
+        ai: aiData,
+        posting: postingData,
+        api: apiData,
+        danger: dangerData,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Save locally + notify all listeners
+      updateSettings(payload);
+
+      // Optional: Send to backend
+      try {
+        await apiFetch("/api/user/settings", {
+          method: "POST",
+          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+        });
+        console.log("Settings saved to server");
+      } catch (backendError) {
+        console.warn("Saved locally, server unavailable:", backendError);
+      }
+
+      setHasChanges(false);
+      showToast("Settings saved successfully", "success");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      showToast("Failed to save settings", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSyncSettings = async () => {
+    setSaving(true);
+    try {
+      const response = await apiFetch("/api/user/settings");
+      if (response) {
+        const settings = response;
+        setIntegrationData(settings.integrations || null);
+        setAiData(settings.ai || null);
+        setPostingData(settings.posting || null);
+        setApiData(settings.api || null);
+        setDangerData(settings.danger || null);
+        setHasChanges(false);
+        showToast("Settings synced from server", "success");
+      }
+    } catch (error) {
+      console.warn("Unable to sync with server, using local cache", error);
+      showToast("Using local cache (server unavailable)", "warning");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showToast = (message, type = "success") => {
+    const options = {
+      style: {
+        background: "#1a1a2e",
+        color: "#fff",
+        borderRadius: "12px",
+        border: "1px solid rgba(255,255,255,0.1)",
+        padding: "12px 20px",
+        fontSize: "14px",
+      },
+    };
+    if (type === "success") toast.success(message, options);
+    else if (type === "warning") toast(message, { ...options, icon: "⚠️" });
+    else toast.error(message, options);
   };
 
   return (
@@ -60,25 +172,28 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
           <p className="text-gray-400">
             Manage your account preferences and integrations
+            {hasChanges && <span className="ml-3 text-yellow-400">• Unsaved changes</span>}
           </p>
         </div>
 
         <div className="flex items-center space-x-4">
           <button
             onClick={handleSyncSettings}
-            className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white transition-colors"
+            disabled={saving}
+            className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <i className="fa-solid fa-sync text-sm"></i>
+            <i className={`fa-solid fa-sync text-sm ${saving && "fa-spin"}`}></i>
             <span className="text-sm">Sync Settings</span>
           </button>
 
           <button
             onClick={handleSaveSettings}
+            disabled={saving || !hasChanges}
             id="save-settings-btn"
-            className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <i className="fa-solid fa-save"></i>
-            <span>Save Changes</span>
+            <i className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-save"}`}></i>
+            <span>{saving ? "Saving..." : "Save Changes"}</span>
           </button>
         </div>
       </div>
@@ -151,50 +266,56 @@ export default function SettingsPage() {
                   <span>Export & Danger</span>
                 </button>
               </nav>
-            </div>
+        </div>
           </div>
 
           {/* CONTENT */}
           <div className="col-span-9 space-y-8">
             <div ref={integrationsRef}>
-              <Integrations onChange={setIntegrationData} />
+              <Integrations 
+                onChange={(data) => handleSettingChange("integrations", data)} 
+              />
             </div>
             <div ref={aiRef}>
-              <AiPreferences onChange={setAiData} />
+              <AiPreferences 
+                initialData={aiData}
+                onChange={(data) => handleSettingChange("ai", data)} 
+              />
             </div>
             <div ref={postingRef}>
-              <PostingPreferences onChange={setPostingData} />
+              <PostingPreferences 
+                initialData={postingData}
+                onChange={(data) => handleSettingChange("posting", data)} 
+              />
             </div>
             <div ref={apiRef}>
-              <ApiKeysStorage onChange={setApiData} />
+              <ApiKeysStorage 
+                initialData={apiData}
+                onChange={(data) => handleSettingChange("api", data)} 
+              />
             </div>
             <div ref={dangerRef}>
-              <ExportDanger onChange={setDangerData} />
+              <ExportDanger 
+                initialData={dangerData}
+                onChange={(data) => handleSettingChange("danger", data)} 
+              />
             </div>
           </div>
         </div>
       </main>
 
-      {/* Toast Radix pour remplacer alert */}
-      <Toast.Provider swipeDirection="right">
-        <Toast.Root
-          open={toastOpen}
-          onOpenChange={setToastOpen}
-          className="bg-gray-900 text-white rounded-xl p-4 shadow-lg fixed bottom-8 right-8 w-72"
-        >
-          <Toast.Title className="font-semibold">{toastMessage}</Toast.Title>
-          <Toast.Description className="text-sm text-gray-400"></Toast.Description>
-          <Toast.Action asChild altText="Close">
-            <button
-              className="text-sm text-cyan-400 hover:underline"
-              onClick={() => setToastOpen(false)}
-            >
-              Close
-            </button>
-          </Toast.Action>
-        </Toast.Root>
-        <Toast.Viewport className="fixed bottom-0 right-0 p-6" />
-      </Toast.Provider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: "#1a1a2e",
+            color: "#fff",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.1)",
+          },
+        }}
+      />
     </div>
   );
 }

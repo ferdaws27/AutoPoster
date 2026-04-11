@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import useSettings from "../hooks/useSettings";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 const sampleHooksData = [
@@ -18,6 +19,7 @@ const platformsList = [
 
 export default function HookGeneratorPage() {
   const navigate = useNavigate();
+  const { toneLabel, connectedPlatforms } = useSettings();
   const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -53,12 +55,13 @@ export default function HookGeneratorPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
         },
         body: JSON.stringify({
           topic: topic,
           platforms: selectedPlatforms,
-          language: "auto", // Auto-detect language
-          tone: "dynamic",
+          language: "auto",
+          tone: toneLabel,
           count: 5
         })
       });
@@ -95,12 +98,13 @@ export default function HookGeneratorPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
         },
         body: JSON.stringify({
           topic: topic,
           platform: platform,
-          language: "auto", // Auto-detect language
-          tone: "dynamic"
+          language: "auto",
+          tone: toneLabel
         })
       });
 
@@ -142,25 +146,24 @@ export default function HookGeneratorPage() {
 
   const selectHook = (hook, index) => setSelectedHook({ ...hook, index });
 
-  const insertHook = () => {
-    if (selectedHook) {
+  const insertHook = (hookOverride) => {
+    const hook = hookOverride || selectedHook;
+    if (hook) {
       // Stocker le hook sélectionné dans localStorage
       const hookData = {
-        text: selectedHook.text,
-        platform: selectedPlatforms[0] || 'twitter', // Utiliser la première plateforme sélectionnée
-        score: selectedHook.score,
-        type: selectedHook.type,
-        reason: selectedHook.reason || 'High engagement potential',
+        text: hook.text,
+        platform: selectedPlatforms[0] || 'twitter',
+        score: hook.score,
+        type: hook.type,
+        reason: hook.reason || 'High engagement potential',
         originalTopic: topic,
         timestamp: new Date().toISOString()
       };
       
       localStorage.setItem('selectedHook', JSON.stringify(hookData));
       
-      // Afficher la notification de succès
       setSuccessOpen(true);
       
-      // Navigation automatique après un court délai
       setTimeout(() => {
         navigate('/dashboard/CreatePostPage');
       }, 2000);
@@ -275,7 +278,7 @@ export default function HookGeneratorPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           selectHook(hook, idx);
-                          insertHook();
+                          insertHook({ ...hook, index: idx });
                         }}
                         className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium hover:opacity-90"
                       >

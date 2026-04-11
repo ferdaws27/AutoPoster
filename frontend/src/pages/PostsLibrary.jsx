@@ -1,12 +1,21 @@
 import { useState , useEffect } from "react";
-import { data, useNavigate } from "react-router-dom";
+import { data, useNavigate, useSearchParams } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
 
 export default function PostsLibrary() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { posts, deletePost, updatePost, duplicatePost } = usePosts();
   console.log('PostsLibrary posts:', posts);
-  const [activeTab, setActiveTab] = useState("all");
+
+  // Map query param filter to tab name
+  const filterParam = searchParams.get("filter");
+  const initialTab = filterParam === "draft" ? "drafts"
+    : filterParam === "posted" ? "published"
+    : filterParam === "scheduled" ? "scheduled"
+    : "all";
+
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [view, setView] = useState("grid");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({

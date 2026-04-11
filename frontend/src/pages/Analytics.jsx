@@ -19,15 +19,11 @@ const PLATFORM_ICONS = {
   Medium: faMedium,
 };
 
-export default function PostsLibrary() {
+export default function AnalyticsPage() {
   const navigate = useNavigate();
   const { fetchAnalyticsData } = usePosts();
   const [analyticsData, setAnalyticsData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("drafts");
-  const [view, setView] = useState("grid");
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ platform: "", date: "", performance: "", sort: "newest" });
   const [activeRange, setActiveRange] = useState("30D");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("pdf");
@@ -91,7 +87,7 @@ export default function PostsLibrary() {
   };
 
   const handleViewAllPosts = () => {
-    navigate("/posts");
+    navigate("/dashboard/PostsLibrary");
   };
 
   useEffect(() => {
@@ -865,24 +861,43 @@ export default function PostsLibrary() {
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">AI Insights & Recommendations</h2>
-            <p className="text-gray-400 text-sm">Personalized suggestions to improve your content performance</p>
+            <p className="text-gray-400 text-sm">Personalized suggestions based on your actual performance data</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/20">
             <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faLightbulb} className="text-cyan-400" /><span className="text-cyan-400 font-medium text-sm">Content Suggestion</span></div>
-            <p className="text-white text-sm mb-2">Your audience engages 94% more with posts about AI and automation.</p>
-            <p className="text-gray-400 text-xs">Consider creating more content around these topics for better reach.</p>
+            <p className="text-white text-sm mb-2">
+              {(() => {
+                const best = contentPerformance.reduce((a, b) => a.avgEngagement > b.avgEngagement ? a : b, contentPerformance[0]);
+                return best && best.avgEngagement > 0
+                  ? `${best.label} get the highest engagement (avg ${best.avgEngagement}). Focus on creating more of this type.`
+                  : "Start posting to discover which content type resonates most with your audience.";
+              })()}
+            </p>
+            <p className="text-gray-400 text-xs">Based on {analyticsData.length} posts analyzed.</p>
           </div>
           <div className="bg-black/30 rounded-2xl p-4 border border-violet-400/20">
             <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faClock} className="text-violet-400" /><span className="text-violet-400 font-medium text-sm">Timing Optimization</span></div>
-            <p className="text-white text-sm mb-2">Post 2 hours earlier on weekdays for 35% better engagement.</p>
-            <p className="text-gray-400 text-xs">Your audience is most active between 12-2 PM EST.</p>
+            <p className="text-white text-sm mb-2">
+              {bestTimes.length > 0
+                ? `Your best performing time is ${bestTimes[0].day} with ${bestTimes[0].value}. Schedule posts around this window.`
+                : "Not enough data yet. Post at varied times to discover your audience's peak hours."}
+            </p>
+            <p className="text-gray-400 text-xs">Based on engagement patterns in the last {activeRange}.</p>
           </div>
           <div className="bg-black/30 rounded-2xl p-4 border border-teal-400/20">
             <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faChartLine} className="text-teal-400" /><span className="text-teal-400 font-medium text-sm">Growth Opportunity</span></div>
-            <p className="text-white text-sm mb-2">Medium posts get 3x more long-form engagement.</p>
-            <p className="text-gray-400 text-xs">Expand your Twitter threads into Medium articles for better reach.</p>
+            <p className="text-white text-sm mb-2">
+              {(() => {
+                const platforms = ["Twitter", "LinkedIn", "Medium"];
+                const unused = platforms.filter(p => (analytics.platformPostCount?.[p] || 0) === 0);
+                if (unused.length > 0) return `You haven't posted on ${unused.join(", ")} yet. Expanding there could increase your total reach.`;
+                const best = platforms.reduce((a, b) => (analytics.platformEngagement[a] || 0) > (analytics.platformEngagement[b] || 0) ? a : b);
+                return `${best} is your strongest platform (${analytics.platformPercentages[best]}% of engagement). Double down there for maximum growth.`;
+              })()}
+            </p>
+            <p className="text-gray-400 text-xs">Estimated reach: {analytics.estimatedReach.toLocaleString()} based on engagement.</p>
           </div>
         </div>
       </div>

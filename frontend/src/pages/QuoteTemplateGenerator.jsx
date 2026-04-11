@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import * as Toast from "@radix-ui/react-toast";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import useSettings from "../hooks/useSettings";
 
 export default function QuoteTemplate() {
+  const { connectedPlatforms } = useSettings();
   const [quote, setQuote] = useState("");
   const [charCount, setCharCount] = useState(0);
-  const [selectedPlatforms, setSelectedPlatforms] = useState([
-    "twitter",
-    "linkedin",
-    "medium",
-  ]);
+  const defaultPlatforms = Object.entries(connectedPlatforms)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  const [selectedPlatforms, setSelectedPlatforms] = useState(
+    defaultPlatforms.length > 0 ? defaultPlatforms : ["twitter", "linkedin", "medium"]
+  );
   const [variations, setVariations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [variationsVisible, setVariationsVisible] = useState(false);

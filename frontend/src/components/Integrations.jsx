@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 
-export default function Integrations() {
+export default function Integrations({ onChange }) {
   const { user } = useOutletContext();
 
   // ✅ INIT STATE AVEC LOCALSTORAGE
@@ -51,9 +51,10 @@ export default function Integrations() {
     }
   }, [user]);
 
-  // ✅ SAVE LOCALSTORAGE
+  // ✅ SAVE LOCALSTORAGE + notify parent
   useEffect(() => {
     localStorage.setItem("platforms", JSON.stringify(platforms));
+    if (onChange) onChange(platforms);
   }, [platforms]);
 
   // ✅ TOGGLE (TWITTER + MEDIUM SEULEMENT)

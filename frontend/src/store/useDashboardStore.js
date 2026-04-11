@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiFetch } from "../services/api";
+import { getSettings } from "../hooks/useSettings";
 
 const initialAIIdeas = [
   {
@@ -143,17 +144,17 @@ const useDashboardStore = create((set, get) => ({
       const currentCount = get().generationCount + 1;
       set({ generationCount: currentCount });
       
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_OPENAI_API_KEY;
+      const settings = getSettings();
+      const apiKey = settings.openRouterKey;
       
       // Debug: Vérifier si la clé API est chargée
       console.log("=== AI IDEAS DEBUG ===");
       console.log("API Key exists:", !!apiKey);
       console.log("API Key length:", apiKey?.length);
-      console.log("API Key starts with:", apiKey?.substring(0, 10) + "...");
       console.log("Génération numéro:", currentCount);
       
       if (!apiKey) {
-        throw new Error("Clé API OpenRouter non trouvée. Veuillez configurer VITE_OPENROUTER_API_KEY dans .env");
+        throw new Error("API key not found. Set it in Settings > API Keys.");
       }
       
       // Adapter le contenu en fonction du numéro de génération
@@ -227,14 +228,14 @@ IMPORTANT: Sois SPÉCIFIQUE à cette phase. Retourne UNIQUEMENT le JSON valide a
           "X-Title": "AutoPoster - AI Ideas Generator"
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+          model: getSettings().modelId,
           messages: [
             {
               role: "user",
               content: prompt
             }
           ],
-          temperature: 0.9, // Plus de créativité et variété
+          temperature: getSettings().temperature,
           max_tokens: 1000,
           top_p: 0.95
         })

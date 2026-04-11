@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
+import useSettings from "../hooks/useSettings";
 
 // Composant réutilisable pour chaque mini chart
 const MiniLineChart = ({ data, color }) => {
@@ -28,6 +29,7 @@ const MiniLineChart = ({ data, color }) => {
 
 export default function TrendRadar() {
   const navigate = useNavigate();
+  const { openRouterKey } = useSettings();
   const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -237,9 +239,9 @@ export default function TrendRadar() {
     setIsGeneratingInsights(true);
     
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      const apiKey = openRouterKey;
       if (!apiKey) {
-        console.error('OpenAI API key not found');
+        console.error('API key not found');
         // Fallback: générer des insights basiques basés sur les données disponibles
         generateBasicInsights();
         return;

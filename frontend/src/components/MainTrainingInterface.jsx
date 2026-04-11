@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function MainTrainingInterface() {
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
   const [phase, setPhase] = useState("upload"); // upload | uploading | analysis | results
   const [progress, setProgress] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [files, setFiles] = useState([]);
   const [analysisResults, setAnalysisResults] = useState([]);
+  const [dragActive, setDragActive] = useState(false);
 
   /* ================= FILE HANDLING ================= */
 
@@ -124,6 +127,57 @@ export default function MainTrainingInterface() {
     fileInputRef.current?.click();
   };
 
+  /* ================= DRAG & DROP ================= */
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  /* ================= APPLY VOICE PROFILE ================= */
+  const applyVoiceProfile = () => {
+    if (!analysisResults.length || !analysisResults[0]) return;
+
+    const result = analysisResults[0];
+    const profile = {
+      sentiment: result.nltk?.sentiment || "Neutral",
+      writingStyle: result.nltk?.writing_style || "Professional",
+      avgSentenceLength: result.nltk?.avg_sentence_length || 18,
+      engagementScore: result.nltk?.engagement_score || 0,
+      contentType: result.nltk?.content_type || "General",
+      readability: result.spacy?.readability || 50,
+      primaryTheme: result.spacy?.primary_theme || "General Content",
+      keywords: result.spacy?.keywords || [],
+      tone: result.spacy?.tone || "Neutral",
+      lexicalDiversity: result.spacy?.lexical_diversity || 0.5,
+      writingPurpose: result.spacy?.writing_purpose || "General",
+      trainedAt: new Date().toISOString(),
+    };
+
+    // Save to localStorage so useSettings and AI prompts can use it
+    const settings = JSON.parse(localStorage.getItem("userSettings") || "{}");
+    settings.voiceProfile = profile;
+    localStorage.setItem("userSettings", JSON.stringify(settings));
+
+    // Trigger reactivity for useSettings listeners
+    window.dispatchEvent(new Event("storage"));
+
+    setShowModal(true);
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
 
@@ -141,8 +195,12 @@ export default function MainTrainingInterface() {
           </div>
 
           <div
-            className="upload-zone rounded-3xl p-12 text-center cursor-pointer transition-all"
+            className={`upload-zone rounded-3xl p-12 text-center cursor-pointer transition-all ${dragActive ? "border-cyan-400 bg-cyan-400/10" : ""}`}
             onClick={openFileBrowser}
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
           >
             {phase === "upload" && (
               <div className="space-y-6">
@@ -539,7 +597,7 @@ export default function MainTrainingInterface() {
 
             <button
               className="px-8 py-3 gradient-accent rounded-2xl text-white font-semibold hover:opacity-90 transition-opacity"
-              onClick={() => setShowModal(true)}
+              onClick={applyVoiceProfile}
             >
               <i className="fa-solid fa-wand-magic-sparkles mr-2"></i>
               Apply to All Future Posts
@@ -563,7 +621,7 @@ export default function MainTrainingInterface() {
                 AutoPoster has learned your writing style and will apply it to all future posts.
               </p>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => { setShowModal(false); navigate("/dashboard"); }}
                 className="w-full p-3 gradient-accent rounded-2xl text-white font-medium"
               >
                 Continue to Dashboard

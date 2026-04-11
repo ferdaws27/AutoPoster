@@ -8,9 +8,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { faTwitter, faLinkedin, faMedium, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import { usePosts } from '../hooks/usePosts';
+import useSettings from '../hooks/useSettings';
 
 export default function SchedulingPage() {
   const navigate = useNavigate();
+  const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling } = useSettings();
   const [viewMode, setViewMode] = useState('week');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -27,7 +29,7 @@ export default function SchedulingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [newPost, setNewPost] = useState({
     content: '',
-    platforms: { Twitter: false, LinkedIn: true, Medium: false },
+    platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
     date: '',
     time: '',
     selectedImage: 0
@@ -251,10 +253,10 @@ export default function SchedulingPage() {
       setSuccessMessage({ title: 'Post scheduled successfully', description: 'Your content will be published as planned' });
       setShowSuccessToast(true);
       
-      // Reset form
+      // Reset form with connected platforms from settings
       setNewPost({
         content: '',
-        platforms: { Twitter: false, LinkedIn: true, Medium: false },
+        platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
         date: '',
         time: '',
         selectedImage: 0
@@ -322,10 +324,10 @@ export default function SchedulingPage() {
       setSuccessMessage({ title: 'Draft saved successfully', description: 'Your draft has been saved for later' });
       setShowSuccessToast(true);
       
-      // Reset form
+      // Reset form with connected platforms from settings
       setNewPost({
         content: '',
-        platforms: { Twitter: false, LinkedIn: true, Medium: false },
+        platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
         date: '',
         time: '',
         selectedImage: 0

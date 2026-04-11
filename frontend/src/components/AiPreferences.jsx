@@ -1,8 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function AiPreferences() {
-  const [tone, setTone] = useState(60);
+export default function AiPreferences({ initialData, onChange }) {
+  const [selectedModel, setSelectedModel] = useState(
+    initialData?.model || "deepseek"
+  );
+  const [tone, setTone] = useState(initialData?.tone || 60);
+  const [creativity, setCreativity] = useState(
+    initialData?.creativity || "Balanced"
+  );
+  const [contentLength, setContentLength] = useState(
+    initialData?.contentLength || "Medium (100–200 words)"
+  );
   const sliderRef = useRef(null);
+
+  // Notify parent on any change
+  useEffect(() => {
+    if (onChange) {
+      onChange({ model: selectedModel, tone, creativity, contentLength });
+    }
+  }, [selectedModel, tone, creativity, contentLength]);
 
   /* ===== SLIDER DRAG ===== */
   useEffect(() => {
@@ -30,27 +46,6 @@ export default function AiPreferences() {
     return () => thumb.removeEventListener("mousedown", startDrag);
   }, []);
 
-  /* ===== MODEL SELECT ===== */
-  useEffect(() => {
-    const options = document.querySelectorAll(".model-option");
-
-    options.forEach((option) => {
-      option.onclick = () => {
-        options.forEach((opt) => {
-          opt.classList.remove("border-cyan-400/50");
-          const dot = opt.querySelector(".model-dot");
-          dot.classList.remove("bg-cyan-400");
-          dot.classList.add("border-gray-400");
-        });
-
-        option.classList.add("border-cyan-400/50");
-        const activeDot = option.querySelector(".model-dot");
-        activeDot.classList.add("bg-cyan-400");
-        activeDot.classList.remove("border-gray-400");
-      };
-    });
-  }, []);
-
   return (
     <div className="setting-card glass-effect rounded-3xl p-8 animate-slide-in">
       {/* HEADER */}
@@ -74,29 +69,29 @@ export default function AiPreferences() {
           </label>
 
           <div className="grid grid-cols-3 gap-4">
-            {/* DeepSeek */}
             <ModelCard
               title="DeepSeek"
               description="Advanced reasoning and creativity"
               level={5}
               color="cyan"
-              active
+              active={selectedModel === "deepseek"}
+              onClick={() => setSelectedModel("deepseek")}
             />
-
-            {/* LLaMA */}
             <ModelCard
               title="LLaMA"
               description="Balanced performance and speed"
               level={4}
               color="violet"
+              active={selectedModel === "llama"}
+              onClick={() => setSelectedModel("llama")}
             />
-
-            {/* Mistral */}
             <ModelCard
               title="Mistral"
               description="Fast and efficient processing"
               level={3}
               color="teal"
+              active={selectedModel === "mistral"}
+              onClick={() => setSelectedModel("mistral")}
             />
           </div>
         </div>
@@ -134,6 +129,8 @@ export default function AiPreferences() {
     </label>
 
     <select
+      value={creativity}
+      onChange={(e) => setCreativity(e.target.value)}
       className="
         w-full
         rounded-2xl
@@ -150,10 +147,7 @@ export default function AiPreferences() {
       <option className="bg-[#0E1116] text-white">
         Conservative
       </option>
-      <option
-        className="bg-[#0E1116] text-white"
-        defaultValue
-      >
+      <option className="bg-[#0E1116] text-white">
         Balanced
       </option>
       <option className="bg-[#0E1116] text-white">
@@ -171,6 +165,8 @@ export default function AiPreferences() {
     </label>
 
     <select
+      value={contentLength}
+      onChange={(e) => setContentLength(e.target.value)}
       className="
         w-full
         rounded-2xl
@@ -187,10 +183,7 @@ export default function AiPreferences() {
       <option className="bg-[#0E1116] text-white">
         Short (50–100 words)
       </option>
-      <option
-        className="bg-[#0E1116] text-white"
-        defaultValue
-      >
+      <option className="bg-[#0E1116] text-white">
         Medium (100–200 words)
       </option>
       <option className="bg-[#0E1116] text-white">
@@ -210,10 +203,11 @@ export default function AiPreferences() {
 
 /* ===== MODEL CARD ===== */
 
-function ModelCard({ title, description, level, color, active }) {
+function ModelCard({ title, description, level, color, active, onClick }) {
   return (
     <div
-      className={`model-option p-4 bg-black/20 rounded-2xl border cursor-pointer transition-all ${
+      onClick={onClick}
+      className={`p-4 bg-black/20 rounded-2xl border cursor-pointer transition-all ${
         active
           ? "border-cyan-400/50"
           : "border-gray-700/50 hover:border-gray-400"
