@@ -22,33 +22,51 @@ export default function Layout() {
   ];
 
   const [user, setUser] = useState(null);
-  const linkedinToken = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
+  const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   useEffect(() => {
+    if (!token) return;
+
+    // Try cached user first
+    const cached = localStorage.getItem("user");
+    if (cached) {
+      try { setUser(JSON.parse(cached)); } catch {}
+    }
+
     const fetchUser = async () => {
+      const headers = { Authorization: `Bearer ${token}` };
       try {
-        const response = await fetch(
-          "http://127.0.0.1:5000/api/oauth/linkedin/me",
-          {
-            headers: {
-              Authorization: `Bearer ${linkedinToken}`,
-            },
-          }
-        );
-
-        const data = await response.json();
-
-        setUser(data);
-        localStorage.setItem("user", JSON.stringify(data));
-      } catch (error) {
-        console.error("Error fetching user:", error);
+        // Try generic /api/auth/me first
+        let res = await fetch(`${API}/api/auth/me`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const u = data.user || data;
+          setUser(u);
+          localStorage.setItem("user", JSON.stringify(u));
+          return;
+        }
+        // Fallback to LinkedIn /me
+        res = await fetch(`${API}/api/oauth/linkedin/me`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+          localStorage.setItem("user", JSON.stringify(data));
+          return;
+        }
+      } catch (e) {
+        console.warn("User fetch error:", e);
+      }
+      // Fallback: use cached or guest defaults
+      if (!cached) {
+        const guest = { full_name: "Guest User", email: "guest@autoposter.tn", role: "FREE", profile_picture: "" };
+        setUser(guest);
+        localStorage.setItem("user", JSON.stringify(guest));
       }
     };
 
-    if (linkedinToken) {
-      fetchUser();
-    }
-  }, [linkedinToken]);
+    fetchUser();
+  }, [token]);
 
   if (!user) return <p>Loading user...</p>;
 
@@ -95,10 +113,10 @@ export default function Layout() {
             />
             <div>
               <div className="text-white font-medium text-sm">
-                {user.full_name}
+                {user.full_name || user.name || user.first_name || user.username || "User"}
               </div>
               <div className="text-gray-400 text-xs">
-                {user.role || "LinkedIn User"}
+                {user.role || "FREE"}
               </div>
             </div>
           </div>
