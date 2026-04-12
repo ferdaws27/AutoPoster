@@ -33,6 +33,31 @@ export default function OAuthCallback() {
       // decode au cas où
       const decoded = decodeURIComponent(token);
       localStorage.setItem("token", decoded);
+
+      // Check for provider + user info (Medium OAuth passes these)
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.substring(1)
+        : window.location.hash;
+      const hashParams = new URLSearchParams(hash);
+      const provider = hashParams.get("provider");
+      const userEncoded = hashParams.get("user");
+
+      if (provider && userEncoded) {
+        try {
+          const parts = decodeURIComponent(userEncoded).split("||");
+          const userData = {
+            username: parts[0] || "",
+            full_name: parts[1] || parts[0] || "",
+            name: parts[1] || parts[0] || "",
+            profile_picture: parts[2] || "",
+            oauth_provider: provider,
+          };
+          localStorage.setItem("user", JSON.stringify(userData));
+        } catch (e) {
+          console.warn("Failed to parse user info:", e);
+        }
+      }
+
       navigate("/dashboard", { replace: true });
     } else {
       // Only redirect to /login if we're actually on the callback path.

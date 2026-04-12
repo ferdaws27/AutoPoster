@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faRobot,
@@ -11,6 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { faTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import * as Toast from "@radix-ui/react-toast";
+import { loginGuest } from "../services/auth";
 
 export default function Login() {
   /* ================== BACKGROUND ================== */
@@ -284,6 +286,7 @@ export default function Login() {
   }
 
   /* ================== LOGIN STATE ================== */
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -301,6 +304,24 @@ export default function Login() {
   };
   const connectLinkedIn = () => {
     window.location.href = `${API}/api/oauth/linkedin/start`;
+  };
+  const connectMedium = () => {
+    window.location.href = `${API}/api/oauth/medium/start`;
+  };
+  const continueWithoutConnecting = async () => {
+    setLoading(true);
+    try {
+      const data = await loginGuest();
+      if (data.user) localStorage.setItem("user", JSON.stringify({
+        ...data.user,
+        full_name: `${data.user.first_name || "Guest"} ${data.user.last_name || "User"}`.trim(),
+      }));
+      setSuccess(true);
+      setTimeout(() => navigate("/dashboard", { replace: true }), 1500);
+    } catch (e) {
+      console.error("Guest login failed:", e);
+      setLoading(false);
+    }
   };
 
   /* ================== RETURN ================== */
@@ -346,7 +367,7 @@ export default function Login() {
               <div className="space-y-4 mb-8">
                 <OAuthButton icon={faTwitter} label="Connect X (Twitter)" onClick={connectTwitter} />
                 <OAuthButton icon={faLinkedinIn} label="Connect LinkedIn" onClick={connectLinkedIn} />
-                <OAuthButton icon={faMedium} label="Connect Medium" onClick={connect} />
+                <OAuthButton icon={faMedium} label="Connect Medium" onClick={connectMedium} />
               </div>
               <div className="text-center">
                 <div className="flex items-center mb-4">
@@ -354,8 +375,8 @@ export default function Login() {
                   <span className="px-4 text-gray-500 text-sm">or</span>
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
                 </div>
-                <button onClick={() => setSuccess(true)} className="w-full p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all">
-                  <span className="font-medium">Continue without connecting</span>
+                <button onClick={continueWithoutConnecting} disabled={loading} className="w-full p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50">
+                  <span className="font-medium">{loading ? "Connecting..." : "Continue without connecting"}</span>
                   <span className="block text-sm text-gray-500 mt-1">You can add platforms later</span>
                 </button>
               </div>
