@@ -10,17 +10,102 @@ import {
   faRocket,
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
-import { faTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
+import { faXTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import * as Toast from "@radix-ui/react-toast";
 import { loginGuest } from "../services/auth";
+
+/* ================== FEATURE CAROUSEL (outside Login to avoid remount) ================== */
+const FEATURES = [
+  {
+    icon: faMagicWandSparkles,
+    title: "AI Content Optimization",
+    description: "Automatically adapts your content for each platform's audience and format.",
+    bgClass: "bg-cyan-400/20",
+    textClass: "text-cyan-400",
+  },
+  {
+    icon: faClock,
+    title: "Smart Scheduling",
+    description: "Posts at optimal times based on engagement and audience behavior.",
+    bgClass: "bg-violet-400/20",
+    textClass: "text-violet-400",
+  },
+  {
+    icon: faChartLine,
+    title: "Advanced Analytics",
+    description: "Track growth, engagement, and ROI across all platforms.",
+    bgClass: "bg-green-400/20",
+    textClass: "text-green-400",
+  },
+];
+
+function FeatureCarousel() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % FEATURES.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const feature = FEATURES[index];
+
+  return (
+    <div className="fixed top-8 left-8 w-96 z-20 hidden lg:block">
+      <div className="glass-effect rounded-2xl p-6 border border-gray-700/50 transition-all">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold">Why AutoPoster?</h3>
+          <div className="flex space-x-1">
+            {FEATURES.map((_, i) => (
+              <div
+                key={i}
+                className={`w-2 h-2 rounded-full ${
+                  i === index ? "bg-cyan-400" : "bg-gray-600"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-4 transition-all">
+          <div className="flex items-start space-x-3">
+            <div
+              className={`w-8 h-8 rounded-lg ${feature.bgClass} flex items-center justify-center`}
+            >
+              <FontAwesomeIcon icon={feature.icon} className={`${feature.textClass} text-sm`} />
+            </div>
+            <div>
+              <div className="text-white font-medium mb-1">{feature.title}</div>
+              <div className="text-gray-400 text-sm">{feature.description}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Login() {
   /* ================== BACKGROUND ================== */
   function Background() {
     return (
       <div className="fixed inset-0 gradient-bg z-0 overflow-hidden">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-400/10 blur-3xl rounded-full" />
-        <div className="absolute bottom-32 right-32 w-80 h-80 bg-violet-400/10 blur-3xl rounded-full" />
+        <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-400/10 blur-3xl rounded-full animate-pulse-slow" />
+        <div className="absolute bottom-32 right-32 w-80 h-80 bg-violet-400/10 blur-3xl rounded-full animate-pulse-slow" style={{ animationDelay: "2s" }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-400/5 blur-3xl rounded-full" />
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-cyan-400/30 rounded-full animate-float"
+            style={{
+              left: `${15 + i * 15}%`,
+              top: `${20 + (i % 3) * 25}%`,
+              animationDelay: `${i * 0.7}s`,
+              animationDuration: `${3 + i * 0.5}s`,
+            }}
+          />
+        ))}
       </div>
     );
   }
@@ -30,13 +115,15 @@ export default function Login() {
     return (
       <button
         onClick={onClick}
-        className="w-full p-4 rounded-2xl bg-black/50 border border-gray-700 hover:border-cyan-400 transition-all group relative overflow-hidden"
+        className="w-full p-4 rounded-2xl bg-black/50 border border-gray-700 hover:border-cyan-400/60 transition-all group relative overflow-hidden hover:bg-black/70 transform hover:scale-[1.01] active:scale-[0.99]"
       >
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/0 via-cyan-400/5 to-violet-400/0 opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="relative z-10 flex items-center justify-center space-x-4">
-          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center group-hover:bg-gray-800 transition-colors">
             <FontAwesomeIcon icon={icon} className="text-white text-lg" />
           </div>
           <span className="text-white font-medium text-lg">{label}</span>
+          <FontAwesomeIcon icon={faRocket} className="text-gray-600 group-hover:text-cyan-400 transition-colors text-sm ml-auto" />
         </div>
       </button>
     );
@@ -59,73 +146,7 @@ export default function Login() {
     );
   }
 
-  /* ================== FEATURE CAROUSEL ================== */
-  const FEATURES = [
-    {
-      icon: faMagicWandSparkles,
-      title: "AI Content Optimization",
-      description: "Automatically adapts your content for each platform’s audience and format.",
-      color: "cyan",
-    },
-    {
-      icon: faClock,
-      title: "Smart Scheduling",
-      description: "Posts at optimal times based on engagement and audience behavior.",
-      color: "violet",
-    },
-    {
-      icon: faChartLine,
-      title: "Advanced Analytics",
-      description: "Track growth, engagement, and ROI across all platforms.",
-      color: "green",
-    },
-  ];
-
-  function FeatureCarousel() {
-    const [index, setIndex] = useState(0);
-
-    useEffect(() => {
-      const timer = setInterval(() => {
-        setIndex((prev) => (prev + 1) % FEATURES.length);
-      }, 4000);
-      return () => clearInterval(timer);
-    }, []);
-
-    const feature = FEATURES[index];
-
-    return (
-      <div className="fixed top-8 left-8 w-96 z-20 hidden lg:block">
-        <div className="glass-effect rounded-2xl p-6 border border-gray-700/50 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold">Why AutoPoster?</h3>
-            <div className="flex space-x-1">
-              {FEATURES.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full ${
-                    i === index ? "bg-cyan-400" : "bg-gray-600"
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4 transition-all">
-            <div className="flex items-start space-x-3">
-              <div
-                className={`w-8 h-8 rounded-lg bg-${feature.color}-400/20 flex items-center justify-center`}
-              >
-                <FontAwesomeIcon icon={feature.icon} className={`text-${feature.color}-400 text-sm`} />
-              </div>
-              <div>
-                <div className="text-white font-medium mb-1">{feature.title}</div>
-                <div className="text-gray-400 text-sm">{feature.description}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // FeatureCarousel moved outside Login - see top of file
 
   /* ================== STATS CARD ================== */
   function Stat({ value, label, color }) {
@@ -193,8 +214,12 @@ export default function Login() {
   /* ================== LOADING OVERLAY ================== */
   function LoadingOverlay() {
     return (
-      <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 text-white">
-        Connecting...
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="glass-effect rounded-2xl p-8 border border-cyan-400/30 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-cyan-400/30 border-t-cyan-400 animate-spin" />
+          <p className="text-white font-medium text-lg">Connecting...</p>
+          <p className="text-gray-400 text-sm mt-1">Setting up your workspace</p>
+        </div>
       </div>
     );
   }
@@ -221,7 +246,7 @@ export default function Login() {
           <div className="bg-black/30 rounded-2xl p-6 mb-6">
             <h3 className="text-xl font-semibold text-white mb-4">Choose Your Platforms</h3>
             <div className="grid grid-cols-3 gap-4">
-              <Platform icon={faTwitter} label="Twitter / X" />
+              <Platform icon={faXTwitter} label="X (Twitter)" />
               <Platform icon={faLinkedin} label="LinkedIn" />
               <Platform icon={faMedium} label="Medium" />
             </div>
@@ -291,6 +316,36 @@ export default function Login() {
   const [onboarding, setOnboarding] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Typing effect for tagline
+  const taglines = ["Write Once. Post Everywhere.", "AI-Powered Social Media.", "Grow Your Audience 10x Faster."];
+  const [taglineIdx, setTaglineIdx] = useState(0);
+  const [displayText, setDisplayText] = useState("");
+  const [charIdx, setCharIdx] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const current = taglines[taglineIdx];
+    const timeout = deleting ? 30 : 60;
+
+    if (!deleting && charIdx < current.length) {
+      const t = setTimeout(() => setCharIdx(charIdx + 1), timeout);
+      return () => clearTimeout(t);
+    } else if (!deleting && charIdx === current.length) {
+      const t = setTimeout(() => setDeleting(true), 2000);
+      return () => clearTimeout(t);
+    } else if (deleting && charIdx > 0) {
+      const t = setTimeout(() => setCharIdx(charIdx - 1), timeout);
+      return () => clearTimeout(t);
+    } else if (deleting && charIdx === 0) {
+      setDeleting(false);
+      setTaglineIdx((taglineIdx + 1) % taglines.length);
+    }
+  }, [charIdx, deleting, taglineIdx]);
+
+  useEffect(() => {
+    setDisplayText(taglines[taglineIdx].slice(0, charIdx));
+  }, [charIdx, taglineIdx]);
+
   const connect = () => {
     setLoading(true);
     setTimeout(() => {
@@ -326,23 +381,24 @@ export default function Login() {
 
   /* ================== RETURN ================== */
   return (
-    <div className="min-h-screen relative text-white overflow-hidden">
+    <div className="min-h-screen relative text-white overflow-x-hidden">
       <Background />
       <FeatureCarousel />
 
       {/* Main login container */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-8">
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-8 pb-32">
         <div className="w-full max-w-lg">
           {/* Brand */}
-          <div className="text-center mb-12 animate-float">
-            <div className="inline-flex items-center justify-center w-24 h-24 mb-8 rounded-3xl glass-effect glow-cyan relative">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-24 h-24 mb-8 rounded-3xl glass-effect glow-cyan relative group cursor-default">
               <div className="absolute inset-0 gradient-accent rounded-3xl opacity-20 animate-pulse-slow"></div>
-              <div className="relative z-10 flex items-center space-x-1">
+              <div className="absolute inset-0 rounded-3xl bg-cyan-400/10 scale-110 blur-xl animate-pulse-slow" style={{ animationDelay: "1s" }}></div>
+              <div className="relative z-10 flex items-center space-x-1 group-hover:scale-110 transition-transform">
                 <i className="fa-solid fa-pen-nib text-2xl text-cyan-400"></i>
                 <div className="flex space-x-1">
-                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full"></div>
-                  <div className="w-1 h-1 bg-violet-400 rounded-full"></div>
-                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full"></div>
+                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0s" }}></div>
+                  <div className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }}></div>
+                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }}></div>
                 </div>
               </div>
             </div>
@@ -352,7 +408,9 @@ export default function Login() {
                 Poster
               </span>
             </h1>
-            <p className="text-2xl font-semibold text-gray-300 mb-3">Write Once. Post Everywhere.</p>
+            <p className="text-2xl font-semibold text-gray-300 mb-3 h-8">
+              {displayText}<span className="animate-pulse text-cyan-400">|</span>
+            </p>
             <p className="text-gray-400 text-lg leading-relaxed">Connect your platforms and let AI handle the rest.</p>
           </div>
 
@@ -364,11 +422,14 @@ export default function Login() {
                 <h2 className="text-2xl font-semibold text-white mb-3">Welcome to the Future</h2>
                 <p className="text-gray-400">Connect your social platforms to get started with AI-powered content distribution</p>
               </div>
+
+              {/* OAuth Buttons */}
               <div className="space-y-4 mb-8">
-                <OAuthButton icon={faTwitter} label="Connect X (Twitter)" onClick={connectTwitter} />
+                <OAuthButton icon={faXTwitter} label="Connect X (Twitter)" onClick={connectTwitter} />
                 <OAuthButton icon={faLinkedinIn} label="Connect LinkedIn" onClick={connectLinkedIn} />
                 <OAuthButton icon={faMedium} label="Connect Medium" onClick={connectMedium} />
               </div>
+
               <div className="text-center">
                 <div className="flex items-center mb-4">
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
@@ -423,7 +484,7 @@ export default function Login() {
     <div className="flex space-x-2">
       {/* X / Twitter */}
       <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-        <FontAwesomeIcon icon={faTwitter} className="text-white text-xs" />
+        <FontAwesomeIcon icon={faXTwitter} className="text-white text-xs" />
       </div>
 
       {/* LinkedIn */}
