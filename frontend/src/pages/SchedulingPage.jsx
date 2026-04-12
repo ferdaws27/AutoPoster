@@ -600,7 +600,7 @@ export default function SchedulingPage() {
   };
 
   const platformTextColors = {
-    Twitter: 'text-blue-400',
+    Twitter: 'text-blue-400', 
     LinkedIn: 'text-violet-400',
     Medium: 'text-teal-400'
   };
@@ -610,13 +610,13 @@ export default function SchedulingPage() {
       <div className="gradient-bg min-h-screen text-white p-8">
         
         {/* Header Section */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-white mb-2">Content Scheduler</h1>
             <p className="text-gray-400">Plan and schedule your content across all platforms</p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3 flex-shrink-0">
             {/* View Toggle */}
             <div className="flex items-center bg-black/30 rounded-2xl p-1">
               <button 
@@ -652,11 +652,11 @@ export default function SchedulingPage() {
         </div>
 
         {/* Calendar and Posts Layout */}
-        <div className="grid grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           
           {/* Upcoming Posts Panel */}
-          <div className="col-span-1">
-            <div className="glass-effect rounded-3xl p-6 h-[800px] overflow-y-auto">
+          <div className="col-span-1 order-2 lg:order-1">
+            <div className="glass-effect rounded-3xl p-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
               <h2 className="text-xl font-semibold text-white mb-6">Upcoming Posts</h2>
               
               {/* Filter Tabs */}
@@ -782,8 +782,8 @@ export default function SchedulingPage() {
           </div>
 
           {/* Calendar Section */}
-          <div className="col-span-3">
-            <div className="glass-effect rounded-3xl p-6 h-[800px] flex flex-col">
+          <div className="col-span-1 lg:col-span-3 order-1 lg:order-2">
+            <div className="glass-effect rounded-3xl p-6 max-h-[calc(100vh-12rem)] flex flex-col">
               {/* Calendar Header */}
               <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <div className="flex items-center space-x-4">
@@ -801,9 +801,9 @@ export default function SchedulingPage() {
                     <FontAwesomeIcon icon={faChevronRight} />
                   </button>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center flex-wrap gap-3">
                   {/* Platform Legend */}
-                  <div className="flex items-center space-x-4 text-sm">
+                  <div className="flex items-center gap-3 text-sm">
                     {Object.keys(platformColors).map(platform => (
                       <div key={platform} className="flex items-center space-x-2">
                         <div className={`w-3 h-3 ${platformColors[platform]} rounded`}></div>
@@ -822,36 +822,37 @@ export default function SchedulingPage() {
               </div>
 
               {/* Calendar Grid */}
-              <div className={`grid gap-px bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 ${
-                viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'
-              }`}>
+              <div className="bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 flex flex-col">
                 
                 {/* Day Headers */}
-                {viewDays.map((day, index) => {
-                  const isToday = day.toDateString() === today.toDateString();
-                  return (
-                    <div key={index} className={`bg-black/20 p-4 text-center ${isToday ? 'border-2 border-cyan-400/30 rounded-lg' : ''}`}>
-                      <div className={`text-sm font-medium mb-1 ${isToday ? 'text-cyan-400' : 'text-gray-400'}`}>
-                        {viewMode === 'week' 
-                          ? day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
-                          : day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()
-                        }
-                        {isToday && <span className="ml-1">TODAY</span>}
+                <div className={`grid gap-px flex-shrink-0 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'}`}>
+                  {viewDays.map((day, index) => {
+                    const isToday = day.toDateString() === today.toDateString();
+                    return (
+                      <div key={index} className={`bg-black/20 p-3 text-center ${isToday ? 'border-b-2 border-cyan-400/30' : ''}`}>
+                        <div className={`text-xs font-medium mb-0.5 ${isToday ? 'text-cyan-400' : 'text-gray-400'}`}>
+                          {viewMode === 'week' 
+                            ? day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+                            : day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()
+                          }
+                          {isToday && <span className="ml-1">TODAY</span>}
+                        </div>
+                        <div className={`text-base font-semibold ${isToday ? 'text-cyan-400' : 'text-white'}`}>
+                          {day.getDate()}
+                        </div>
                       </div>
-                      <div className={`text-lg font-semibold ${isToday ? 'text-cyan-400' : 'text-white'}`}>
-                        {day.getDate()}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
 
                 {/* Calendar Cells */}
+                <div className={`grid gap-px flex-1 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'}`}>
                 {viewDays.map((day, index) => {
                   const dayPosts = getPostsForDay(day);
                   const isToday = day.toDateString() === today.toDateString();
                   
                   return (
-                    <div key={index} className={`bg-black/10 p-3 relative ${viewMode === 'week' ? 'min-h-[120px]' : 'min-h-[400px]'} ${isToday ? 'border-2 border-cyan-400/20 rounded-lg' : ''}`}>
+                    <div key={index} className={`bg-black/10 p-3 relative ${viewMode === 'week' ? 'min-h-[140px]' : 'min-h-[300px]'} ${isToday ? 'border-x-2 border-b-2 border-cyan-400/20' : ''}`}>
                       {/* Events for this day */}
                       <div className="space-y-2">
                         {dayPosts.map((post, postIndex) => (
@@ -894,6 +895,7 @@ export default function SchedulingPage() {
                     </div>
                   );
                 })}
+                </div>
               </div>
 
               {/* Quick Actions */}
@@ -1075,7 +1077,7 @@ export default function SchedulingPage() {
                   onClick={() => setShowEditModal(false)}
                   className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
                 >
-                  <i className="fa-solid fa-times"></i>
+                  <FontAwesomeIcon icon={faTimes} />
                 </button>
               </div>
               
@@ -1083,7 +1085,7 @@ export default function SchedulingPage() {
                 {/* Content Section */}
                 <div className="relative">
                   <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <i className="fa-solid fa-file-text mr-2"></i>Content
+                    <FontAwesomeIcon icon={faFileLines} className="mr-2" />Content
                   </label>
                   <div className="relative">
                     <textarea
@@ -1103,13 +1105,13 @@ export default function SchedulingPage() {
                 {/* Platforms Section */}
                 <div>
                   <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <i className="fa-solid fa-share-nodes mr-2"></i>Publish To
+                    <FontAwesomeIcon icon={faShareNodes} className="mr-2" />Publish To
                   </label>
                   <div className="grid grid-cols-3 gap-4">
                     {[
-                      { name: 'Twitter', icon: 'fa-twitter', color: 'text-white' },
-                      { name: 'LinkedIn', icon: 'fa-linkedin', color: 'text-blue-400' },
-                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
+                      { name: 'Twitter', icon: faXTwitter, color: 'text-white' },
+                      { name: 'LinkedIn', icon: faLinkedin, color: 'text-blue-400' },
+                      { name: 'Medium', icon: faMedium, color: 'text-green-400' }
                     ].map(platform => (
                       <label
                         key={platform.name}
@@ -1132,11 +1134,11 @@ export default function SchedulingPage() {
                           className="sr-only"
                         />
                         <div className="flex flex-col items-center space-y-2">
-                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
+                          <FontAwesomeIcon icon={platform.icon} className={`text-2xl ${platform.color}`} />
                           <span className="text-sm font-medium text-white">{platform.name}</span>
                           {editingPost.platforms[platform.name] && (
                             <div className="absolute top-2 right-2">
-                              <i className="fa-solid fa-check-circle text-cyan-400 text-xs"></i>
+                              <FontAwesomeIcon icon={faCheckCircle} className="text-cyan-400 text-xs" />
                             </div>
                           )}
                         </div>
@@ -1148,7 +1150,7 @@ export default function SchedulingPage() {
                 {/* Scheduling Section */}
                 <div>
                   <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <i className="fa-solid fa-clock mr-2"></i>Schedule (Optional)
+                    <FontAwesomeIcon icon={faClock} className="mr-2" />Schedule (Optional)
                   </label>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="relative">
@@ -1158,7 +1160,7 @@ export default function SchedulingPage() {
                         value={editingPost.date}
                         onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
                       />
-                      <i className="fa-solid fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                      <FontAwesomeIcon icon={faCalendar} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                     </div>
                     <div className="relative">
                       <input
@@ -1167,13 +1169,13 @@ export default function SchedulingPage() {
                         value={editingPost.time}
                         onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
                       />
-                      <i className="fa-solid fa-clock absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                      <FontAwesomeIcon icon={faClock} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                     </div>
                   </div>
                   {editingPost.date && editingPost.time && (
                     <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
                       <p className="text-green-400 text-sm">
-                        <i className="fa-solid fa-check-circle mr-2"></i>
+                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
                         Scheduled for {new Date(editingPost.date).toLocaleDateString()} at {editingPost.time}
                       </p>
                     </div>
@@ -1204,7 +1206,7 @@ export default function SchedulingPage() {
                         />
                         <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           {editingPost.selectedImage === index && (
-                            <i className="fa-solid fa-check text-white text-xl"></i>
+                            <FontAwesomeIcon icon={faCheck} className="text-white text-xl" />
                           )}
                         </div>
                       </div>
@@ -1215,7 +1217,7 @@ export default function SchedulingPage() {
                 {/* Action Buttons */}
                 <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
                   <div className="text-sm text-gray-400">
-                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
                     Changes will be saved immediately
                   </div>
                   <div className="flex space-x-3">
@@ -1234,7 +1236,7 @@ export default function SchedulingPage() {
                       }}
                       disabled={isSaving}
                     >
-                      <i className="fa-solid fa-times"></i>
+                      <FontAwesomeIcon icon={faTimes} />
                       <span>Cancel</span>
                     </button>
                     <button 
@@ -1244,12 +1246,12 @@ export default function SchedulingPage() {
                     >
                       {isSaving ? (
                         <>
-                          <i className="fa-solid fa-spinner fa-spin"></i>
+                          <FontAwesomeIcon icon={faSpinner} spin />
                           <span>Saving...</span>
                         </>
                       ) : (
                         <>
-                          <i className="fa-solid fa-save"></i>
+                          <FontAwesomeIcon icon={faSave} />
                           <span>Save Changes</span>
                         </>
                       )}

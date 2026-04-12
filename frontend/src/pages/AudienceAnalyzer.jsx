@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Highcharts from "highcharts";
+import { apiFetch } from "../services/api";
 
 export default function AudienceAnalyzer() {
   const chartRef = useRef(null);
@@ -9,9 +10,63 @@ export default function AudienceAnalyzer() {
   const [downloadState, setDownloadState] = useState("idle");
   const [selectedInterest, setSelectedInterest] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState("idle"); // idle | analyzing | done | error
+  const [aiInsights, setAiInsights] = useState([]);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiStrategy, setAiStrategy] = useState(null);
+  const [aiStrategyLoading, setAiStrategyLoading] = useState(false);
+  const [contentPrefs, setContentPrefs] = useState(null);
+  const [contentPrefsLoading, setContentPrefsLoading] = useState(false);
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    apiFetch("/audience-analytics")
+      .then((data) => setAnalytics(data))
+      .catch((err) => console.error("Audience analytics fetch error:", err));
+  }, []);
+
+  // Auto-trigger AI analysis when analytics data is loaded
+  useEffect(() => {
+    if (!analytics || analytics.total_interactions === 0) return;
+    setAiLoading(true);
+    setAiStatus("analyzing");
+    apiFetch("/ai-persona-analysis")
+      .then((data) => {
+        if (data.success) {
+          setAiAnalysis(data.data);
+          setAiStatus("done");
+        } else {
+          setAiStatus("error");
+        }
+      })
+      .catch((err) => {
+        console.error("AI analysis error:", err);
+        setAiStatus("error");
+      })
+      .finally(() => setAiLoading(false));
+  }, [analytics]);
+
+  // Derived values from analytics
+  const personas = analytics?.personas || {};
+  const platforms = analytics?.platforms || {};
+  const locations = analytics?.locations || {};
+  const industries = analytics?.industries || {};
+  const totalInteractions = analytics?.total_interactions || 0;
+  const activeUsers = analytics?.active_users || 0;
+  const engagementRate = analytics?.engagement_rate || 0;
+
+  const personaTotal = Object.values(personas).reduce((a, b) => a + b, 0) || 1;
+  const personaPercent = (name) => Math.round((personas[name] || 0) / personaTotal * 100);
+  const personaFollowers = (name) => personas[name] || 0;
+
+  const platformTotal = Object.values(platforms).reduce((a, b) => a + b, 0) || 1;
+  const locationTotal = Object.values(locations).reduce((a, b) => a + b, 0) || 1;
+  const industryTotal = Object.values(industries).reduce((a, b) => a + b, 0) || 1;
+
+  useEffect(() => {
+    if (!chartRef.current || !analytics) return;
 
     if (chartInstance.current) {
       chartInstance.current.destroy();
@@ -58,17 +113,44 @@ export default function AudienceAnalyzer() {
       },
       series: [{
         name: "Engagement Rate",
-        data: [7.8, 6.9, 8.2, 5.4],
+        data: [
+          personaPercent("Entrepreneurs"),
+          personaPercent("AI Students"),
+          personaPercent("Writers"),
+          personaPercent("Investors")
+        ],
         colorByPoint: true,
         colors: ["#00C2FF", "#7B61FF", "#14B8A6", "#F59E0B"]
       }],
       legend: { enabled: false }
     });
 
-  }, []);
+  }, [analytics]);
+
+  const handleGenerateAiInsights = () => {
+    setAiInsightsLoading(true);
+    apiFetch("/ai-audience-insights")
+      .then((data) => {
+        if (data.success) {
+          setAiInsights(data.insights);
+        }
+      })
+      .catch((err) => console.error("AI insights error:", err))
+      .finally(() => setAiInsightsLoading(false));
+  };
 
   const handleGenerateStrategy = () => {
     setShowModal(true);
+    setAiStrategyLoading(true);
+    setAiStrategy(null);
+    apiFetch("/ai-generate-strategy")
+      .then((data) => {
+        if (data.success) {
+          setAiStrategy(data.strategy);
+        }
+      })
+      .catch((err) => console.error("AI strategy error:", err))
+      .finally(() => setAiStrategyLoading(false));
   };
 
   const handleApplyStrategy = () => {
@@ -91,6 +173,12 @@ export default function AudienceAnalyzer() {
     setTimeout(() => setShowNotification(false), 3000);
   };
 
+  // Get AI insight for a specific persona
+  const getAiPersonaInsight = (personaName) => {
+    if (!aiAnalysis?.persona_insights) return null;
+    return aiAnalysis.persona_insights.find(p => p.persona === personaName);
+  };
+
   return (
     <div className=" p-8">
       
@@ -102,7 +190,7 @@ export default function AudienceAnalyzer() {
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">Audience Persona Analyzer — Know Your Readers</h1>
           <p className="text-xl text-gray-300 mb-2">AI analyzes your followers and interactions to reveal audience types and preferences</p>
-          <p className="text-gray-400">Based on 2,847 followers • 1,234 active engagers • Last updated 3 hours ago</p>
+          <p className="text-gray-400">Based on {totalInteractions.toLocaleString()} interactions • {activeUsers.toLocaleString()} active engagers • {analytics?.total_posts || 0} posts analyzed</p>
         </div>
       </div>
 
@@ -121,13 +209,13 @@ export default function AudienceAnalyzer() {
             </div>
           </div>
           <div className="mb-2">
-            <div className="text-3xl font-bold metric-value">2,847</div>
-            <div className="text-gray-400 text-sm">Total Audience Size</div>
+            <div className="text-3xl font-bold metric-value">{totalInteractions.toLocaleString()}</div>
+            <div className="text-gray-400 text-sm">Total Interactions</div>
           </div>
           <div className="text-gray-300 text-xs">
-            <span className="text-cyan-400">LinkedIn:</span> 1,623 • 
-            <span className="text-violet-400">Twitter:</span> 894 • 
-            <span className="text-teal-400">Medium:</span> 330
+            <span className="text-cyan-400">LinkedIn:</span> {(platforms["LinkedIn"] || 0).toLocaleString()} • 
+            <span className="text-violet-400">Twitter:</span> {(platforms["Twitter"] || 0).toLocaleString()} • 
+            <span className="text-teal-400">Medium:</span> {(platforms["Medium"] || 0).toLocaleString()}
           </div>
         </div>
 
@@ -143,11 +231,11 @@ export default function AudienceAnalyzer() {
             </div>
           </div>
           <div className="mb-2">
-            <div className="text-3xl font-bold metric-value">1,234</div>
-            <div className="text-gray-400 text-sm">Active Commenters</div>
+            <div className="text-3xl font-bold metric-value">{activeUsers.toLocaleString()}</div>
+            <div className="text-gray-400 text-sm">Active Users</div>
           </div>
           <div className="text-gray-300 text-xs">
-            43% of total audience • 2.3 comments per person monthly
+            {totalInteractions > 0 ? Math.round(activeUsers / (analytics?.total_posts || 1) * 100) / 100 : 0} users per post average
           </div>
         </div>
 
@@ -163,8 +251,8 @@ export default function AudienceAnalyzer() {
             </div>
           </div>
           <div className="mb-2">
-            <div className="text-3xl font-bold metric-value">6.8%</div>
-            <div className="text-gray-400 text-sm">Engagement Rate</div>
+            <div className="text-3xl font-bold metric-value">{engagementRate}</div>
+            <div className="text-gray-400 text-sm">Engagement Rate (per post)</div>
           </div>
           <div className="text-gray-300 text-xs">
             2x industry average • Strongest on professional content
@@ -183,51 +271,70 @@ export default function AudienceAnalyzer() {
               Persona Clusters
             </h3>
             <div className="flex items-center space-x-2 bg-black/30 rounded-2xl px-4 py-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-green-400 text-sm font-medium">AI Analyzing</span>
+              <div className={`w-2 h-2 rounded-full ${
+                aiStatus === "analyzing" ? "bg-yellow-400 animate-pulse" :
+                aiStatus === "done" ? "bg-green-400" :
+                aiStatus === "error" ? "bg-red-400" :
+                "bg-gray-400"
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                aiStatus === "analyzing" ? "text-yellow-400" :
+                aiStatus === "done" ? "text-green-400" :
+                aiStatus === "error" ? "text-red-400" :
+                "text-gray-400"
+              }`}>{
+                aiStatus === "analyzing" ? "AI Analyzing..." :
+                aiStatus === "done" ? "AI Analysis Complete" :
+                aiStatus === "error" ? "AI Error" :
+                "Waiting for data"
+              }</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <PersonaCard 
               name="Entrepreneurs"
-              percent="34%"
-              followers="967"
+              percent={`${personaPercent("Entrepreneurs")}%`}
+              followers={personaFollowers("Entrepreneurs").toLocaleString()}
               icon="fa-rocket"
               color="cyan"
               interests={["AI Tools", "Productivity", "Startups"]}
               topPost="Short Hooks & Tips"
               onInterestClick={handleInterestClick}
+              aiInsight={getAiPersonaInsight("Entrepreneurs")}
             />
             <PersonaCard 
               name="AI Students"
-              percent="28%"
-              followers="797"
+              percent={`${personaPercent("AI Students")}%`}
+              followers={personaFollowers("AI Students").toLocaleString()}
               icon="fa-graduation-cap"
               color="violet"
               interests={["Machine Learning", "Tutorials", "Research"]}
               topPost="Educational Content"
               onInterestClick={handleInterestClick}
+              aiInsight={getAiPersonaInsight("AI Students")}
             />
             <PersonaCard 
               name="Writers"
-              percent="23%"
-              followers="655"
+              percent={`${personaPercent("Writers")}%`}
+              followers={personaFollowers("Writers").toLocaleString()}
               icon="fa-feather"
               color="teal"
               interests={["Storytelling", "Content", "Creativity"]}
               topPost="Personal Stories"
               onInterestClick={handleInterestClick}
+              aiInsight={getAiPersonaInsight("Writers")}
             />
             <PersonaCard 
               name="Investors"
-              percent="15%"
-              followers="428"
+              percent={`${personaPercent("Investors")}%`}
+              followers={personaFollowers("Investors").toLocaleString()}
               icon="fa-chart-line"
               color="yellow"
               interests={["Markets", "Tech Trends", "Analysis"]}
               topPost="Industry Insights"
               onInterestClick={handleInterestClick}
+              aiInsight={getAiPersonaInsight("Investors")}
             />
           </div>
         </div>
@@ -250,35 +357,47 @@ export default function AudienceAnalyzer() {
           
           {/* AI Insights List */}
           <div className="space-y-4 mb-6">
-            <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
-              <i className="fa-solid fa-brain text-cyan-400 mr-2"></i>
-              AI Insights
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-white flex items-center">
+                <i className="fa-solid fa-brain text-cyan-400 mr-2"></i>
+                AI Insights
+              </h4>
+              <button
+                onClick={handleGenerateAiInsights}
+                disabled={aiInsightsLoading}
+                className="px-4 py-2 rounded-2xl text-sm font-medium bg-gradient-to-r from-cyan-400/20 to-violet-500/20 text-cyan-400 hover:from-cyan-400/30 hover:to-violet-500/30 border border-cyan-400/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className={`fa-solid ${aiInsightsLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'} mr-2`}></i>
+                {aiInsightsLoading ? 'Generating...' : 'Generate AI Insights'}
+              </button>
+            </div>
             
-            <InsightItem 
-              icon="fa-calendar-days"
-              color="cyan"
-              title="Your entrepreneur followers engage more on weekdays"
-              description="Peak engagement: Tuesday-Thursday 2-4 PM"
-            />
-            <InsightItem 
-              icon="fa-book-open"
-              color="violet"
-              title="Writers prefer your storytelling posts"
-              description="3.2x higher engagement on personal narrative content"
-            />
-            <InsightItem 
-              icon="fa-graduation-cap"
-              color="teal"
-              title="AI students love tutorial content"
-              description="Step-by-step guides get 67% more saves"
-            />
-            <InsightItem 
-              icon="fa-chart-line"
-              color="yellow"
-              title="Investors engage with data-driven posts"
-              description="Charts and statistics increase comments by 45%"
-            />
+            {aiInsightsLoading && (
+              <div className="text-center py-6">
+                <i className="fa-solid fa-spinner fa-spin text-cyan-400 text-2xl mb-3"></i>
+                <p className="text-gray-400 text-sm">AI is analyzing your audience data...</p>
+              </div>
+            )}
+
+            {!aiInsightsLoading && aiInsights.length > 0 && aiInsights.map((insight, index) => (
+              <InsightItem 
+                key={index}
+                icon={insight.icon}
+                color={insight.color}
+                title={insight.title}
+                description={insight.description}
+              />
+            ))}
+
+            {!aiInsightsLoading && aiInsights.length === 0 && (analytics?.insights || []).map((insight, index) => (
+              <InsightItem 
+                key={index}
+                icon={insight.icon}
+                color={insight.color}
+                title={insight.title}
+                description={insight.description}
+              />
+            ))}
           </div>
 
           {/* Generate Strategy Button */}
@@ -311,11 +430,12 @@ export default function AudienceAnalyzer() {
             icon="fa-map-marker-alt"
             color="cyan"
             data={[
-              { label: "United States", value: "42%", color: "cyan" },
-              { label: "United Kingdom", value: "18%", color: "violet" },
-              { label: "Canada", value: "12%", color: "teal" },
-              { label: "Germany", value: "8%", color: "yellow" },
-              { label: "Others", value: "20%", color: "gray" }
+              { label: "USA", value: `${Math.round((locations["USA"] || 0) / locationTotal * 100)}%`, color: "cyan" },
+              { label: "UK", value: `${Math.round((locations["UK"] || 0) / locationTotal * 100)}%`, color: "violet" },
+              { label: "Canada", value: `${Math.round((locations["Canada"] || 0) / locationTotal * 100)}%`, color: "teal" },
+              { label: "Germany", value: `${Math.round((locations["Germany"] || 0) / locationTotal * 100)}%`, color: "yellow" },
+              { label: "France", value: `${Math.round((locations["France"] || 0) / locationTotal * 100)}%`, color: "gray" },
+              { label: "Tunisia", value: `${Math.round((locations["Tunisia"] || 0) / locationTotal * 100)}%`, color: "cyan" }
             ]}
           />
           <DemographicsCard 
@@ -323,11 +443,10 @@ export default function AudienceAnalyzer() {
             icon="fa-briefcase"
             color="violet"
             data={[
-              { label: "Technology", value: "38%", color: "cyan" },
-              { label: "Marketing", value: "24%", color: "violet" },
-              { label: "Education", value: "16%", color: "teal" },
-              { label: "Finance", value: "14%", color: "yellow" },
-              { label: "Others", value: "8%", color: "gray" }
+              { label: "Tech", value: `${Math.round((industries["Tech"] || 0) / industryTotal * 100)}%`, color: "cyan" },
+              { label: "Marketing", value: `${Math.round((industries["Marketing"] || 0) / industryTotal * 100)}%`, color: "violet" },
+              { label: "Education", value: `${Math.round((industries["Education"] || 0) / industryTotal * 100)}%`, color: "teal" },
+              { label: "Finance", value: `${Math.round((industries["Finance"] || 0) / industryTotal * 100)}%`, color: "yellow" }
             ]}
           />
           <DemographicsCard 
@@ -351,42 +470,81 @@ export default function AudienceAnalyzer() {
             <i className="fa-solid fa-heart text-pink-400 mr-3"></i>
             Content Preferences by Persona
           </h3>
+          <button
+            onClick={() => {
+              setContentPrefsLoading(true);
+              apiFetch("/ai-content-preferences")
+                .then((data) => {
+                  if (data.success) setContentPrefs(data);
+                })
+                .catch((err) => console.error("Content prefs error:", err))
+                .finally(() => setContentPrefsLoading(false));
+            }}
+            disabled={contentPrefsLoading}
+            className="px-4 py-2 rounded-2xl text-sm font-medium bg-gradient-to-r from-pink-400/20 to-violet-500/20 text-pink-400 hover:from-pink-400/30 hover:to-violet-500/30 border border-pink-400/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i className={`fa-solid ${contentPrefsLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'} mr-2`}></i>
+            {contentPrefsLoading ? 'Analyzing...' : 'Generate with AI'}
+          </button>
         </div>
 
+        {contentPrefsLoading && (
+          <div className="text-center py-12">
+            <i className="fa-solid fa-spinner fa-spin text-pink-400 text-3xl mb-4"></i>
+            <p className="text-gray-400">AI is analyzing content performance and posting times...</p>
+          </div>
+        )}
+
+        {!contentPrefsLoading && (
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Top Performing Content Types */}
           <div className="space-y-6">
             <h4 className="text-lg font-semibold text-white mb-4">Top Performing Content Types</h4>
             
             <div className="space-y-4">
-              <ContentTypeBar 
-                title="Tutorial & How-to Posts"
-                engagement="8.4%"
-                percentage={84}
-                gradient="from-cyan-400 to-violet-400"
-                description="Most loved by AI Students & Entrepreneurs"
-              />
-              <ContentTypeBar 
-                title="Personal Stories"
-                engagement="7.1%"
-                percentage={71}
-                gradient="from-violet-400 to-teal-400"
-                description="Writers & Entrepreneurs resonate most"
-              />
-              <ContentTypeBar 
-                title="Industry Insights"
-                engagement="6.8%"
-                percentage={68}
-                gradient="from-teal-400 to-yellow-400"
-                description="Investors & Entrepreneurs prefer these"
-              />
-              <ContentTypeBar 
-                title="Quick Tips"
-                engagement="5.9%"
-                percentage={59}
-                gradient="from-yellow-400 to-orange-400"
-                description="Universal appeal across all personas"
-              />
+              {contentPrefs?.content_types?.length > 0 ? (
+                contentPrefs.content_types.map((ct, i) => (
+                  <ContentTypeBar
+                    key={i}
+                    title={ct.title}
+                    engagement={ct.engagement}
+                    percentage={ct.percentage}
+                    gradient={ct.gradient}
+                    description={ct.description}
+                  />
+                ))
+              ) : (
+                <>
+                  <ContentTypeBar 
+                    title="Tutorial & How-to Posts"
+                    engagement="8.4%"
+                    percentage={84}
+                    gradient="from-cyan-400 to-violet-400"
+                    description="Most loved by AI Students & Entrepreneurs"
+                  />
+                  <ContentTypeBar 
+                    title="Personal Stories"
+                    engagement="7.1%"
+                    percentage={71}
+                    gradient="from-violet-400 to-teal-400"
+                    description="Writers & Entrepreneurs resonate most"
+                  />
+                  <ContentTypeBar 
+                    title="Industry Insights"
+                    engagement="6.8%"
+                    percentage={68}
+                    gradient="from-teal-400 to-yellow-400"
+                    description="Investors & Entrepreneurs prefer these"
+                  />
+                  <ContentTypeBar 
+                    title="Quick Tips"
+                    engagement="5.9%"
+                    percentage={59}
+                    gradient="from-yellow-400 to-orange-400"
+                    description="Universal appeal across all personas"
+                  />
+                </>
+              )}
             </div>
           </div>
 
@@ -395,37 +553,53 @@ export default function AudienceAnalyzer() {
             <h4 className="text-lg font-semibold text-white mb-4">Optimal Posting Times by Persona</h4>
             
             <div className="space-y-4">
-              <PostingTimeCard 
-                icon="fa-rocket"
-                persona="Entrepreneurs"
-                time="Tuesday, 2:00 PM"
-                color="cyan"
-                performance="+73% above average"
-              />
-              <PostingTimeCard 
-                icon="fa-graduation-cap"
-                persona="AI Students"
-                time="Wednesday, 7:00 PM"
-                color="violet"
-                performance="+65% above average"
-              />
-              <PostingTimeCard 
-                icon="fa-feather"
-                persona="Writers"
-                time="Sunday, 10:00 AM"
-                color="teal"
-                performance="+58% above average"
-              />
-              <PostingTimeCard 
-                icon="fa-chart-line"
-                persona="Investors"
-                time="Thursday, 9:00 AM"
-                color="yellow"
-                performance="+52% above average"
-              />
+              {contentPrefs?.posting_times?.length > 0 ? (
+                contentPrefs.posting_times.map((pt, i) => (
+                  <PostingTimeCard
+                    key={i}
+                    icon={pt.icon}
+                    persona={pt.persona}
+                    time={pt.time}
+                    color={pt.color}
+                    performance={pt.performance}
+                  />
+                ))
+              ) : (
+                <>
+                  <PostingTimeCard 
+                    icon="fa-rocket"
+                    persona="Entrepreneurs"
+                    time="Tuesday, 2:00 PM"
+                    color="cyan"
+                    performance="+73% above average"
+                  />
+                  <PostingTimeCard 
+                    icon="fa-graduation-cap"
+                    persona="AI Students"
+                    time="Wednesday, 7:00 PM"
+                    color="violet"
+                    performance="+65% above average"
+                  />
+                  <PostingTimeCard 
+                    icon="fa-feather"
+                    persona="Writers"
+                    time="Sunday, 10:00 AM"
+                    color="teal"
+                    performance="+58% above average"
+                  />
+                  <PostingTimeCard 
+                    icon="fa-chart-line"
+                    persona="Investors"
+                    time="Thursday, 9:00 AM"
+                    color="yellow"
+                    performance="+52% above average"
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Action Button */}
@@ -456,53 +630,109 @@ export default function AudienceAnalyzer() {
       {/* Strategy Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-          <div className="glass-effect bg-black/30 backdrop-blur-sm rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30">
+          <div className="glass-effect bg-black/30 backdrop-blur-sm rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30 max-h-[90vh] overflow-y-auto">
             <div className="text-center mb-6">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
-                <i className="fa-solid fa-lightbulb text-cyan-400 text-2xl"></i>
+                <i className={`fa-solid ${aiStrategyLoading ? 'fa-spinner fa-spin' : 'fa-lightbulb'} text-cyan-400 text-2xl`}></i>
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">AI-Generated Content Strategy</h3>
-              <p className="text-gray-400">Based on your audience persona analysis</p>
+              <p className="text-gray-400">
+                {aiStrategyLoading ? 'AI is crafting your strategy...' : 'Based on your audience persona analysis'}
+              </p>
             </div>
             
-            <div className="space-y-4 mb-6">
-              <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
-                <div className="flex items-center space-x-3 mb-2">
-                  <i className="fa-solid fa-calendar text-cyan-400"></i>
-                  <span className="text-white font-medium">Optimal Posting Schedule</span>
-                </div>
-                <div className="text-gray-300 text-sm">
-                  • Tuesdays 2:00 PM for Entrepreneurs (34% of audience)<br/>
-                  • Wednesdays 7:00 PM for AI Students (28% of audience)<br/>
-                  • Sundays 10:00 AM for Writers (23% of audience)
-                </div>
+            {aiStrategyLoading && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-cyan-400/30 border-t-cyan-400 animate-spin"></div>
+                <p className="text-gray-300 text-lg mb-2">Analyzing your audience data...</p>
+                <p className="text-gray-500 text-sm">This may take a few seconds</p>
               </div>
+            )}
 
-              <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
-                <div className="flex items-center space-x-3 mb-2">
-                  <i className="fa-solid fa-pen text-violet-400"></i>
-                  <span className="text-white font-medium">Content Mix Recommendation</span>
+            {!aiStrategyLoading && aiStrategy && (
+              <div className="space-y-4 mb-6">
+                {/* Posting Schedule */}
+                <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <i className="fa-solid fa-calendar text-cyan-400"></i>
+                    <span className="text-white font-medium">Optimal Posting Schedule</span>
+                  </div>
+                  <div className="text-gray-300 text-sm space-y-1">
+                    {(aiStrategy.posting_schedule || []).map((s, i) => (
+                      <div key={i}>• {s.best_time} for {s.persona} ({s.audience_pct}% of audience) — {s.tip}</div>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-gray-300 text-sm">
-                  • 40% Tutorial & How-to content<br/>
-                  • 30% Personal stories and experiences<br/>
-                  • 20% Industry insights and analysis<br/>
-                  • 10% Quick tips and actionable advice
-                </div>
-              </div>
 
-              <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
-                <div className="flex items-center space-x-3 mb-2">
-                  <i className="fa-solid fa-target text-teal-400"></i>
-                  <span className="text-white font-medium">Platform Focus</span>
+                {/* Content Mix */}
+                <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <i className="fa-solid fa-pen text-violet-400"></i>
+                    <span className="text-white font-medium">Content Mix Recommendation</span>
+                  </div>
+                  <div className="text-gray-300 text-sm space-y-1">
+                    {(aiStrategy.content_mix || []).map((c, i) => (
+                      <div key={i}>• {c.percentage}% {c.type} — {c.description}</div>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-gray-300 text-sm">
-                  • LinkedIn: Professional insights and career advice<br/>
-                  • Twitter: Quick tips and industry commentary<br/>
-                  • Medium: In-depth tutorials and thought pieces
+
+                {/* Platform Focus */}
+                <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <i className="fa-solid fa-share-nodes text-teal-400"></i>
+                    <span className="text-white font-medium">Platform Focus</span>
+                  </div>
+                  <div className="text-gray-300 text-sm space-y-1">
+                    {(aiStrategy.platform_focus || []).map((p, i) => (
+                      <div key={i}>• <span className="text-white font-medium">{p.platform}:</span> {p.strategy}</div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* AI Strategy */}
+                <div className="bg-black/30 rounded-2xl p-4 border border-gray-700/50">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <i className="fa-solid fa-brain text-violet-400"></i>
+                    <span className="text-white font-medium">AI Strategy</span>
+                  </div>
+                  <div className="text-gray-300 text-sm">{aiStrategy.overall_strategy}</div>
+                </div>
+
+                {/* Top Opportunity */}
+                <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/30">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <i className="fa-solid fa-rocket text-teal-400"></i>
+                    <span className="text-white font-medium">Top Opportunity</span>
+                  </div>
+                  <div className="text-gray-300 text-sm">{aiStrategy.top_opportunity}</div>
+                </div>
+
+                {/* Quick Wins */}
+                {aiStrategy.quick_wins && (
+                  <div className="bg-black/30 rounded-2xl p-4 border border-green-400/30">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <i className="fa-solid fa-bolt text-green-400"></i>
+                      <span className="text-white font-medium">Quick Wins</span>
+                    </div>
+                    <div className="text-gray-300 text-sm space-y-1">
+                      {aiStrategy.quick_wins.map((w, i) => (
+                        <div key={i} className="flex items-start space-x-2">
+                          <i className="fa-solid fa-check text-green-400 mt-1 text-xs"></i>
+                          <span>{w}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {!aiStrategyLoading && !aiStrategy && (
+              <div className="text-center py-8">
+                <p className="text-gray-400">Failed to generate strategy. Please try again.</p>
+              </div>
+            )}
             
             <div className="flex space-x-4">
               <button
@@ -513,7 +743,8 @@ export default function AudienceAnalyzer() {
               </button>
               <button
                 onClick={handleApplyStrategy}
-                className="flex-1 p-3 bg-gradient-to-r from-cyan-400 to-violet-500 rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+                disabled={aiStrategyLoading || !aiStrategy}
+                className="flex-1 p-3 bg-gradient-to-r from-cyan-400 to-violet-500 rounded-2xl text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Apply Strategy
               </button>
@@ -537,7 +768,7 @@ export default function AudienceAnalyzer() {
 }
 
 // Helper Components
-function PersonaCard({ name, percent, followers, icon, color, interests, topPost, onInterestClick }) {
+function PersonaCard({ name, percent, followers, icon, color, interests, topPost, onInterestClick, aiInsight }) {
   const colorClasses = {
     cyan: "from-cyan-400/20 to-violet-400/20 text-cyan-400 border-cyan-400/20",
     violet: "from-violet-400/20 to-teal-400/20 text-violet-400 border-violet-400/20",
@@ -556,6 +787,21 @@ function PersonaCard({ name, percent, followers, icon, color, interests, topPost
         <div className="text-gray-400 text-sm">{followers} followers</div>
       </div>
       
+      {aiInsight && (
+        <div className={`bg-${color}-400/10 rounded-2xl p-3 mb-4 border border-${color}-400/20`}>
+          <div className="flex items-center space-x-2 mb-1">
+            <i className={`fa-solid fa-brain text-${color}-400 text-xs`}></i>
+            <span className={`text-${color}-400 text-xs font-medium`}>AI Tip</span>
+          </div>
+          <div className="text-gray-300 text-xs">{aiInsight.engagement_tip}</div>
+          {aiInsight.best_time && (
+            <div className="text-gray-400 text-xs mt-1">
+              <i className="fa-solid fa-clock mr-1"></i>{aiInsight.best_time}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="space-y-3 mb-4">
         <div className="text-gray-300 text-sm font-medium">Key Interests:</div>
         <div className="flex flex-wrap gap-2">
@@ -573,7 +819,7 @@ function PersonaCard({ name, percent, followers, icon, color, interests, topPost
       
       <div className="bg-black/30 rounded-2xl p-3">
         <div className="text-gray-400 text-xs mb-1">Top Post Type</div>
-        <div className="text-white font-medium text-sm">{topPost}</div>
+        <div className="text-white font-medium text-sm">{aiInsight?.best_content || topPost}</div>
       </div>
     </div>
   );

@@ -31,6 +31,8 @@
     "force": "^0.0.3",
     "highcharts": "^12.5.0",
     "highcharts-react-official": "^3.2.3",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.7",
     "react": "^19.2.4",
     "react-circular-progressbar": "^2.2.0",
     "react-dom": "^19.2.4",
