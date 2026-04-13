@@ -226,7 +226,12 @@ export default function Dashboard() {
       <main className="flex-1 m-0 px-8 py-8 w-full">
         <header className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold">Good morning, {user?.full_name || "Flen"}</h2>
+            <h2 className="text-3xl font-bold">
+              {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"},{" "}
+              {user?.first_name && user?.last_name
+                ? `${user.first_name} ${user.last_name}`
+                : user?.full_name || "there"}
+            </h2>
             <p className="text-gray-400">Let's create something amazing today</p>
           </div>
           <div className="flex items-center space-x-4">
@@ -293,11 +298,25 @@ export default function Dashboard() {
             <div>
               <h3 className="text-white font-semibold mb-1">Next Post</h3>
               <div className="flex items-center text-sm">
-                <div className="flex space-x-1 mr-2">
-                  <i className="fa-brands fa-x-twitter text-white text-xs"></i>
-                  <i className="fa-brands fa-linkedin text-blue-400 text-xs"></i>
-                </div>
-                <span className="text-gray-400">2 platforms</span>
+                {nextPostTime ? (() => {
+                  const p = nextPostTime.platforms || {};
+                  const active = Object.entries(p).filter(([, v]) => v).map(([k]) => k);
+                  const count = active.length;
+                  return count > 0 ? (
+                    <>
+                      <div className="flex space-x-1 mr-2">
+                        {active.includes('twitter') && <i className="fa-brands fa-x-twitter text-white text-xs"></i>}
+                        {active.includes('linkedin') && <i className="fa-brands fa-linkedin-in text-blue-400 text-xs"></i>}
+                        {active.includes('medium') && <i className="fa-brands fa-medium text-green-400 text-xs"></i>}
+                      </div>
+                      <span className="text-gray-400">{count} platform{count > 1 ? 's' : ''}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">No platform selected</span>
+                  );
+                })() : (
+                  <span className="text-gray-400">Schedule one now</span>
+                )}
               </div>
             </div>
           </div>
@@ -398,20 +417,21 @@ export default function Dashboard() {
             <Section title="Select Platforms">
               <Platform
                 label="Twitter/X"
-                icon="fa-twitter"
+                icon="fa-x-twitter"
                 checked={platforms.twitter}
                 onClick={() => setPlatforms({ ...platforms, twitter: !platforms.twitter })}
               />
               <Platform
                 label="LinkedIn"
                 icon="fa-linkedin-in"
-                blue
+                color="text-blue-400"
                 checked={platforms.linkedin}
                 onClick={() => setPlatforms({ ...platforms, linkedin: !platforms.linkedin })}
               />
               <Platform
                 label="Medium"
                 icon="fa-medium"
+                color="text-green-400"
                 checked={platforms.medium}
                 onClick={() => setPlatforms({ ...platforms, medium: !platforms.medium })}
               />
@@ -550,14 +570,14 @@ const Section = ({ title, children }) => (
   </div>
 );
 
-const Platform = ({ label, icon, blue, checked, onClick }) => (
+const Platform = ({ label, icon, color = "text-white", checked, onClick }) => (
   <div
     onClick={onClick}
     className={`flex items-center p-3 rounded-xl border cursor-pointer ${
       checked ? "border-cyan-400" : "border-gray-600"
     }`}
   >
-    <i className={`fa-brands ${icon} ${blue ? "text-blue-400" : "text-white"} mr-3`}></i>
+    <i className={`fa-brands ${icon} ${color} mr-3`}></i>
     {label}
   </div>
 );

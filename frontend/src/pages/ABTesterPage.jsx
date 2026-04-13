@@ -431,8 +431,8 @@ export default function CreateTestSection() {
             <h3 className="text-white font-semibold mb-4">Win Rate by Platform</h3>
             <div className="space-y-4">
               {[
-                { platform: "Twitter", icon: "fa-twitter", color: "blue-400", value: 87 },
-                { platform: "LinkedIn", icon: "fa-linkedin", color: "blue-600", value: 74 },
+                { platform: "Twitter/X", icon: "fa-x-twitter", color: "white", value: 87 },
+                { platform: "LinkedIn", icon: "fa-linkedin-in", color: "blue-400", value: 74 },
                 { platform: "Medium", icon: "fa-medium", color: "green-400", value: 62 },
               ].map((p, idx) => (
                 <div key={idx} className="flex items-center justify-between">

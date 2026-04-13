@@ -11,8 +11,8 @@ const PLATFORM_ICONS = {
 
 const PLATFORM_COLORS = {
   twitter: { bg: "bg-black", border: "border-gray-600", accent: "text-white" },
-  linkedin: { bg: "bg-[#0A66C2]/20", border: "border-[#0A66C2]/40", accent: "text-[#0A66C2]" },
-  medium: { bg: "bg-emerald-500/20", border: "border-emerald-500/40", accent: "text-emerald-400" },
+  linkedin: { bg: "bg-blue-400/20", border: "border-blue-400/40", accent: "text-blue-400" },
+  medium: { bg: "bg-green-400/20", border: "border-green-400/40", accent: "text-green-400" },
 };
 
 export default function Integrations({ onChange }) {

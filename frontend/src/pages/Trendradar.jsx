@@ -9,6 +9,13 @@ import {
 import { useNavigate } from "react-router-dom";
 import useSettings from "../hooks/useSettings";
 
+// Standard platform icon colors
+const ICON_COLORS = {
+  'fa-x-twitter': 'text-white',
+  'fa-linkedin-in': 'text-blue-400',
+  'fa-medium': 'text-green-400',
+};
+
 // Composant réutilisable pour chaque mini chart
 const MiniLineChart = ({ data, color }) => {
   const chartData = data.map((value, index) => ({
@@ -40,9 +47,9 @@ export default function TrendRadar() {
   const [newsTopics, setNewsTopics] = useState([]);
   const [extractedKeywords, setExtractedKeywords] = useState([]);
   const [platformInsights, setPlatformInsights] = useState([
-    { platform: "Twitter", icon: "fa-twitter", color: "blue", engagement: "+23%", times: "9AM, 1PM, 5PM EST" },
-    { platform: "LinkedIn", icon: "fa-linkedin", color: "violet", engagement: "+18%", times: "8AM, 12PM, 6PM EST" },
-    { platform: "Medium", icon: "fa-medium", color: "teal", engagement: "+15%", times: "7AM, 2PM, 8PM EST" },
+    { platform: "Twitter/X", icon: "fa-x-twitter", color: "cyan", engagement: "+23%", times: "9AM, 1PM, 5PM EST" },
+    { platform: "LinkedIn", icon: "fa-linkedin-in", color: "blue", engagement: "+18%", times: "8AM, 12PM, 6PM EST" },
+    { platform: "Medium", icon: "fa-medium", color: "green", engagement: "+15%", times: "7AM, 2PM, 8PM EST" },
   ]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   
@@ -318,10 +325,10 @@ Return ONLY the JSON array, no additional text.`;
         // Formatter les données pour l'affichage
         const formattedInsights = insightsData.map(insight => ({
           platform: insight.platform,
-          icon: insight.platform === "Twitter" ? "fa-twitter" : 
-                  insight.platform === "LinkedIn" ? "fa-linkedin" : "fa-medium",
-          color: insight.platform === "Twitter" ? "blue" : 
-                  insight.platform === "LinkedIn" ? "violet" : "teal",
+          icon: insight.platform === "Twitter" ? "fa-x-twitter" : 
+                  insight.platform === "LinkedIn" ? "fa-linkedin-in" : "fa-medium",
+          color: insight.platform === "Twitter" ? "cyan" : 
+                  insight.platform === "LinkedIn" ? "blue" : "green",
           engagement: insight.engagement || "+15%",
           times: insight.times || "9AM, 5PM EST",
           insights: Array.isArray(insight.insights) ? insight.insights : []
@@ -350,8 +357,8 @@ Return ONLY the JSON array, no additional text.`;
     const basicInsights = [
       {
         platform: "Twitter",
-        icon: "fa-twitter",
-        color: "blue",
+        icon: "fa-x-twitter",
+        color: "cyan",
         engagement: trends.length > 0 ? "+25%" : "+15%",
         times: "9AM, 1PM, 5PM EST",
         insights: [
@@ -362,8 +369,8 @@ Return ONLY the JSON array, no additional text.`;
       },
       {
         platform: "LinkedIn",
-        icon: "fa-linkedin", 
-        color: "violet",
+        icon: "fa-linkedin-in", 
+        color: "blue",
         engagement: extractedKeywords.length > 0 ? "+20%" : "+12%",
         times: "8AM, 12PM, 6PM EST",
         insights: [
@@ -375,7 +382,7 @@ Return ONLY the JSON array, no additional text.`;
       {
         platform: "Medium",
         icon: "fa-medium",
-        color: "teal", 
+        color: "green", 
         engagement: newsTopics.length > 0 ? "+18%" : "+10%",
         times: "7AM, 2PM, 8PM EST",
         insights: [
@@ -768,15 +775,15 @@ Return ONLY the JSON array, no additional text.`;
                       <p className="text-gray-400 text-sm mb-3">{topic.desc}</p>
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2">
-                          <i className="fa-brands fa-twitter text-blue-400"></i>
+                          <i className="fa-brands fa-x-twitter text-white"></i>
                           <span className="text-gray-300 text-sm">{topic.twitter} posts</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <i className="fa-brands fa-linkedin text-violet-400"></i>
+                          <i className="fa-brands fa-linkedin-in text-blue-400"></i>
                           <span className="text-gray-300 text-sm">{topic.linkedin} posts</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <i className="fa-brands fa-medium text-teal-400"></i>
+                          <i className="fa-brands fa-medium text-green-400"></i>
                           <span className="text-gray-300 text-sm">{topic.medium} posts</span>
                         </div>
                       </div>
@@ -1161,7 +1168,7 @@ Return ONLY the JSON array, no additional text.`;
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-xl bg-${p.color}-400/20 flex items-center justify-center`}>
-                        <i className={`fa-brands ${p.icon} text-${p.color}-400`}></i>
+                        <i className={`fa-brands ${p.icon} ${ICON_COLORS[p.icon] || `text-${p.color}-400`}`}></i>
                       </div>
                       <div>
                         <span className="text-white font-semibold text-lg">{p.platform}</span>

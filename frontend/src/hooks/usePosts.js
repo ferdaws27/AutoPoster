@@ -121,13 +121,14 @@ export const usePosts = () => {
           // Transform backend data to frontend format
           const backendPosts = postsResponse.data.posts.map(post => ({
             id: post._id,
-            idea: post.content,
+            idea: post.idea || post.content,
             content: post.content,
             platforms: post.platforms,
             status: post.status,
             scheduleDate: post.schedule_date,
             scheduleTime: post.schedule_time,
             engagement: post.engagement,
+            selectedImages: post.selectedImages || post.selected_images || [],
             createdAt: post.created_at,
             updatedAt: post.updated_at
           }));
@@ -216,11 +217,13 @@ export const usePosts = () => {
       if (isAuthenticated()) {
         const backendData = {
           content: postData.content || postData.idea,
+          idea: postData.idea,
           platforms: postData.platforms || {},
           status: postData.status || 'draft',
           schedule_date: postData.scheduleDate,
           schedule_time: postData.scheduleTime,
-          engagement: postData.engagement || {}
+          engagement: postData.engagement || {},
+          selectedImages: postData.selectedImages || []
         };
 
         try {
@@ -232,13 +235,14 @@ export const usePosts = () => {
           if (response.success && response.data) {
             const newPost = {
               id: response.data._id,
-              idea: response.data.content,
+              idea: response.data.idea || response.data.content,
               content: response.data.content,
               platforms: response.data.platforms,
               status: response.data.status,
               scheduleDate: response.data.schedule_date,
               scheduleTime: response.data.schedule_time,
               engagement: response.data.engagement,
+              selectedImages: response.data.selectedImages || [],
               createdAt: response.data.created_at,
               updatedAt: response.data.updated_at
             };
@@ -279,7 +283,7 @@ export const usePosts = () => {
 
       const backendData = {};
       if (postData.content !== undefined) backendData.content = postData.content;
-      if (postData.idea !== undefined) backendData.content = postData.idea;
+      if (postData.idea !== undefined) backendData.idea = postData.idea;
       if (postData.platforms !== undefined) backendData.platforms = postData.platforms;
       if (postData.status !== undefined) backendData.status = postData.status;
       if (postData.scheduleDate !== undefined) backendData.schedule_date = postData.scheduleDate;
@@ -303,7 +307,7 @@ export const usePosts = () => {
           if (response.success && response.data) {
             updatedPost = {
               id: response.data._id,
-              idea: response.data.content,
+              idea: response.data.idea || response.data.content,
               content: response.data.content,
               platforms: response.data.platforms,
               status: response.data.status,
@@ -329,7 +333,10 @@ export const usePosts = () => {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         const userId = user.id || user.email || 'guest';
         const userPrefix = `autoposter_${userId}_`;
-        const storageKeys = [userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published'];
+        const storageKeys = [
+          userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published',
+          'autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'
+        ];
         let found = false;
 
         for (const key of storageKeys) {
@@ -392,34 +399,43 @@ export const usePosts = () => {
     try {
       setLoading(true);
 
+      let deleted = false;
+
       if (isAuthenticated()) {
         // Use backend API
-        const response = await apiFetch(`/api/posts/${postId}`, {
-          method: 'DELETE'
-        });
-
-        if (response.success) {
-          setPosts(prev => prev.filter(p => p.id !== postId));
-        }
-      } else {
-        // Fallback to localStorage with user-specific keys
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const userId = user.id || user.email || 'guest';
-        const userPrefix = `autoposter_${userId}_`;
-        const storageKeys = [userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published'];
-
-        for (const key of storageKeys) {
-          const items = JSON.parse(localStorage.getItem(key) || '[]');
-          const filtered = items.filter(p => p.id !== postId);
-          if (filtered.length !== items.length) {
-            localStorage.setItem(key, JSON.stringify(filtered));
-            console.log(`Deleted post ${postId} from localStorage for user ${userId}`);
-            break;
+        try {
+          const response = await apiFetch(`/api/posts/${postId}`, {
+            method: 'DELETE'
+          });
+          if (response.success) {
+            deleted = true;
           }
+        } catch (backendError) {
+          console.warn('Backend delete failed, trying localStorage:', backendError.message);
         }
-
-        setPosts(prev => prev.filter(p => p.id !== postId));
       }
+
+      // Also clean from localStorage (user-specific + generic keys)
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user.id || user.email || 'guest';
+      const userPrefix = `autoposter_${userId}_`;
+      const storageKeys = [
+        userPrefix + 'drafts', userPrefix + 'scheduled', userPrefix + 'published',
+        'autoposter_drafts', 'autoposter_scheduled', 'autoposter_published'
+      ];
+
+      for (const key of storageKeys) {
+        const items = JSON.parse(localStorage.getItem(key) || '[]');
+        const filtered = items.filter(p => p.id !== postId);
+        if (filtered.length !== items.length) {
+          localStorage.setItem(key, JSON.stringify(filtered));
+          console.log(`Deleted post ${postId} from ${key}`);
+          deleted = true;
+        }
+      }
+
+      // Always remove from state
+      setPosts(prev => prev.filter(p => p.id !== postId));
     } catch (err) {
       console.error('Error deleting post:', err);
       setError(err.message);
@@ -449,12 +465,14 @@ export const usePosts = () => {
             console.log('Backend API duplicate successful');
             const newPost = {
               id: response.data._id,
+              idea: response.data.content,
               content: response.data.content,
               platforms: response.data.platforms,
               status: response.data.status,
               scheduleDate: response.data.schedule_date,
               scheduleTime: response.data.schedule_time,
               engagement: response.data.engagement,
+              selectedImages: response.data.selectedImages,
               createdAt: response.data.created_at,
               updatedAt: response.data.updated_at
             };
@@ -486,10 +504,13 @@ export const usePosts = () => {
 
       console.log('Created duplicate post:', duplicatedPost);
 
-      // Save to localStorage
-      const drafts = JSON.parse(localStorage.getItem('autoposter_drafts') || '[]');
+      // Save to localStorage with user-specific key
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user.id || user.email || 'guest';
+      const userPrefix = `autoposter_${userId}_`;
+      const drafts = JSON.parse(localStorage.getItem(userPrefix + 'drafts') || '[]');
       drafts.push(duplicatedPost);
-      localStorage.setItem('autoposter_drafts', JSON.stringify(drafts));
+      localStorage.setItem(userPrefix + 'drafts', JSON.stringify(drafts));
 
       // Update state
       setPosts(prev => [duplicatedPost, ...prev]);

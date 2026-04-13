@@ -99,22 +99,22 @@ export default function PostingPreferences({ initialData, onChange }) {
 
           <div className="grid gap-4">
             <PlatformTime
-              icon="fa-twitter"
-              color="text-blue-400"
-              name="Twitter"
+              icon="fa-x-twitter"
+              color="text-white"
+              name="Twitter/X"
               times={platformTimes.twitter}
               onTimeChange={(i, v) => updatePlatformTime("twitter", i, v)}
             />
             <PlatformTime
-              icon="fa-linkedin"
-              color="text-violet-400"
+              icon="fa-linkedin-in"
+              color="text-blue-400"
               name="LinkedIn"
               times={platformTimes.linkedin}
               onTimeChange={(i, v) => updatePlatformTime("linkedin", i, v)}
             />
             <PlatformTime
               icon="fa-medium"
-              color="text-teal-400"
+              color="text-green-400"
               name="Medium"
               times={platformTimes.medium}
               onTimeChange={(i, v) => updatePlatformTime("medium", i, v)}

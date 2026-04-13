@@ -9,7 +9,6 @@ import {
   faDownload, faCalendarPlus, faShareNodes,
   faChartLine, faArrowTrendUp, faUsers, faStar
 } from "@fortawesome/free-solid-svg-icons";
-import { faLinkedin } from "@fortawesome/free-brands-svg-icons";
 
 /* ------------------- DATA ------------------- */
 const barData = [
@@ -72,7 +71,7 @@ const recommendationsData = [
         description: "Your Tuesday posts outperform other days by 45% on average."
       },
       {
-        icon: faLinkedin,
+        icon: "fa-brands fa-linkedin-in",
         text: "Focus more on LinkedIn",
         confidence: 91,
         color: "blue-400",
@@ -309,7 +308,10 @@ function AIRecommendations() {
               <div key={i} className="recommendation-item bg-black/20 rounded-2xl p-4 border border-gray-700/50">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <FontAwesomeIcon icon={item.icon} className={colorMap[item.color]} />
+                    {typeof item.icon === 'string' 
+                      ? <i className={`${item.icon} ${colorMap[item.color]}`}></i>
+                      : <FontAwesomeIcon icon={item.icon} className={colorMap[item.color]} />
+                    }
                     <span className="text-white font-medium">{item.text}</span>
                   </div>
                   <div className={`${colorMap[item.color]} text-sm font-medium`}>{item.confidence}% confidence</div>

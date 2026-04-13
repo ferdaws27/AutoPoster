@@ -10,7 +10,6 @@ import {
   faRocket,
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
-import { faXTwitter, faLinkedinIn, faMedium, faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import * as Toast from "@radix-ui/react-toast";
 import { loginGuest } from "../services/auth";
 
@@ -120,7 +119,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/0 via-cyan-400/5 to-violet-400/0 opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="relative z-10 flex items-center justify-center space-x-4">
           <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center group-hover:bg-gray-800 transition-colors">
-            <FontAwesomeIcon icon={icon} className="text-white text-lg" />
+            <i className={`fa-brands ${icon} text-white text-lg`}></i>
           </div>
           <span className="text-white font-medium text-lg">{label}</span>
           <FontAwesomeIcon icon={faRocket} className="text-gray-600 group-hover:text-cyan-400 transition-colors text-sm ml-auto" />
@@ -246,9 +245,9 @@ export default function Login() {
           <div className="bg-black/30 rounded-2xl p-6 mb-6">
             <h3 className="text-xl font-semibold text-white mb-4">Choose Your Platforms</h3>
             <div className="grid grid-cols-3 gap-4">
-              <Platform icon={faXTwitter} label="X (Twitter)" />
-              <Platform icon={faLinkedin} label="LinkedIn" />
-              <Platform icon={faMedium} label="Medium" />
+              <Platform icon="fa-x-twitter" label="X (Twitter)" />
+              <Platform icon="fa-linkedin-in" label="LinkedIn" />
+              <Platform icon="fa-medium" label="Medium" />
             </div>
           </div>
           <div className="flex gap-4">
@@ -280,7 +279,7 @@ export default function Login() {
   function Platform({ icon, label }) {
     return (
       <div className="text-center p-4 rounded-xl border border-gray-600 hover:border-cyan-400 cursor-pointer">
-        <FontAwesomeIcon icon={icon} className="text-3xl text-white mb-2" />
+        <i className={`fa-brands ${icon} text-3xl text-white mb-2`}></i>
         <div className="text-sm text-gray-300">{label}</div>
       </div>
     );
@@ -425,9 +424,9 @@ export default function Login() {
 
               {/* OAuth Buttons */}
               <div className="space-y-4 mb-8">
-                <OAuthButton icon={faXTwitter} label="Connect X (Twitter)" onClick={connectTwitter} />
-                <OAuthButton icon={faLinkedinIn} label="Connect LinkedIn" onClick={connectLinkedIn} />
-                <OAuthButton icon={faMedium} label="Connect Medium" onClick={connectMedium} />
+                <OAuthButton icon="fa-x-twitter" label="Connect X (Twitter)" onClick={connectTwitter} />
+                <OAuthButton icon="fa-linkedin-in" label="Connect LinkedIn" onClick={connectLinkedIn} />
+                <OAuthButton icon="fa-medium" label="Connect Medium" onClick={connectMedium} />
               </div>
 
               <div className="text-center">
@@ -484,17 +483,17 @@ export default function Login() {
     <div className="flex space-x-2">
       {/* X / Twitter */}
       <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-        <FontAwesomeIcon icon={faXTwitter} className="text-white text-xs" />
+        <i className="fa-brands fa-x-twitter text-white text-xs"></i>
       </div>
 
       {/* LinkedIn */}
       <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-        <FontAwesomeIcon icon={faLinkedinIn} className="text-white text-xs" />
+        <i className="fa-brands fa-linkedin-in text-white text-xs"></i>
       </div>
 
       {/* Medium */}
       <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-        <FontAwesomeIcon icon={faMedium} className="text-white text-xs" />
+        <i className="fa-brands fa-medium text-white text-xs"></i>
       </div>
     </div>
   </div>

@@ -12,20 +12,26 @@ const sampleHooksData = [
 ];
 
 const platformsList = [
-  { key: 'twitter', label: 'Twitter', icon: 'fa-brands fa-twitter' },
-  { key: 'linkedin', label: 'LinkedIn', icon: 'fa-brands fa-linkedin' },
-  { key: 'medium', label: 'Medium', icon: 'fa-brands fa-medium' },
+  { key: 'twitter', label: 'Twitter/X', icon: 'fa-brands fa-x-twitter', color: 'text-white', description: 'Short, punchy hooks' },
+  { key: 'linkedin', label: 'LinkedIn', icon: 'fa-brands fa-linkedin-in', color: 'text-blue-400', description: 'Professional authority' },
+  { key: 'medium', label: 'Medium', icon: 'fa-brands fa-medium', color: 'text-green-400', description: 'Editorial depth' },
 ];
 
 export default function HookGeneratorPage() {
   const navigate = useNavigate();
-  const { toneLabel, connectedPlatforms } = useSettings();
+  const { toneLabel, contentLength, connectedPlatforms, temperature, modelId, voiceProfile, creativity } = useSettings();
   const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hooks, setHooks] = useState([]); // <-- vide au départ
   const [selectedHook, setSelectedHook] = useState(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState(platformsList.map(p => p.key));
+  const [selectedPlatforms, setSelectedPlatforms] = useState(() => {
+    const connected = Object.entries(connectedPlatforms || {})
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    const validConnected = connected.filter(p => platformsList.some(pl => pl.key === p));
+    return validConnected.length > 0 ? validConnected : platformsList.map(p => p.key);
+  });
   const [successOpen, setSuccessOpen] = useState(false);
 
   useEffect(() => setCharCount(topic.length), [topic]);
@@ -60,8 +66,13 @@ export default function HookGeneratorPage() {
         body: JSON.stringify({
           topic: topic,
           platforms: selectedPlatforms,
-          language: "auto",
+          language: navigator.language?.startsWith("fr") ? "fr" : navigator.language?.split("-")[0] || "auto",
           tone: toneLabel,
+          contentLength: contentLength,
+          temperature: temperature,
+          model: modelId,
+          creativity: creativity,
+          voiceProfile: voiceProfile || null,
           count: 5
         })
       });
@@ -103,8 +114,13 @@ export default function HookGeneratorPage() {
         body: JSON.stringify({
           topic: topic,
           platform: platform,
-          language: "auto",
-          tone: toneLabel
+          language: navigator.language?.startsWith("fr") ? "fr" : navigator.language?.split("-")[0] || "auto",
+          tone: toneLabel,
+          contentLength: contentLength,
+          temperature: temperature,
+          model: modelId,
+          creativity: creativity,
+          voiceProfile: voiceProfile || null,
         })
       });
 
@@ -212,20 +228,30 @@ export default function HookGeneratorPage() {
       Target Platforms
     </label>
     <div className="flex flex-wrap gap-4">
-      {platformsList.map(p => (
-        <div
-          key={p.key}
-          onClick={() => togglePlatform(p.key)}
-          className={`platform-selector flex items-center space-x-3 p-4 border border-gray-600 rounded-2xl cursor-pointer ${selectedPlatforms.includes(p.key) ? 'active bg-cyan-400/15 border-cyan-400 text-cyan-400' : ''}`}
-          data-platform={p.key}
-        >
-          <i className={`${p.icon} text-xl ${p.color ? p.color : ''}`}></i>
-          <div>
-            <div className="font-semibold">{p.label}</div>
-            <div className="text-sm text-gray-400">{p.description}</div>
+      {platformsList.map(p => {
+        const isActive = selectedPlatforms.includes(p.key);
+        return (
+          <div
+            key={p.key}
+            onClick={() => togglePlatform(p.key)}
+            className={`platform-selector flex items-center space-x-3 p-4 border rounded-2xl cursor-pointer transition-all ${
+              isActive
+                ? 'bg-cyan-400/10 border-cyan-400/60 shadow-lg shadow-cyan-400/10'
+                : 'border-gray-700 bg-black/20 opacity-50 hover:opacity-75 hover:border-gray-500'
+            }`}
+            data-platform={p.key}
+          >
+            <i className={`${p.icon} text-xl ${isActive ? p.color : 'text-gray-500'}`}></i>
+            <div>
+              <div className={`font-semibold ${isActive ? 'text-white' : 'text-gray-400'}`}>{p.label}</div>
+              <div className="text-xs text-gray-500">{p.description}</div>
+            </div>
+            {isActive && (
+              <i className="fa-solid fa-circle-check text-cyan-400 text-sm ml-2"></i>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 
@@ -268,7 +294,23 @@ export default function HookGeneratorPage() {
                 >
                   <p className="text-white text-lg mb-2">"{hook.text}"</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400 text-sm">{hook.type.replace("-", " ")} Hook</span>
+                    <div className="flex items-center space-x-3">
+                      <span className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                        hook.platform === 'twitter' ? 'bg-gray-700 text-white' :
+                        hook.platform === 'linkedin' ? 'bg-blue-500/20 text-blue-400' :
+                        hook.platform === 'medium' ? 'bg-green-500/20 text-green-400' :
+                        'bg-gray-700 text-gray-300'
+                      }`}>
+                        <i className={`mr-1 ${
+                          hook.platform === 'twitter' ? 'fa-brands fa-x-twitter' :
+                          hook.platform === 'linkedin' ? 'fa-brands fa-linkedin-in' :
+                          hook.platform === 'medium' ? 'fa-brands fa-medium' :
+                          'fa-solid fa-globe'
+                        }`}></i>
+                        {hook.platform === 'twitter' ? 'Twitter/X' : hook.platform === 'linkedin' ? 'LinkedIn' : hook.platform === 'medium' ? 'Medium' : hook.platform}
+                      </span>
+                      <span className="text-gray-400 text-sm">{hook.type.replace("-", " ")} Hook</span>
+                    </div>
                     <div className="flex items-center space-x-4">
                       <div className="engagement-bar w-20 h-2 rounded-full bg-gray-700/40">
                         <div className="engagement-fill rounded-full bg-cyan-400" style={{ width: `${hook.score}%` }}></div>
@@ -309,10 +351,11 @@ export default function HookGeneratorPage() {
       <div className="flex items-center justify-between mt-4">
         <div className="flex items-center space-x-4">
           <span className="text-gray-400 text-sm">Platform:</span>
-          <div id="selected-platforms" className="flex space-x-2">
-            {selectedPlatforms.includes('medium') && <i className="text-green-400 fa-brands fa-medium"></i>}
-            {selectedPlatforms.includes('linkedin') && <i className="text-blue-600 fa-brands fa-linkedin"></i>}
-            {selectedPlatforms.includes('twitter') && <i className="text-blue-400 fa-brands fa-twitter"></i>}
+          <div id="selected-platforms" className="flex space-x-2 items-center">
+            {selectedHook.platform === 'twitter' && <><i className="text-white fa-brands fa-x-twitter"></i><span className="text-gray-300 text-sm">Twitter/X</span></>}
+            {selectedHook.platform === 'linkedin' && <><i className="text-blue-400 fa-brands fa-linkedin-in"></i><span className="text-gray-300 text-sm">LinkedIn</span></>}
+            {selectedHook.platform === 'medium' && <><i className="text-green-400 fa-brands fa-medium"></i><span className="text-gray-300 text-sm">Medium</span></>}
+            {!['twitter', 'linkedin', 'medium'].includes(selectedHook.platform) && <span className="text-gray-300 text-sm">{selectedHook.platform}</span>}
           </div>
         </div>
         <div className="flex items-center space-x-2">

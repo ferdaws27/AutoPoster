@@ -206,9 +206,9 @@ export default function QuoteTemplate() {
                   <i
                     className={`fa-brands ${
                       platform === "twitter"
-                        ? "fa-twitter"
+                        ? "fa-x-twitter"
                         : platform === "linkedin"
-                        ? "fa-linkedin"
+                        ? "fa-linkedin-in"
                         : "fa-medium"
                     } text-xl`}
                   ></i>
