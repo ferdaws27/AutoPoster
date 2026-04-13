@@ -28,11 +28,7 @@ import {
 
 export default function CreatePostPage() {
   const { createPost, posts, stats: hookStats } = usePosts();
-<<<<<<< HEAD
   const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity } = useSettings();
-=======
-  const { modelId, toneLabel, temperature, connectedPlatforms, voiceProfile } = useSettings();
->>>>>>> c1aa72665b0a7c8ca78d284ad782f121cfffc25e
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
