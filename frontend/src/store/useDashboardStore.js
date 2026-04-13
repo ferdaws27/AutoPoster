@@ -145,143 +145,29 @@ const useDashboardStore = create((set, get) => ({
       set({ generationCount: currentCount });
       
       const settings = getSettings();
-      const apiKey = settings.openRouterKey;
       
-      // Debug: Vérifier si la clé API est chargée
-      console.log("=== AI IDEAS DEBUG ===");
-      console.log("API Key exists:", !!apiKey);
-      console.log("API Key length:", apiKey?.length);
-      console.log("Génération numéro:", currentCount);
-      
-      if (!apiKey) {
-        throw new Error("API key not found. Set it in Settings > API Keys.");
-      }
-      
-      // Adapter le contenu en fonction du numéro de génération
-      const generationThemes = [
-        {
-          phase: "découverte",
-          focus: "tendances émergentes et innovations récentes",
-          angle: "ce qui est nouveau et surprenant"
-        },
-        {
-          phase: "approfondissement", 
-          focus: "stratégies avancées et techniques concrètes",
-          angle: "comment appliquer et optimiser"
-        },
-        {
-          phase: "spécialisation",
-          focus: "niches spécifiques et expertises pointues", 
-          angle: "sujets techniques et avancés"
-        },
-        {
-          phase: "expérimentation",
-          focus: "approches non conventionnelles et tests",
-          angle: "essayer ce que les autres ne font pas"
-        },
-        {
-          phase: "domination",
-          focus: "stratégies de leadership et d'autorité",
-          angle: "devenir la référence dans son domaine"
-        }
-      ];
-      
-      const themeIndex = (currentCount - 1) % generationThemes.length;
-      const currentTheme = generationThemes[themeIndex];
-      
-      const prompt = `Tu es un expert en marketing digital et création de contenu. C'est la GÉNÉRATION ${currentCount}.
-
-CONTEXTE: ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-PHASE ACTUELLE: ${currentTheme.phase}
-FOCUS SPÉCIFIQUE: ${currentTheme.focus}
-ANGLE D'APPROCHE: ${currentTheme.angle}
-
-GÉNÈRE 5 idées de contenu UNIQUEMENT pour cette phase ${currentTheme.phase}. 
-Ces idées doivent être COMPLÈTEMENT DIFFÉRENTES des générations précédentes.
-
-FORMAT JSON EXACT:
-[
-  {
-    "category": "Trending|Insights|Growth|Strategy|Tips|Tech|Business",
-    "platform": "twitter|linkedin|medium", 
-    "title": "TITRE SPÉCIFIQUE (max 60 caractères)",
-    "desc": "Description avec VALEUR CONCRÈTE (max 150 caractères)",
-    "status": "Scheduled|Review|Draft"
-  }
-]
-
-EXEMPLES POUR CETTE PHASE:
-- Génération 1 (découverte): "Nouveaux outils IA qui sortent ce mois-ci"
-- Génération 2 (approfondissement): "Comment optimiser son workflow avec Notion IA"
-- Génération 3 (spécialisation): "Prompts avancés pour développeurs ChatGPT"
-- Génération 4 (expérimentation): "Test: 30 jours sans réseaux sociaux"
-- Génération 5 (domination): "Devenir l'expert IA référent sur LinkedIn"
-
-IMPORTANT: Sois SPÉCIFIQUE à cette phase. Retourne UNIQUEMENT le JSON valide avec 5 objets.`;
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const data = await apiFetch("/api/ai-ideas/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "AutoPoster - AI Ideas Generator"
-        },
         body: JSON.stringify({
-          model: getSettings().modelId,
-          messages: [
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: getSettings().temperature,
-          max_tokens: 1000,
-          top_p: 0.95
-        })
+          generationCount: currentCount,
+          model: settings.modelId,
+          temperature: settings.temperature,
+        }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenRouter error: ${response.status} - ${errorText}`);
+      if (!data.success) {
+        throw new Error(data.error || "Failed to generate ideas");
       }
 
-      const data = await response.json();
-      const aiContent = data.choices[0].message.content;
-      
-      // Debug: Voir la réponse brute de l'API
-      console.log("=== AI API RESPONSE ===");
-      console.log("Raw response:", aiContent);
-      console.log("Response type:", typeof aiContent);
-      
-      let ideas;
-      
-      try {
-        // Essayer de parser le JSON directement
-        ideas = JSON.parse(aiContent);
-      } catch (parseError) {
-        // Si le parsing échoue, essayer d'extraire le JSON du texte
-        const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          ideas = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("Format de réponse invalide");
-        }
-      }
-
-      // Ajouter des IDs uniques et formater les idées
-      const formattedIdeas = ideas.map((idea, index) => ({
+      // Ajouter des IDs uniques
+      const formattedIdeas = data.ideas.map((idea, index) => ({
         id: Date.now() + index,
-        category: idea.category || "Strategy",
-        platform: idea.platform || "twitter",
-        title: idea.title || "Nouvelle idée",
-        desc: idea.desc || "Description à venir",
-        status: idea.status || "Draft"
+        ...idea,
       }));
 
       set({ 
         aiIdeas: formattedIdeas, 
-        aiSuggestion: `✅ Génération ${currentCount} complétée : 5 nouvelles idées ${currentTheme.phase} !` 
+        aiSuggestion: `✅ Génération ${currentCount} complétée : 5 nouvelles idées ${data.phase} !` 
       });
       
     } catch (error) {

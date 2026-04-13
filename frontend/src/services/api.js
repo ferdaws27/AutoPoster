@@ -31,3 +31,40 @@ export async function apiFetch(path, options = {}) {
 
   return data;
 }
+
+/**
+ * Call the backend AI generate proxy.
+ * Returns the AI-generated text content string.
+ */
+export async function aiGenerate({ prompt, model, temperature, max_tokens }) {
+  const data = await apiFetch("/api/ai/generate/", {
+    method: "POST",
+    body: JSON.stringify({ prompt, model, temperature, max_tokens }),
+  });
+  if (!data.success) throw new Error(data.error || "AI generation failed");
+  return data.content;
+}
+
+// ─── A/B Test API ───
+export async function createABTest(payload) {
+  return apiFetch("/api/ab-tests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getABTests() {
+  return apiFetch("/api/ab-tests/");
+}
+
+export async function runABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/run`, { method: "POST" });
+}
+
+export async function deleteABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}`, { method: "DELETE" });
+}
+
+export async function getABStats() {
+  return apiFetch("/api/ab-tests/stats");
+}

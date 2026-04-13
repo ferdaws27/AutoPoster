@@ -79,13 +79,8 @@ export default function useSettings() {
   const apiSettings = settings.api || {};
   const apiKeys = apiSettings.keys || {};
 
-  // Resolved OpenRouter key: settings > env var
-  const openRouterKey =
-    apiKeys.openrouter ||
-    (typeof import.meta !== "undefined" &&
-      (import.meta.env?.VITE_OPENROUTER_API_KEY ||
-        import.meta.env?.VITE_OPENAI_API_KEY)) ||
-    "";
+  // Resolved OpenRouter key: settings only (API calls go through backend)
+  const openRouterKey = apiKeys.openrouter || "";
 
   // --- Voice Profile ---
   const voiceProfile = settings.voiceProfile || null;
@@ -156,11 +151,6 @@ export function getSettings() {
     contentLength: ai.contentLength || "Medium (100–200 words)",
     timezone: raw.posting?.timezone || "UTC (GMT+0)",
     maxPostsPerDay: raw.posting?.maxPosts || 3,
-    openRouterKey:
-      (raw.api?.keys?.openrouter) ||
-      (typeof import.meta !== "undefined" &&
-        (import.meta.env?.VITE_OPENROUTER_API_KEY ||
-          import.meta.env?.VITE_OPENAI_API_KEY)) ||
-      "",
+    openRouterKey: raw.api?.keys?.openrouter || "",
   };
 }

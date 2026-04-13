@@ -21,12 +21,20 @@ const PLATFORM_ICONS = {
 
 export default function AnalyticsPage() {
   const navigate = useNavigate();
-  const { fetchAnalyticsData } = usePosts();
+  const { fetchAnalyticsData, fetchBestTimes, fetchContentPerformance, fetchAiInsights } = usePosts();
   const [analyticsData, setAnalyticsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeRange, setActiveRange] = useState("30D");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("pdf");
+
+  // Real backend data states
+  const [backendBestTimes, setBackendBestTimes] = useState(null);
+  const [backendContentPerf, setBackendContentPerf] = useState(null);
+  const [backendAiInsights, setBackendAiInsights] = useState(null);
+  const [bestTimesLoading, setBestTimesLoading] = useState(true);
+  const [contentPerfLoading, setContentPerfLoading] = useState(true);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(true);
 
   const ranges = ["7D", "30D", "90D"];
 
@@ -104,7 +112,51 @@ export default function AnalyticsPage() {
       }
     };
     loadAnalytics();
-  }, [fetchAnalyticsData]);
+
+    // Fetch best times from backend
+    const loadBestTimes = async () => {
+      try {
+        setBestTimesLoading(true);
+        const data = await fetchBestTimes();
+        setBackendBestTimes(data);
+      } catch (err) {
+        console.error("Error loading best times:", err);
+      } finally {
+        setBestTimesLoading(false);
+      }
+    };
+    loadBestTimes();
+
+    // Fetch content performance from backend
+    const loadContentPerf = async () => {
+      try {
+        setContentPerfLoading(true);
+        const data = await fetchContentPerformance();
+        setBackendContentPerf(data);
+      } catch (err) {
+        console.error("Error loading content performance:", err);
+      } finally {
+        setContentPerfLoading(false);
+      }
+    };
+    loadContentPerf();
+
+    // Fetch AI insights from backend
+    const loadAiInsights = async () => {
+      try {
+        setAiInsightsLoading(true);
+        const data = await fetchAiInsights();
+        if (data?.success) {
+          setBackendAiInsights(data);
+        }
+      } catch (err) {
+        console.error("Error loading AI insights:", err);
+      } finally {
+        setAiInsightsLoading(false);
+      }
+    };
+    loadAiInsights();
+  }, [fetchAnalyticsData, fetchBestTimes, fetchContentPerformance, fetchAiInsights]);
 
   const calculateAnalytics = () => {
     const now = new Date();
@@ -269,6 +321,11 @@ export default function AnalyticsPage() {
       .sort((a, b) => b.avgEngagement - a.avgEngagement)
       .slice(0, 3);
 
+    // Calculate average engagement across all hours for comparison
+    const overallAvgEngagement = bestHours.length > 0
+      ? bestHours.reduce((sum, h) => sum + h.avgEngagement, 0) / bestHours.length
+      : 0;
+
     const bestTimes = bestHours.map((hourData, index) => {
       const hourLabel = hourData.hour === 0 ? '12:00 AM'
         : hourData.hour === 12 ? '12:00 PM'
@@ -277,10 +334,13 @@ export default function AnalyticsPage() {
       const colors = ['text-cyan-400', 'text-violet-400', 'text-teal-400'];
       const descriptions = ['Peak engagement time', 'High performance window', 'Consistent engagement'];
       const day = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      const aboveAvg = overallAvgEngagement > 0
+        ? Math.round(((hourData.avgEngagement - overallAvgEngagement) / overallAvgEngagement) * 100)
+        : 0;
       return {
         day: `${day}, ${hourLabel}`,
         desc: descriptions[index] || 'Good performance',
-        value: hourData.avgEngagement > 0 ? `${Math.round(hourData.avgEngagement)} avg` : 'No data',
+        value: hourData.avgEngagement > 0 ? `+${Math.max(aboveAvg, 0)}%` : 'No data',
         color: colors[index]
       };
     });
@@ -380,10 +440,13 @@ export default function AnalyticsPage() {
         const categories = [];
         const now = new Date();
         const daysAgo = parseInt(activeRange.replace('D', ''));
-        for (let i = daysAgo; i >= 0; i -= Math.ceil(daysAgo / 6)) {
+        const step = Math.ceil(daysAgo / 6);
+        for (let i = daysAgo; i > 0; i -= step) {
           const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
           categories.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
         }
+        // Always include today as the last category
+        categories.push(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
         return categories;
       };
 
@@ -399,11 +462,12 @@ export default function AnalyticsPage() {
               const postDate = new Date(post.createdAt);
               if (isNaN(postDate)) return;
               const daysDiff = Math.floor((now - postDate) / (24 * 60 * 60 * 1000));
-              if (daysDiff <= daysAgo) {
-                const bucketIndex = Math.min(
-                  Math.floor((daysDiff / daysAgo) * categories.length),
+              if (daysDiff >= 0 && daysDiff <= daysAgo) {
+                // Map: daysDiff=0 (today) → last bucket, daysDiff=daysAgo (oldest) → first bucket
+                const bucketIndex = Math.max(0, Math.min(
+                  categories.length - 1 - Math.floor((daysDiff / daysAgo) * categories.length),
                   categories.length - 1
-                );
+                ));
                 
                 if (bucketIndex >= 0 && bucketIndex < timeBuckets.length) {
                   const engagement = post.engagement;
@@ -556,8 +620,26 @@ export default function AnalyticsPage() {
     return () => clearTimeout(timer);
   }, [analyticsData, activeRange]);
 
-  const contentPerformance = analytics.contentPerformance;
-  const bestTimes = analytics.bestTimes;
+  const ICON_MAP = { faImage, faVideo, faAlignLeft, faPoll };
+
+  // Use backend data when available, fall back to client-side calculation
+  const contentPerformance = backendContentPerf?.content_performance
+    ? backendContentPerf.content_performance.map(item => ({
+        icon: ICON_MAP[item.icon] || faAlignLeft,
+        color: item.color,
+        label: item.label,
+        value: item.value,
+        posts: item.posts,
+        avgEngagement: item.avgEngagement,
+        totalEngagement: item.totalEngagement,
+        likes: item.likes,
+        comments: item.comments,
+        shares: item.shares,
+      }))
+    : analytics.contentPerformance;
+
+  const bestTimes = backendBestTimes?.best_times || analytics.bestTimes;
+  const bestTimesAiInsight = backendBestTimes?.ai_insight || null;
   const topPosts = analytics.topPosts;
 
   return (
@@ -745,7 +827,10 @@ export default function AnalyticsPage() {
 
       <div id="insights-section" className="grid grid-cols-2 gap-8 mb-8 animate-slide-up" style={{ animationDelay: "0.6s" }}>
         <div className="glass-effect rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Best Performing Times</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Best Performing Times</h3>
+            {bestTimesLoading && <div className="text-xs text-gray-500 animate-pulse">Analyzing...</div>}
+          </div>
           <div className="space-y-4">
             {bestTimes.length > 0 ? bestTimes.map((time, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-black/30 rounded-2xl">
@@ -759,25 +844,43 @@ export default function AnalyticsPage() {
               <div className="text-gray-500 text-sm p-3">Not enough data for this range.</div>
             )}
           </div>
+          {bestTimesAiInsight && (
+            <div className="mt-4 p-3 bg-cyan-400/5 border border-cyan-400/20 rounded-2xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <FontAwesomeIcon icon={faBrain} className="text-cyan-400 text-sm" />
+                <span className="text-cyan-400 text-xs font-medium">AI Timing Insight</span>
+              </div>
+              <p className="text-gray-300 text-sm">{bestTimesAiInsight.recommendation}</p>
+              {bestTimesAiInsight.tip && (
+                <p className="text-cyan-400/80 text-xs mt-1">💡 {bestTimesAiInsight.tip}</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="glass-effect rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Content Type Performance</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Content Type Performance</h3>
+            {contentPerfLoading && <div className="text-xs text-gray-500 animate-pulse">Loading...</div>}
+          </div>
           <div className="space-y-4">
             {contentPerformance.map((content, idx) => (
               <div key={idx} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <FontAwesomeIcon icon={content.icon} className={`${content.color}`} />
+                    <FontAwesomeIcon icon={content.icon} className={`${content.color} text-lg`} />
                     <div>
                       <span className="text-gray-300">{content.label}</span>
-                      <div className="text-gray-500 text-xs">{content.posts} posts {content.avgEngagement} eng</div>
+                      <div className="text-gray-500 text-xs">
+                        {content.posts} posts · {content.avgEngagement} avg eng
+                        {content.likes != null && ` · ${content.likes}♥ ${content.comments}💬 ${content.shares}↗`}
+                      </div>
                     </div>
                   </div>
                   <span className="text-white font-medium text-sm">{content.value}%</span>
                 </div>
                 <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden">
-                  <div className={`h-full ${content.color} rounded-full`} style={{ width: `${content.value}%` }} />
+                  <div className={`h-full ${content.color} rounded-full transition-all duration-700`} style={{ width: `${content.value}%` }} />
                 </div>
               </div>
             ))}
@@ -864,42 +967,63 @@ export default function AnalyticsPage() {
             <p className="text-gray-400 text-sm">Personalized suggestions based on your actual performance data</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/20">
-            <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faLightbulb} className="text-cyan-400" /><span className="text-cyan-400 font-medium text-sm">Content Suggestion</span></div>
-            <p className="text-white text-sm mb-2">
-              {(() => {
-                const best = contentPerformance.reduce((a, b) => a.avgEngagement > b.avgEngagement ? a : b, contentPerformance[0]);
-                return best && best.avgEngagement > 0
-                  ? `${best.label} get the highest engagement (avg ${best.avgEngagement}). Focus on creating more of this type.`
-                  : "Start posting to discover which content type resonates most with your audience.";
-              })()}
-            </p>
-            <p className="text-gray-400 text-xs">Based on {analyticsData.length} posts analyzed.</p>
+        {aiInsightsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {["cyan", "violet", "teal"].map((c, idx) => (
+              <div key={idx} className={`bg-black/30 rounded-2xl p-4 border border-${c}-400/20 animate-pulse`}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className={`w-4 h-4 bg-${c}-400/30 rounded`} />
+                  <div className={`h-4 w-32 bg-${c}-400/20 rounded`} />
+                </div>
+                <div className="space-y-2 mb-2">
+                  <div className="h-3 w-full bg-gray-700/50 rounded" />
+                  <div className="h-3 w-4/5 bg-gray-700/50 rounded" />
+                  <div className="h-3 w-3/5 bg-gray-700/50 rounded" />
+                </div>
+                <div className="h-3 w-40 bg-gray-700/30 rounded" />
+              </div>
+            ))}
           </div>
-          <div className="bg-black/30 rounded-2xl p-4 border border-violet-400/20">
-            <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faClock} className="text-violet-400" /><span className="text-violet-400 font-medium text-sm">Timing Optimization</span></div>
-            <p className="text-white text-sm mb-2">
-              {bestTimes.length > 0
-                ? `Your best performing time is ${bestTimes[0].day} with ${bestTimes[0].value}. Schedule posts around this window.`
-                : "Not enough data yet. Post at varied times to discover your audience's peak hours."}
-            </p>
-            <p className="text-gray-400 text-xs">Based on engagement patterns in the last {activeRange}.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faLightbulb} className="text-cyan-400" /><span className="text-cyan-400 font-medium text-sm">{backendAiInsights?.content_suggestion?.title || "Content Suggestion"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.content_suggestion?.text || (() => {
+                  const best = contentPerformance.reduce((a, b) => a.avgEngagement > b.avgEngagement ? a : b, contentPerformance[0]);
+                  return best && best.avgEngagement > 0
+                    ? `${best.label} get the highest engagement (avg ${best.avgEngagement} per post, ${best.posts} posts). Focus on creating more of this type.`
+                    : "Start posting to discover which content type resonates most with your audience.";
+                })()}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.content_suggestion?.footer || `Based on ${backendContentPerf?.total_posts || analyticsData.length} posts analyzed.`}</p>
+            </div>
+            <div className="bg-black/30 rounded-2xl p-4 border border-violet-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faClock} className="text-violet-400" /><span className="text-violet-400 font-medium text-sm">{backendAiInsights?.timing_optimization?.title || "Timing Optimization"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.timing_optimization?.text
+                  || (bestTimesAiInsight ? bestTimesAiInsight.recommendation
+                  : bestTimes.length > 0
+                  ? `Your best performing time is ${bestTimes[0].day} with ${bestTimes[0].value}. Schedule posts around this window.`
+                  : "Not enough data yet. Post at varied times to discover your audience's peak hours.")}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.timing_optimization?.footer || `Based on real interaction data from ${backendBestTimes?.total_interactions?.toLocaleString() || 0} interactions.`}</p>
+            </div>
+            <div className="bg-black/30 rounded-2xl p-4 border border-teal-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faChartLine} className="text-teal-400" /><span className="text-teal-400 font-medium text-sm">{backendAiInsights?.growth_opportunity?.title || "Growth Opportunity"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.growth_opportunity?.text || (() => {
+                  const platforms = ["Twitter", "LinkedIn", "Medium"];
+                  const unused = platforms.filter(p => (analytics.platformPostCount?.[p] || 0) === 0);
+                  if (unused.length > 0) return `You haven't posted on ${unused.join(", ")} yet. Expanding there could increase your total reach.`;
+                  const best = platforms.reduce((a, b) => (analytics.platformEngagement[a] || 0) > (analytics.platformEngagement[b] || 0) ? a : b);
+                  return `${best} is your strongest platform (${analytics.platformPercentages[best]}% of engagement). Double down there for maximum growth.`;
+                })()}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.growth_opportunity?.footer || `Estimated reach: ${analytics.estimatedReach.toLocaleString()} based on engagement.`}</p>
+            </div>
           </div>
-          <div className="bg-black/30 rounded-2xl p-4 border border-teal-400/20">
-            <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faChartLine} className="text-teal-400" /><span className="text-teal-400 font-medium text-sm">Growth Opportunity</span></div>
-            <p className="text-white text-sm mb-2">
-              {(() => {
-                const platforms = ["Twitter", "LinkedIn", "Medium"];
-                const unused = platforms.filter(p => (analytics.platformPostCount?.[p] || 0) === 0);
-                if (unused.length > 0) return `You haven't posted on ${unused.join(", ")} yet. Expanding there could increase your total reach.`;
-                const best = platforms.reduce((a, b) => (analytics.platformEngagement[a] || 0) > (analytics.platformEngagement[b] || 0) ? a : b);
-                return `${best} is your strongest platform (${analytics.platformPercentages[best]}% of engagement). Double down there for maximum growth.`;
-              })()}
-            </p>
-            <p className="text-gray-400 text-xs">Estimated reach: {analytics.estimatedReach.toLocaleString()} based on engagement.</p>
-          </div>
-        </div>
+        )}
       </div>
 
       {showExportModal && (

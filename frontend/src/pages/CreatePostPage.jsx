@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
 import useSettings from "../hooks/useSettings";
+import { aiGenerate } from "../services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHistory,
@@ -32,7 +33,7 @@ import {
 
 export default function CreatePostPage() {
   const { createPost, posts, stats: hookStats } = usePosts();
-  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile } = useSettings();
+  const { modelId, toneLabel, temperature, connectedPlatforms, voiceProfile } = useSettings();
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
@@ -237,13 +238,6 @@ export default function CreatePostPage() {
     }
   }, []);
 
-  // Test API key loading immediately
-  useEffect(() => {
-    console.log("=== API KEY TEST ===");
-    console.log("API Key exists:", !!openRouterKey);
-    console.log("API Key length:", openRouterKey?.length);
-  }, [openRouterKey]);
-
   useEffect(() => {
     const textarea = ideaRef.current;
     if (!textarea) return;
@@ -296,12 +290,6 @@ export default function CreatePostPage() {
       return alert("Select at least one platform");
     }
 
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      setLoading(false);
-      return alert("API key not found. Set it in Settings > API Keys.");
-    }
-
     const newVariations = {};
     const currentCount = generationCount + 1;
 
@@ -350,35 +338,15 @@ export default function CreatePostPage() {
         prompt += voiceInstruction;
 
         try {
-          const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-              "HTTP-Referer": "http://localhost:5173",
-              "X-Title": "AutoPoster App",
-            },
-            body: JSON.stringify({
-              model: modelId,
-              messages: [{ role: "user", content: prompt }],
-              max_tokens: platform === "Twitter" ? 100 : 300,
-            }),
+          const content = await aiGenerate({
+            prompt,
+            model: modelId,
+            max_tokens: platform === "Twitter" ? 100 : 300,
           });
-
-          if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`OpenRouter error: ${res.status} - ${errorText}`);
-          }
-
-          const data = await res.json();
-          newVariations[platform] = data.choices[0].message.content.trim();
+          newVariations[platform] = content;
         } catch (fetchError) {
           console.warn(`API failed for ${platform}, using fallback`, fetchError);
-          newVariations[platform] = await generateMockContent(
-            platform,
-            idea,
-            currentCount
-          );
+          newVariations[platform] = generateAlternativeMockContent(platform, idea);
         }
       }
 
@@ -393,32 +361,15 @@ export default function CreatePostPage() {
   };
 
   const generateAIidea = async () => {
-    const apiKey = openRouterKey;
-    if (!apiKey) return null;
-
     try {
       const prompt =
         "Generate an interesting and engaging social media content idea. Return just the idea as a short phrase (1-6 words).";
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 50,
-        }),
+      return await aiGenerate({
+        prompt,
+        model: modelId,
+        max_tokens: 50,
       });
-
-      if (!res.ok) throw new Error("API error");
-
-      const data = await res.json();
-      return data.choices[0].message.content.trim();
     } catch (err) {
       console.error("Error generating AI idea:", err);
       return null;
@@ -426,11 +377,6 @@ export default function CreatePostPage() {
   };
 
   const generateMockContent = async (platform, idea, count) => {
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      return `AI content generation unavailable for ${platform}.`;
-    }
-
     let prompt = "";
     if (platform === "Twitter") {
       prompt = `Create a compelling Twitter post (max 280 characters) about: ${idea}. Generation ${count}.`;
@@ -441,28 +387,11 @@ export default function CreatePostPage() {
     }
 
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: platform === "Twitter" ? 100 : 300,
-        }),
+      return await aiGenerate({
+        prompt,
+        model: modelId,
+        max_tokens: platform === "Twitter" ? 100 : 300,
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
-
-      const data = await res.json();
-      return data.choices[0].message.content.trim();
     } catch (err) {
       console.error(`Error generating ${platform} content:`, err);
       return `Unable to generate ${platform} content.`;
@@ -477,46 +406,17 @@ export default function CreatePostPage() {
     if (platforms.length === 0) return alert("Select at least one platform");
 
     setLoading(true);
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      alert("API key not found. Set it in Settings > API Keys.");
-      setLoading(false);
-      return;
-    }
 
     try {
-      const promptGenerationResponse = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": "http://localhost:5173",
-            "X-Title": "AutoPoster App",
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [
-              {
-                role: "user",
-                content: `Based on this post idea: "${idea}"
+      const keywordsText = await aiGenerate({
+        prompt: `Based on this post idea: "${idea}"
 Generate 3 search keywords for relevant stock images.
 Return valid JSON array only like:
 ["keyword1", "keyword2", "keyword3"]`,
-              },
-            ],
-            max_tokens: 150,
-          }),
-        }
-      );
+        model: modelId,
+        max_tokens: 150,
+      });
 
-      if (!promptGenerationResponse.ok) {
-        throw new Error("Failed to generate image keywords");
-      }
-
-      const promptData = await promptGenerationResponse.json();
-      const keywordsText = promptData.choices[0].message.content.trim();
       const keywords = JSON.parse(keywordsText);
       const mainKeyword = keywords[0] || idea.split(" ")[0];
 
@@ -599,12 +499,6 @@ Return valid JSON array only like:
 
     setLoading(true);
 
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      setLoading(false);
-      return alert("Missing API key");
-    }
-
     try {
       let prompt = "";
 
@@ -617,28 +511,11 @@ Return valid JSON array only like:
       }
 
       try {
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": "http://localhost:5173",
-            "X-Title": "AutoPoster App",
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: platform === "Twitter" ? 100 : 300,
-          }),
+        const newContent = await aiGenerate({
+          prompt,
+          model: modelId,
+          max_tokens: platform === "Twitter" ? 100 : 300,
         });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText);
-        }
-
-        const data = await res.json();
-        const newContent = data.choices[0].message.content.trim();
 
         setVariations((prev) => ({
           ...prev,
@@ -680,35 +557,16 @@ Return valid JSON array only like:
     if (!idea) return alert("Enter your idea first");
 
     setLoading(true);
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      alert("API key not found. Set it in Settings > API Keys.");
-      setLoading(false);
-      return;
-    }
 
     try {
       const prompt = `Enhance and improve this idea: "${idea}".`;
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 150,
-        }),
+      const enhancedIdea = await aiGenerate({
+        prompt,
+        model: modelId,
+        max_tokens: 150,
       });
 
-      if (!res.ok) throw new Error("OpenAI API error");
-
-      const data = await res.json();
-      const enhancedIdea = data.choices[0].message.content.trim();
       ideaRef.current.value = enhancedIdea;
       setCharCount(enhancedIdea.length);
     } catch (err) {
@@ -796,36 +654,17 @@ const saveDraft = async () => {
     if (!idea) return alert("Enter your idea first");
 
     setLoading(true);
-    const apiKey = openRouterKey;
-    if (!apiKey) {
-      setLoading(false);
-      return;
-    }
 
     try {
       const prompt = `Based on this content idea: "${idea}", provide 3 actionable suggestions as JSON.`;
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "AutoPoster App",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 250,
-        }),
+      const content = await aiGenerate({
+        prompt,
+        model: modelId,
+        max_tokens: 250,
       });
 
-      if (!res.ok) {
-        throw new Error("OpenAI API error");
-      }
-
-      const data = await res.json();
-      const parsed = JSON.parse(data.choices[0].message.content.trim());
+      const parsed = JSON.parse(content);
       setAiSuggestions(parsed);
     } catch (err) {
       console.error(err);

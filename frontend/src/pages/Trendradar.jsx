@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
-import useSettings from "../hooks/useSettings";
+import { aiGenerate } from "../services/api";
 
 // Composant réutilisable pour chaque mini chart
 const MiniLineChart = ({ data, color }) => {
@@ -29,7 +29,6 @@ const MiniLineChart = ({ data, color }) => {
 
 export default function TrendRadar() {
   const navigate = useNavigate();
-  const { openRouterKey } = useSettings();
   const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -234,25 +233,16 @@ export default function TrendRadar() {
     navigate('/dashboard/CreatePostPage');
   };
 
-  // Fonction pour générer des insights dynamiques basés sur l'IA OpenRouter
+  // Fonction pour générer des insights dynamiques basés sur l'IA via le backend
   const generateDynamicInsights = async () => {
     setIsGeneratingInsights(true);
     
     try {
-      const apiKey = openRouterKey;
-      if (!apiKey) {
-        console.error('API key not found');
-        // Fallback: générer des insights basiques basés sur les données disponibles
-        generateBasicInsights();
-        return;
-      }
-
       // Préparer les données contextuelles pour l'IA
       const currentTrends = trends.slice(0, 5).map(t => t.title || t.name).filter(Boolean).join(', ');
       const currentKeywords = extractedKeywords.slice(0, 5).map(k => k.keyword).filter(Boolean).join(', ');
       const currentHashtags = hashtags.slice(0, 5).filter(Boolean).join(', ');
       
-      // Construire un prompt intelligent basé sur les données réelles
       const prompt = `Based on the following real-time trending data from social media, generate dynamic platform insights for social media marketing:
 
 CURRENT TRENDS: ${currentTrends || 'No trends available'}
@@ -273,70 +263,36 @@ Make the insights actionable and specific to the current trending topics. Consid
 
 Return ONLY the JSON array, no additional text.`;
 
-      console.log('Generating AI insights with OpenRouter...');
-      console.log('Trends data:', currentTrends);
-      console.log('Keywords:', currentKeywords);
-      console.log('Hashtags:', currentHashtags);
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "AutoPoster Trend Insights",
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 500,
-          temperature: 0.7,
-        }),
+      const insightsText = await aiGenerate({
+        prompt,
+        max_tokens: 500,
+        temperature: 0.7,
       });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      
+      let insightsData;
+      try {
+        insightsData = JSON.parse(insightsText);
+      } catch (parseError) {
+        console.error('Failed to parse AI response as JSON:', parseError);
+        generateBasicInsights();
+        return;
       }
 
-      const data = await response.json();
-      console.log('OpenRouter response:', data);
+      const formattedInsights = insightsData.map(insight => ({
+        platform: insight.platform,
+        icon: insight.platform === "Twitter" ? "fa-twitter" : 
+                insight.platform === "LinkedIn" ? "fa-linkedin" : "fa-medium",
+        color: insight.platform === "Twitter" ? "blue" : 
+                insight.platform === "LinkedIn" ? "violet" : "teal",
+        engagement: insight.engagement || "+15%",
+        times: insight.times || "9AM, 5PM EST",
+        insights: Array.isArray(insight.insights) ? insight.insights : []
+      }));
 
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const insightsText = data.choices[0].message.content.trim();
-        console.log('AI insights text:', insightsText);
-        
-        // Parser la réponse JSON
-        let insightsData;
-        try {
-          insightsData = JSON.parse(insightsText);
-        } catch (parseError) {
-          console.error('Failed to parse AI response as JSON:', parseError);
-          generateBasicInsights();
-          return;
-        }
-
-        // Formatter les données pour l'affichage
-        const formattedInsights = insightsData.map(insight => ({
-          platform: insight.platform,
-          icon: insight.platform === "Twitter" ? "fa-twitter" : 
-                  insight.platform === "LinkedIn" ? "fa-linkedin" : "fa-medium",
-          color: insight.platform === "Twitter" ? "blue" : 
-                  insight.platform === "LinkedIn" ? "violet" : "teal",
-          engagement: insight.engagement || "+15%",
-          times: insight.times || "9AM, 5PM EST",
-          insights: Array.isArray(insight.insights) ? insight.insights : []
-        }));
-
-        setPlatformInsights(formattedInsights);
-        console.log('AI-generated insights successfully applied:', formattedInsights);
-        
-      } else {
-        throw new Error('Invalid API response format');
-      }
+      setPlatformInsights(formattedInsights);
 
     } catch (error) {
       console.error('Error generating AI insights:', error);
-      // Fallback vers des insights de base
       generateBasicInsights();
     } finally {
       setIsGeneratingInsights(false);
