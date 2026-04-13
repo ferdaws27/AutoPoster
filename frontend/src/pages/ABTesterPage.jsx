@@ -1,551 +1,657 @@
-import { useState } from "react";
-import { 
-  FaPlusCircle, 
-  FaRocket, 
-  FaCheck, 
-  FaClock, 
-  FaPause, 
-  FaChartBar, 
-  FaCrown, 
-  FaDownload,
+﻿import { useState, useEffect, useRef } from "react";
+import {
+  FaPlusCircle,
+  FaRocket,
+  FaCheck,
+  FaClock,
+  FaCrown,
+  FaTrash,
   FaVials,
   FaTrophy,
   FaChartLine,
   FaCheckCircle,
   FaBrain,
   FaComments,
-  FaHashtag,
   FaHistory,
-  FaEye
+  FaPlay,
+  FaSpinner,
 } from "react-icons/fa";
+import {
+  createABTest,
+  getABTests,
+  runABTest,
+  deleteABTest,
+  getABStats,
+} from "../services/api";
 
-export default function CreateTestSection() {
-  const [originalContent, setOriginalContent] = useState("");
+const VARIATION_OPTIONS = [
+  { value: "tone", label: "Tone Variation (Professional vs Casual)" },
+  { value: "structure", label: "Structure Variation (Story vs Direct)" },
+  { value: "cta", label: "CTA Variation (Question vs Statement)" },
+  { value: "length", label: "Length Variation (Short vs Detailed)" },
+  { value: "emoji", label: "Emoji Variation (With vs Without)" },
+];
 
-  const platforms = [
-    { name: "Twitter", color: "cyan-400", defaultChecked: true },
-    { name: "LinkedIn", color: "violet-400", defaultChecked: true },
-    { name: "Medium", color: "teal-400", defaultChecked: false },
-  ];
+const DURATION_OPTIONS = [
+  { value: "24h", label: "24 Hours (Recommended)" },
+  { value: "48h", label: "48 Hours" },
+  { value: "72h", label: "72 Hours" },
+  { value: "1w", label: "1 Week" },
+];
 
-  const testsHistory = [
-    {
-      name: "Product Launch Announcement",
-      platforms: ["twitter", "linkedin"],
-      winner: "Variant A (Story)",
-      improvement: "+59%",
-      date: "2h ago",
-      winnerColor: "green-400",
-    },
-    {
-      name: "Feature Update Announcement",
-      platforms: ["twitter"],
-      winner: "Variant B (Casual)",
-      improvement: "+23%",
-      date: "1 day ago",
-      winnerColor: "green-400",
-    },
-    {
-      name: "Industry Insights Post",
-      platforms: ["linkedin"],
-      winner: "Variant A (Question CTA)",
-      improvement: "+41%",
-      date: "3 days ago",
-      winnerColor: "green-400",
-    },
-    {
-      name: "Team Hiring Post",
-      platforms: ["twitter", "linkedin"],
-      winner: "Variant B (Direct)",
-      improvement: "-12%",
-      date: "5 days ago",
-      winnerColor: "red-400",
-    },
-  ];
+const PLATFORM_LIST = [
+  { name: "Twitter", key: "twitter", color: "cyan-400" },
+  { name: "LinkedIn", key: "linkedin", color: "violet-400" },
+  { name: "Medium", key: "medium", color: "teal-400" },
+];
+
+function statusBadge(status) {
+  const map = {
+    generating: ["bg-blue-400/20 text-blue-400", "Generating..."],
+    ready: ["bg-cyan-400/20 text-cyan-400", "Ready"],
+    running: ["bg-yellow-400/20 text-yellow-400", "Running..."],
+    completed: ["bg-green-400/20 text-green-400", "Completed"],
+    error: ["bg-red-400/20 text-red-400", "Error"],
+    pending: ["bg-gray-400/20 text-gray-400", "Pending"],
+  };
+  const [cls, text] = map[status] || map.pending;
+  return <span className={`px-3 py-1 text-xs rounded-full ${cls}`}>{text}</span>;
+}
+
+function dotColor(status) {
+  const m = {
+    generating: "bg-blue-400",
+    ready: "bg-cyan-400",
+    running: "bg-yellow-400",
+    completed: "bg-green-400",
+    error: "bg-red-400",
+  };
+  return m[status] || "bg-gray-400";
+}
+
+export default function ABTesterPage() {
+  const [content, setContent] = useState("");
+  const [name, setName] = useState("");
+  const [variationType, setVariationType] = useState("tone");
+  const [duration, setDuration] = useState("24h");
+  const [platforms, setPlatforms] = useState(["twitter", "linkedin"]);
+  const [creating, setCreating] = useState(false);
+
+  const [tests, setTests] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    active: 0,
+    avg_improvement: "+0%",
+    win_rate: "0%",
+  });
+  const [loading, setLoading] = useState(true);
+  const pollRef = useRef(null);
+
+  async function fetchAll() {
+    try {
+      const [t, s] = await Promise.all([getABTests(), getABStats()]);
+      setTests(t);
+      setStats(s);
+    } catch (e) {
+      console.error("Fetch error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchAll();
+    pollRef.current = setInterval(fetchAll, 4000);
+    return () => clearInterval(pollRef.current);
+  }, []);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!content.trim()) return;
+    setCreating(true);
+    try {
+      await createABTest({
+        content,
+        variation_type: variationType,
+        platforms,
+        duration,
+        name,
+      });
+      setContent("");
+      setName("");
+      await fetchAll();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRun(testId) {
+    try {
+      await runABTest(testId);
+      await fetchAll();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleDelete(testId) {
+    if (!confirm("Delete this A/B test?")) return;
+    try {
+      await deleteABTest(testId);
+      await fetchAll();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function togglePlatform(key) {
+    setPlatforms((prev) =>
+      prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]
+    );
+  }
+
+  const activeTests = tests.filter((t) =>
+    ["generating", "ready", "running"].includes(t.status)
+  );
+  const completedTests = tests.filter((t) => t.status === "completed");
 
   return (
-    <div id="main-content" className=" p-8">
-
-      {/* Header Section */}
-      <div id="header-section" className="mb-12">
-        <div className="text-center max-w-4xl mx-auto">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center float-animation">
-            <FaVials className="text-3xl text-white" />
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Post A/B Tester — Optimize Your Content Performance
-          </h1>
-          <p className="text-xl text-gray-300 mb-2">
-            Compare two AI-generated variations, measure engagement, and learn what works best
-          </p>
-          <p className="text-gray-400">
-            Automatically keeps the winner and evolves your content strategy
-          </p>
+    <div id="main-content" className="p-8">
+      {/* Header */}
+      <div className="mb-12 text-center max-w-4xl mx-auto">
+        <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center float-animation">
+          <FaVials className="text-3xl text-white" />
         </div>
+        <h1 className="text-4xl font-bold text-white mb-4">
+          Post A/B Tester — Optimize Your Content Performance
+        </h1>
+        <p className="text-xl text-gray-300 mb-2">
+          Write your post, AI generates two variations, simulate engagement, and
+          pick the winner
+        </p>
       </div>
 
       {/* Stats Overview */}
-      <div id="stats-overview" className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 slide-up">
-        <div className="glass-effect rounded-2xl p-6 border border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-white">24</div>
-              <div className="text-gray-400 text-sm">Active Tests</div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-cyan-400/20 flex items-center justify-center">
-              <FaVials className="text-cyan-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-effect rounded-2xl p-6 border border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-white">87%</div>
-              <div className="text-gray-400 text-sm">Win Rate</div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-green-400/20 flex items-center justify-center">
-              <FaTrophy className="text-green-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-effect rounded-2xl p-6 border border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-white">+34%</div>
-              <div className="text-gray-400 text-sm">Avg. Improvement</div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-violet-400/20 flex items-center justify-center">
-              <FaChartLine className="text-violet-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-effect rounded-2xl p-6 border border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-white">156</div>
-              <div className="text-gray-400 text-sm">Tests Completed</div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-yellow-400/20 flex items-center justify-center">
-              <FaCheckCircle className="text-yellow-400" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 slide-up">
+        {[
+          {
+            label: "Active Tests",
+            value: stats.active,
+            icon: <FaVials className="text-cyan-400" />,
+            bg: "bg-cyan-400/20",
+          },
+          {
+            label: "Win Rate",
+            value: stats.win_rate,
+            icon: <FaTrophy className="text-green-400" />,
+            bg: "bg-green-400/20",
+          },
+          {
+            label: "Avg. Improvement",
+            value: stats.avg_improvement,
+            icon: <FaChartLine className="text-violet-400" />,
+            bg: "bg-violet-400/20",
+          },
+          {
+            label: "Tests Completed",
+            value: stats.completed,
+            icon: <FaCheckCircle className="text-yellow-400" />,
+            bg: "bg-yellow-400/20",
+          },
+        ].map((s, i) => (
+          <div
+            key={i}
+            className="glass-effect rounded-2xl p-6 border border-gray-700/50"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-white">{s.value}</div>
+                <div className="text-gray-400 text-sm">{s.label}</div>
+              </div>
+              <div
+                className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center`}
+              >
+                {s.icon}
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Create New Test Section */}
-      <div id="create-test-section" className="glass-effect rounded-3xl p-8 mb-8 slide-up">
+      {/* Create New Test */}
+      <form
+        onSubmit={handleCreate}
+        className="glass-effect rounded-3xl p-8 mb-8 slide-up"
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white flex items-center">
             <FaPlusCircle className="text-cyan-400 mr-3" /> Create New A/B Test
           </h2>
-          <button className="px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-all">
-            <FaRocket className="mr-2" /> Start Test
+          <button
+            type="submit"
+            disabled={creating || !content.trim()}
+            className="px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center"
+          >
+            {creating ? (
+              <FaSpinner className="animate-spin mr-2" />
+            ) : (
+              <FaRocket className="mr-2" />
+            )}
+            {creating ? "Generating..." : "Start Test"}
           </button>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
           <div>
-            <label className="block text-white font-medium mb-3">Original Post Content</label>
+            <label className="block text-white font-medium mb-3">
+              Test Name (optional)
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Product Launch Announcement"
+              className="w-full mb-4 bg-black/20 border border-gray-700/50 rounded-2xl p-4 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-400/50 transition-all"
+            />
+            <label className="block text-white font-medium mb-3">
+              Your Post Content
+            </label>
             <textarea
-              value={originalContent}
-              onChange={(e) => setOriginalContent(e.target.value)}
-              placeholder="Enter your original post content here..."
-              className="w-full h-40 bg-black/20 border border-gray-700/50 rounded-2xl p-4 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:border-cyan-400/50 focus:bg-black/30 transition-all"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Write your post idea here. AI will generate two variations from it..."
+              className="w-full h-40 bg-black/20 border border-gray-700/50 rounded-2xl p-4 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:border-cyan-400/50 transition-all"
             />
           </div>
 
-          <div>
-            <label className="block text-white font-medium mb-3">Test Parameters</label>
-            <div className="space-y-4">
-              {/* Platforms */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Platforms to Test</label>
-                <div className="flex space-x-3">
-                  {platforms.map((platform, idx) => (
-                    <label key={idx} className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" className="hidden peer" defaultChecked={platform.defaultChecked} />
-                      <div className={`w-5 h-5 border-2 border-gray-600 rounded flex items-center justify-center peer-checked:bg-${platform.color}`}>
+          <div className="space-y-4">
+            <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Platforms to Test
+                </label>
+              <div className="flex space-x-3">
+                {PLATFORM_LIST.map((p) => (
+                  <label
+                    key={p.key}
+                    className="flex items-center space-x-2 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={platforms.includes(p.key)}
+                      onChange={() => togglePlatform(p.key)}
+                    />
+                    <div
+                      className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                        platforms.includes(p.key)
+                          ? `bg-${p.color} border-${p.color}`
+                          : "border-gray-600"
+                      }`}
+                    >
+                      {platforms.includes(p.key) && (
                         <FaCheck className="text-white text-xs" />
-                      </div>
-                      <span className="text-gray-300 text-sm">{platform.name}</span>
-                    </label>
-                  ))}
-                </div>
+                      )}
+                    </div>
+                    <span className="text-gray-300 text-sm">{p.name}</span>
+                  </label>
+                ))}
               </div>
+            </div>
 
-              {/* Variation Type */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Variation Type</label>
-                <select className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50">
-                  <option>Tone Variation (Professional vs Casual)</option>
-                  <option>Structure Variation (Story vs Direct)</option>
-                  <option>CTA Variation (Question vs Statement)</option>
-                  <option>Length Variation (Short vs Detailed)</option>
-                  <option>Emoji Variation (With vs Without)</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">
+                Variation Type
+              </label>
+              <select
+                value={variationType}
+                onChange={(e) => setVariationType(e.target.value)}
+                className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50"
+              >
+                {VARIATION_OPTIONS.map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              {/* Test Duration */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Test Duration</label>
-                <select className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50">
-                  <option>24 Hours (Recommended)</option>
-                  <option>48 Hours</option>
-                  <option>72 Hours</option>
-                  <option>1 Week</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">
+                Test Duration
+              </label>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50"
+              >
+                {DURATION_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-      </div>
+      </form>
 
-      {/* Active Tests Section */}
-      <div id="active-tests-section" className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center">
-            <FaClock className="text-yellow-400 mr-3" /> Active Tests
-          </h2>
-          <div className="flex items-center space-x-3">
+      {/* Active Tests */}
+      {activeTests.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white flex items-center">
+              <FaClock className="text-yellow-400 mr-3" /> Active Tests
+            </h2>
             <div className="flex items-center space-x-2 text-gray-400 text-sm">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
               <span>Live monitoring</span>
             </div>
           </div>
+          <div className="grid gap-6">
+            {activeTests.map((test) => (
+              <TestCard
+                key={test._id}
+                test={test}
+                onRun={handleRun}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
         </div>
+      )}
 
-        <div className="grid gap-6">
-          {/* Test 1 - In Progress */}
-          <div className="glass-effect rounded-3xl p-6 border border-gray-700/50 slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                <span className="text-white font-medium">AI Writing Assistant Update</span>
-                <span className="px-3 py-1 bg-yellow-400/20 text-yellow-400 text-xs rounded-full">In Progress</span>
-              </div>
-              <div className="text-gray-400 text-sm">18h 23m remaining</div>
-            </div>
-
-            {/* Variants */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Variant A */}
-              <div className="variant-card bg-black/20 rounded-2xl p-5 border border-gray-700/50">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-white font-medium flex items-center">
-                    <span className="w-6 h-6 bg-cyan-400 rounded-full flex items-center justify-center text-white text-xs font-bold mr-2">A</span>
-                    Professional Tone
-                  </h4>
-                  <div className="text-cyan-400 text-sm">Leading</div>
-                </div>
-                <p className="text-gray-300 text-sm mb-4">
-                  We're excited to announce a major update to our AI writing assistant...
-                </p>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {[
-                    { label: "Likes", value: 342 },
-                    { label: "Comments", value: 28 },
-                    { label: "Shares", value: 15 },
-                  ].map((item, idx) => (
-                    <div key={idx} className="text-center">
-                      <div className="text-xl font-bold text-cyan-400">{item.value}</div>
-                      <div className="text-gray-400 text-xs">{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Engagement Rate</span>
-                  <span className="text-cyan-400 font-medium">4.2%</span>
-                </div>
-              </div>
-
-              {/* Variant B */}
-              <div className="variant-card bg-black/20 rounded-2xl p-5 border border-gray-700/50">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-white font-medium flex items-center">
-                    <span className="w-6 h-6 bg-violet-400 rounded-full flex items-center justify-center text-white text-xs font-bold mr-2">B</span>
-                    Casual Tone
-                  </h4>
-                  <div className="text-gray-400 text-sm">Behind</div>
-                </div>
-                <p className="text-gray-300 text-sm mb-4">
-                  Just dropped some amazing updates to our AI writing tool! 🚀...
-                </p>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {[
-                    { label: "Likes", value: 298 },
-                    { label: "Comments", value: 22 },
-                    { label: "Shares", value: 11 },
-                  ].map((item, idx) => (
-                    <div key={idx} className="text-center">
-                      <div className="text-xl font-bold text-violet-400">{item.value}</div>
-                      <div className="text-gray-400 text-xs">{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Engagement Rate</span>
-                  <span className="text-violet-400 font-medium">3.8%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="mt-6 flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <button className="px-4 py-2 bg-black/30 rounded-xl text-gray-400 hover:text-white transition-colors">
-                  <FaPause className="mr-2" /> Pause Test
-                </button>
-                <button className="px-4 py-2 bg-black/30 rounded-xl text-gray-400 hover:text-white transition-colors">
-                  <FaChartBar className="mr-2" /> View Details
-                </button>
-              </div>
-              <div className="text-gray-400 text-sm">Posted on Twitter, LinkedIn • 8,234 total impressions</div>
-            </div>
+      {/* Completed Tests */}
+      {completedTests.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white flex items-center mb-6">
+            <FaHistory className="text-gray-400 mr-3" /> Completed Tests
+          </h2>
+          <div className="grid gap-6">
+            {completedTests.map((test) => (
+              <TestCard
+                key={test._id}
+                test={test}
+                onRun={handleRun}
+                onDelete={handleDelete}
+              />
+            ))}
           </div>
+        </div>
+      )}
 
-          {/* Test 2 - Recently Completed */}
-          <div className="glass-effect rounded-3xl p-6 border border-green-400/30 winner-glow slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                <span className="text-white font-medium">Product Launch Announcement</span>
-                <span className="px-3 py-1 bg-green-400/20 text-green-400 text-xs rounded-full">Winner Selected</span>
-              </div>
-              <div className="text-gray-400 text-sm">Completed 2h ago</div>
-            </div>
+      {/* AI Learning Insights */}
+      {completedTests.length >= 2 && (
+        <InsightsSection tests={completedTests} />
+      )}
 
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Winner Variant */}
-              <div className="variant-card bg-green-400/10 rounded-2xl p-5 border border-green-400/30">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-white font-medium flex items-center">
-                    <span className="w-6 h-6 bg-green-400 rounded-full flex items-center justify-center text-white text-xs font-bold mr-2">A</span>
-                    Story Structure
-                    <FaCrown className="text-yellow-400 ml-2" />
-                  </h4>
-                  <div className="text-green-400 text-sm font-medium">WINNER</div>
-                </div>
-                <p className="text-gray-300 text-sm mb-4">
-                  Three months ago, we had a crazy idea. What if we could solve the biggest pain point...
-                </p>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {[
-                    { label: "Likes", value: "1,247" },
-                    { label: "Comments", value: 89 },
-                    { label: "Shares", value: 52 },
-                  ].map((item, idx) => (
-                    <div key={idx} className="text-center">
-                      <div className="text-xl font-bold text-green-400">{item.value}</div>
-                      <div className="text-gray-400 text-xs">{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Engagement Rate</span>
-                  <span className="text-green-400 font-medium">7.8%</span>
-                </div>
-              </div>
+      {/* Empty state */}
+      {!loading && tests.length === 0 && (
+        <div className="text-center text-gray-500 py-20">
+          <FaVials className="text-5xl mx-auto mb-4 opacity-30" />
+          <p className="text-lg">
+            No A/B tests yet. Create one above to start optimising!
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
-              {/* Losing Variant */}
-              <div className="variant-card bg-black/20 rounded-2xl p-5 border border-gray-700/50 opacity-75">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-white font-medium flex items-center">
-                    <span className="w-6 h-6 bg-red-400 rounded-full flex items-center justify-center text-white text-xs font-bold mr-2">B</span>
-                    Direct Approach
-                  </h4>
-                  <div className="text-red-400 text-sm">Lost</div>
-                </div>
-                <p className="text-gray-300 text-sm mb-4">
-                  We're launching our new AI content platform today! Key features include automated posting...
-                </p>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {[
-                    { label: "Likes", value: 823 },
-                    { label: "Comments", value: 34 },
-                    { label: "Shares", value: 18 },
-                  ].map((item, idx) => (
-                    <div key={idx} className="text-center">
-                      <div className="text-xl font-bold text-red-400">{item.value}</div>
-                      <div className="text-gray-400 text-xs">{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Engagement Rate</span>
-                  <span className="text-red-400 font-medium">4.6%</span>
-                </div>
-              </div>
-            </div>
-          </div>
+/* ═══════ TEST CARD ═══════ */
+function TestCard({ test, onRun, onDelete }) {
+  const isCompleted = test.status === "completed";
+  const isReady = test.status === "ready";
+  const isRunning = test.status === "running";
+  const isGenerating = test.status === "generating";
+
+  const aScore =
+    (test.variant_a?.likes || 0) +
+    (test.variant_a?.comments || 0) * 3 +
+    (test.variant_a?.shares || 0) * 5;
+  const bScore =
+    (test.variant_b?.likes || 0) +
+    (test.variant_b?.comments || 0) * 3 +
+    (test.variant_b?.shares || 0) * 5;
+  const aLeading = aScore >= bScore;
+
+  return (
+    <div
+      className={`glass-effect rounded-3xl p-6 border slide-up ${
+        isCompleted ? "border-green-400/30" : "border-gray-700/50"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div
+            className={`w-3 h-3 rounded-full ${dotColor(test.status)} ${
+              isRunning || isGenerating ? "animate-pulse" : ""
+            }`}
+          />
+          <span className="text-white font-medium">{test.name}</span>
+          {statusBadge(test.status)}
+        </div>
+        <div className="flex items-center space-x-3">
+          {test.platforms?.map((p) => (
+            <span key={p} className="text-gray-500 text-xs capitalize">
+              {p}
+            </span>
+          ))}
+          {test.created_at && (
+            <span className="text-gray-500 text-xs">
+              {new Date(test.created_at).toLocaleDateString()}
+            </span>
+          )}
         </div>
       </div>
 
-      
-      {/* ---------------- AI Learning Insights Section ---------------- */}
-      <div id="insights-section" className="glass-effect rounded-3xl p-8 mb-8 slide-up">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-          <FaBrain className="text-violet-400 mr-3" /> AI Learning Insights
-        </h2>
+      {isGenerating && (
+        <div className="flex items-center justify-center py-12 text-gray-400">
+          <FaSpinner className="animate-spin text-2xl mr-3" />
+          <span>AI is generating two variations from your content...</span>
+        </div>
+      )}
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="learning-insight rounded-2xl p-6 border border-violet-400/30">
+      {!isGenerating && test.variant_a?.content && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <VariantCard
+            variant={test.variant_a}
+            letter="A"
+            isWinner={isCompleted && test.winner === "A"}
+            isLoser={isCompleted && test.winner === "B"}
+            leading={!isCompleted && aLeading}
+            color="cyan"
+          />
+          <VariantCard
+            variant={test.variant_b}
+            letter="B"
+            isWinner={isCompleted && test.winner === "B"}
+            isLoser={isCompleted && test.winner === "A"}
+            leading={!isCompleted && !aLeading}
+            color="violet"
+          />
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          {isReady && (
+            <button
+              onClick={() => onRun(test._id)}
+              className="px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30 transition-colors flex items-center"
+            >
+              <FaPlay className="mr-2" /> Run Simulation
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(test._id)}
+            className="px-4 py-2 bg-black/30 rounded-xl text-gray-400 hover:text-red-400 transition-colors flex items-center"
+          >
+            <FaTrash className="mr-2" /> Delete
+          </button>
+        </div>
+
+        {isCompleted && test.improvement && (
+          <div className="text-right">
+            <span className="text-green-400 font-medium mr-2">
+              <FaCrown className="inline mr-1 text-yellow-400" />
+              Winner: Variant {test.winner}
+            </span>
+            <span
+              className={`font-medium ${
+                test.improvement.startsWith("+")
+                  ? "text-green-400"
+                  : "text-red-400"
+              }`}
+            >
+              ({test.improvement})
+            </span>
+          </div>
+        )}
+
+        {isRunning && (
+          <div className="text-gray-400 text-sm flex items-center">
+            <FaSpinner className="animate-spin mr-2" /> Simulating
+            engagement...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════ VARIANT CARD ═══════ */
+function VariantCard({ variant, letter, isWinner, isLoser, leading, color }) {
+  const borderCls = isWinner
+    ? "border-green-400/30 bg-green-400/10"
+    : "border-gray-700/50 bg-black/20";
+  const textColor = isWinner
+    ? "text-green-400"
+    : isLoser
+    ? "text-red-400"
+    : `text-${color}-400`;
+  const badgeColor = isWinner
+    ? "bg-green-400"
+    : isLoser
+    ? "bg-red-400"
+    : `bg-${color}-400`;
+
+  return (
+    <div
+      className={`rounded-2xl p-5 border ${borderCls} ${
+        isLoser ? "opacity-75" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-white font-medium flex items-center">
+          <span
+            className={`w-6 h-6 ${badgeColor} rounded-full flex items-center justify-center text-white text-xs font-bold mr-2`}
+          >
+            {letter}
+          </span>
+          {variant.label || `Variant ${letter}`}
+          {isWinner && <FaCrown className="text-yellow-400 ml-2" />}
+        </h4>
+        {isWinner && (
+          <span className="text-green-400 text-sm font-medium">WINNER</span>
+        )}
+        {isLoser && <span className="text-red-400 text-sm">Lost</span>}
+        {!isWinner && !isLoser && leading && (
+          <span className={`${textColor} text-sm`}>Leading</span>
+        )}
+      </div>
+
+      <p className="text-gray-300 text-sm mb-4 line-clamp-4">
+        {variant.content}
+      </p>
+
+      {(variant.likes > 0 ||
+        variant.comments > 0 ||
+        variant.shares > 0) && (
+        <>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            {[
+              { label: "Likes", value: variant.likes },
+              { label: "Comments", value: variant.comments },
+              { label: "Shares", value: variant.shares },
+            ].map((m, i) => (
+              <div key={i} className="text-center">
+                <div className={`text-xl font-bold ${textColor}`}>
+                  {m.value?.toLocaleString()}
+                </div>
+                <div className="text-gray-400 text-xs">{m.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-400 text-sm">Engagement Rate</span>
+            <span className={`${textColor} font-medium`}>
+              {variant.engagement_rate}%
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ═══════ INSIGHTS ═══════ */
+function InsightsSection({ tests }) {
+  const typeCounts = {};
+  tests.forEach((t) => {
+    const vt = t.variation_type || "tone";
+    if (!typeCounts[vt])
+      typeCounts[vt] = { total: 0, aWins: 0, bWins: 0, improvements: [] };
+    typeCounts[vt].total++;
+    if (t.winner === "A") typeCounts[vt].aWins++;
+    else typeCounts[vt].bWins++;
+    const imp = parseInt((t.improvement || "0").replace(/[+%]/g, ""), 10);
+    if (!isNaN(imp)) typeCounts[vt].improvements.push(imp);
+  });
+
+  const insights = Object.entries(typeCounts).map(([type, data]) => {
+    const avgImp = data.improvements.length
+      ? Math.round(
+          data.improvements.reduce((a, b) => a + b, 0) /
+            data.improvements.length
+        )
+      : 0;
+    const confidence = Math.min(95, 50 + data.total * 10);
+    const labels =
+      VARIATION_OPTIONS.find((v) => v.value === type)?.label || type;
+    return { type, labels, avgImp, confidence, ...data };
+  });
+
+  return (
+    <div className="glass-effect rounded-3xl p-8 mb-8 slide-up">
+      <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+        <FaBrain className="text-violet-400 mr-3" /> AI Learning Insights
+      </h2>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {insights.map((ins) => (
+          <div
+            key={ins.type}
+            className="rounded-2xl p-6 border border-violet-400/30 bg-black/20"
+          >
             <div className="w-12 h-12 mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center">
               <FaComments className="text-violet-400" />
             </div>
-            <h3 className="text-white font-semibold mb-2">Tone Preference</h3>
-            <p className="text-gray-400 text-sm mb-3">Your audience responds 34% better to conversational tone over formal language</p>
-            <div className="text-violet-400 text-sm font-medium">Confidence: 87%</div>
-          </div>
-
-          <div className="learning-insight rounded-2xl p-6 border border-cyan-400/30">
-            <div className="w-12 h-12 mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
-              <FaClock className="text-cyan-400" />
+            <h3 className="text-white font-semibold mb-2">{ins.labels}</h3>
+            <p className="text-gray-400 text-sm mb-1">
+              Tested {ins.total} time{ins.total > 1 ? "s" : ""} — avg
+              improvement{" "}
+              <span className="text-green-400">+{ins.avgImp}%</span>
+            </p>
+            <p className="text-gray-400 text-sm mb-3">
+              A wins: {ins.aWins} | B wins: {ins.bWins}
+            </p>
+            <div className="text-violet-400 text-sm font-medium">
+              Confidence: {ins.confidence}%
             </div>
-            <h3 className="text-white font-semibold mb-2">Optimal Timing</h3>
-            <p className="text-gray-400 text-sm mb-3">Posts with story structure perform 45% better on LinkedIn vs Twitter</p>
-            <div className="text-cyan-400 text-sm font-medium">Confidence: 92%</div>
           </div>
-
-          <div className="learning-insight rounded-2xl p-6 border border-teal-400/30">
-            <div className="w-12 h-12 mb-4 rounded-2xl bg-teal-400/20 flex items-center justify-center">
-              <FaHashtag className="text-teal-400" />
-            </div>
-            <h3 className="text-white font-semibold mb-2">Content Length</h3>
-            <p className="text-gray-400 text-sm mb-3">Medium-length posts (150-200 words) generate highest engagement</p>
-            <div className="text-teal-400 text-sm font-medium">Confidence: 78%</div>
-          </div>
-        </div>
+        ))}
       </div>
-
-      {/* ---------------- Performance Analytics Section ---------------- */}
-      <div id="analytics-section" className="glass-effect rounded-3xl p-8 mb-8 slide-up">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-          <FaChartLine className="text-cyan-400 mr-3" /> Performance Analytics
-        </h2>
-
-        <div className="grid lg:grid-cols-2 gap-8">
-          <div className="bg-black/20 rounded-2xl p-6">
-            <h3 className="text-white font-semibold mb-4">Win Rate by Platform</h3>
-            <div className="space-y-4">
-              {[
-                { platform: "Twitter/X", icon: "fa-x-twitter", color: "white", value: 87 },
-                { platform: "LinkedIn", icon: "fa-linkedin-in", color: "blue-400", value: 74 },
-                { platform: "Medium", icon: "fa-medium", color: "green-400", value: 62 },
-              ].map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <i className={`fa-brands ${p.icon} text-${p.color}`}></i>
-                    <span className="text-gray-300">{p.platform}</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-32 h-2 bg-gray-700 rounded-full">
-                      <div className={`w-[${p.value}%] h-2 bg-${p.color} rounded-full`}></div>
-                    </div>
-                    <span className={`text-${p.color} font-medium`}>{p.value}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-black/20 rounded-2xl p-6">
-            <h3 className="text-white font-semibold mb-4">Average Improvement Over Time</h3>
-            <div className="h-40 flex items-end space-x-2">
-              {[30,45,60,75,85,100].map((h, idx) => (
-                <div key={idx} className={`flex-1 bg-cyan-400/20 rounded-t`} style={{ height: `${h}%` }}></div>
-              ))}
-            </div>
-            <div className="flex justify-between text-gray-400 text-xs mt-2">
-              {["Week 1","Week 2","Week 3","Week 4","Week 5","Week 6"].map((w, idx) => <span key={idx}>{w}</span>)}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Test History Section */}
-      <div id="test-history-section" className="glass-effect rounded-3xl p-8 mb-8 slide-up">
-        <h2 className="text-2xl font-bold text-white flex items-center mb-6">
-          <FaHistory className="text-gray-400 mr-3" /> Test History
-        </h2>
-        <div className="grid gap-4">
-          {testsHistory.map((test, idx) => (
-            <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-black/20 border border-gray-700/50">
-              <div>
-                <div className="text-white font-medium">{test.name}</div>
-                <div className="flex items-center space-x-2 mt-1">
-                  {test.platforms.map((p, i) => (
-                    <span key={i} className="text-gray-400 text-xs">{p}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={`text-${test.winnerColor} font-medium`}>{test.winner}</div>
-                <div className="text-gray-400 text-sm">{test.improvement} improvement</div>
-                <div className="text-gray-500 text-xs">{test.date}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ---------------- Settings & Configuration Section ---------------- */}
-      <div id="settings-section" className="glass-effect rounded-3xl p-8 slide-up">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-          <FaCrown className="text-gray-400 mr-3" /> A/B Test Settings
-        </h2>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          <div>
-            <h3 className="text-white font-semibold mb-4">Default Test Parameters</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Default Test Duration</label>
-                <select className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50">
-                  <option>24 Hours</option>
-                  <option>48 Hours</option>
-                  <option>72 Hours</option>
-                  <option>1 Week</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Minimum Sample Size</label>
-                <input type="number" value="1000" className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50" />
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Statistical Significance</label>
-                <select className="w-full bg-black/20 border border-gray-700/50 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-cyan-400/50">
-                  <option>95% (Recommended)</option>
-                  <option>90%</option>
-                  <option>99%</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-white font-semibold mb-4">Notification Settings</h3>
-            <div className="space-y-4">
-              {[
-                { label: "Notify when test completes", checked: true },
-                { label: "Daily progress updates", checked: true },
-                { label: "Weekly insights summary", checked: false },
-                { label: "Auto-apply winning variants", checked: true },
-              ].map((n, idx) => (
-                <label key={idx} className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" className="hidden peer" defaultChecked={n.checked} />
-                  <div className="w-5 h-5 border-2 border-gray-600 rounded peer-checked:bg-cyan-400 peer-checked:border-cyan-400 flex items-center justify-center">
-                    <FaCheck className="text-white text-xs" />
-                  </div>
-                  <span className="text-gray-300">{n.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   );
 }

@@ -532,6 +532,39 @@ export const usePosts = () => {
     });
   }, [posts]);
 
+  // Fetch best performing times from backend (real interaction data + AI)
+  const fetchBestTimes = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/analytics-best-times');
+      return response;
+    } catch (err) {
+      console.error('Error fetching best times:', err);
+      return null;
+    }
+  }, []);
+
+  // Fetch content type performance from backend (real media type stats)
+  const fetchContentPerformance = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/analytics-content-performance');
+      return response;
+    } catch (err) {
+      console.error('Error fetching content performance:', err);
+      return null;
+    }
+  }, []);
+
+  // Fetch AI-powered analytics insights from backend
+  const fetchAiInsights = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/analytics-ai-insights');
+      return response;
+    } catch (err) {
+      console.error('Error fetching AI insights:', err);
+      return null;
+    }
+  }, []);
+
   return {
     posts,
     loading,
@@ -544,6 +577,9 @@ export const usePosts = () => {
     getPostsByDateRange,
     syncWithLocalStorage,
     syncWithBackend,
-    fetchAnalyticsData
+    fetchAnalyticsData,
+    fetchBestTimes,
+    fetchContentPerformance,
+    fetchAiInsights
   };
 };

@@ -64,6 +64,7 @@ export default function AudienceAnalyzer() {
   const platformTotal = Object.values(platforms).reduce((a, b) => a + b, 0) || 1;
   const locationTotal = Object.values(locations).reduce((a, b) => a + b, 0) || 1;
   const industryTotal = Object.values(industries).reduce((a, b) => a + b, 0) || 1;
+  const personaBreakdown = analytics?.persona_breakdown || {};
 
   useEffect(() => {
     if (!chartRef.current || !analytics) return;
@@ -354,6 +355,38 @@ export default function AudienceAnalyzer() {
           
           {/* Chart */}
           <div ref={chartRef} className="h-64 mb-6"></div>
+
+          {/* Per-Persona Engagement Breakdown */}
+          <div className="space-y-3 mb-6">
+            <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Engagement Breakdown</h4>
+            {[
+              { name: "Entrepreneurs", color: "cyan", icon: "fa-rocket" },
+              { name: "AI Students", color: "violet", icon: "fa-graduation-cap" },
+              { name: "Writers", color: "teal", icon: "fa-feather" },
+              { name: "Investors", color: "yellow", icon: "fa-chart-line" },
+            ].map(({ name, color, icon }) => {
+              const bd = personaBreakdown[name] || {};
+              return (
+                <div key={name} className="bg-black/20 rounded-2xl p-4 border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <i className={`fa-solid ${icon} text-${color}-400`}></i>
+                      <span className="text-white font-medium text-sm">{name}</span>
+                    </div>
+                    <span className={`text-${color}-400 font-bold text-lg`}>{personaPercent(name)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-1.5 mb-3">
+                    <div className={`bg-${color}-400 h-1.5 rounded-full transition-all duration-1000`} style={{ width: `${personaPercent(name)}%` }}></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-pink-400"><i className="fa-solid fa-heart mr-1"></i>{bd.likes ?? 0} likes <span className="text-gray-500">({bd.like_rate ?? 0}%)</span></span>
+                    <span className="text-cyan-400"><i className="fa-solid fa-comment mr-1"></i>{bd.comments ?? 0} comments <span className="text-gray-500">({bd.comment_rate ?? 0}%)</span></span>
+                    <span className="text-green-400"><i className="fa-solid fa-share mr-1"></i>{bd.shares ?? 0} shares <span className="text-gray-500">({bd.share_rate ?? 0}%)</span></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           
           {/* AI Insights List */}
           <div className="space-y-4 mb-6">
