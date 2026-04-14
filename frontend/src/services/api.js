@@ -45,3 +45,56 @@ export async function aiGenerate({ prompt, model, temperature, max_tokens }) {
   return data.content;
 }
 
+// ─── A/B Test API ───
+export async function createABTest(payload) {
+  return apiFetch("/api/ab-tests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getABTests() {
+  return apiFetch("/api/ab-tests/");
+}
+
+export async function runABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/run`, { method: "POST" });
+}
+
+export async function deleteABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}`, { method: "DELETE" });
+}
+
+export async function pauseABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/pause`, { method: "POST" });
+}
+
+export async function getABStats() {
+  return apiFetch("/api/ab-tests/stats");
+}
+
+export async function aiAssistABTest(content, action) {
+  return apiFetch("/api/ab-tests/ai-assist", {
+    method: "POST",
+    body: JSON.stringify({ content, action }),
+  });
+}
+
+export async function getABTestAnalysis(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/analysis`);
+}
+
+export async function getABInsights() {
+  return apiFetch("/api/ab-tests/insights");
+}
+
+export async function getABSettings() {
+  return apiFetch("/api/ab-tests/settings");
+}
+
+export async function saveABSettings(settings) {
+  return apiFetch("/api/ab-tests/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}

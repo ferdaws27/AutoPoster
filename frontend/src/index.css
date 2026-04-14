@@ -44,6 +44,63 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* ================= VARIANT CARD ================= */
+.variant-card {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.variant-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--card-accent, rgba(255,255,255,0.1)), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.variant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+.variant-card:hover::before {
+  opacity: 1;
+}
+.variant-card-cyan { --card-accent: rgba(34, 211, 238, 0.6); }
+.variant-card-violet { --card-accent: rgba(167, 139, 250, 0.6); }
+.variant-card-green { --card-accent: rgba(74, 222, 128, 0.6); }
+
+/* ================= TEST CARD ================= */
+.test-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.test-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--test-accent-from, #00C2FF), var(--test-accent-to, #7B61FF));
+  opacity: 0.7;
+}
+.test-card-running { --test-accent-from: #FACC15; --test-accent-to: #FB923C; }
+.test-card-completed { --test-accent-from: #4ADE80; --test-accent-to: #22D3EE; }
+.test-card-ready { --test-accent-from: #22D3EE; --test-accent-to: #7B61FF; }
+.test-card-generating { --test-accent-from: #60A5FA; --test-accent-to: #A78BFA; }
+
+@keyframes progressPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.progress-pulse {
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
 /* ================= HOOK CARD ================= */
 .hook-card {
   background: rgba(14, 17, 22, 0.6);
