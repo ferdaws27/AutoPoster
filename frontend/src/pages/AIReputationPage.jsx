@@ -59,309 +59,122 @@ export default function AIReputationPage() {
   const { posts, stats, loading } = usePosts();
   const [reputationScore, setReputationScore] = useState(0);
   const [subScores, setSubScores] = useState({
-    consistency: 87,
-    engagement: 92,
-    clarity: 78,
-    growth: 85
+    consistency: 0,
+    engagement: 0,
+    clarity: 0,
+    growth: 0
   });
   const [insights, setInsights] = useState([]);
-  const [trendData, setTrendData] = useState([
-    { week: 'Week 1', score: 70 },
-    { week: 'Week 2', score: 74 },
-    { week: 'Week 3', score: 78 },
-    { week: 'Week 4', score: 82 }
-  ]);
+  const [trendData, setTrendData] = useState([]);
+  const [postDetails, setPostDetails] = useState([]);
   const [isCalculating, setIsCalculating] = useState(true);
   const [showOptimizeModal, setShowOptimizeModal] = useState(false);
   const [optimizeApplied, setOptimizeApplied] = useState(false);
-  const [currentTier, setCurrentTier] = useState({ name: 'Gold', color: COLORS.yellow, range: '71-90' });
+  const [currentTier, setCurrentTier] = useState({ name: 'Bronze', color: COLORS.amber, range: '0-40' });
+  const [totalInteractions, setTotalInteractions] = useState(0);
+  const [avgEngagement, setAvgEngagement] = useState(0);
+  const [insightsLoading, setInsightsLoading] = useState(true);
   const gaugeRef = useRef(null);
   const trendRef = useRef(null);
 
   useEffect(() => {
-    // Simulate loading and calculation
-    setTimeout(() => {
-      calculateReputationScore();
-    }, 1000);
+    fetchReputationScore();
   }, []);
 
   useEffect(() => {
     if (!isCalculating && reputationScore > 0) {
-      initializeCharts();
       animateProgressBars();
       animateSlideUpElements();
     }
   }, [isCalculating, reputationScore]);
 
-  const calculateReputationScore = () => {
+  const fetchReputationScore = async () => {
     setIsCalculating(true);
-    
-    // Calculate real data from posts and stats
-    const totalPosts = posts.length || 0;
-    const draftPosts = stats.drafts || 0;
-    const scheduledPosts = stats.scheduled || 0;
-    const publishedPosts = stats.published || 0;
-    
-    // Calculate consistency score based on posting frequency
-    const consistencyScore = calculateConsistencyScore(posts);
-    
-    // Calculate engagement score based on published vs total posts ratio
-    const engagementScore = calculateEngagementScore(publishedPosts, totalPosts);
-    
-    // Calculate clarity score based on content quality
-    const clarityScore = calculateClarityScore(posts);
-    
-    // Calculate growth score based on activity trends
-    const growthScore = calculateGrowthScore(posts, scheduledPosts);
-    
-    const newSubScores = {
-      consistency: Math.round(consistencyScore),
-      engagement: Math.round(engagementScore),
-      clarity: Math.round(clarityScore),
-      growth: Math.round(growthScore)
-    };
-    
-    setSubScores(newSubScores);
-    
-    // Calculate overall score
-    const overallScore = Math.round(
-      (newSubScores.consistency * 0.3 + 
-       newSubScores.engagement * 0.3 + 
-       newSubScores.clarity * 0.2 + 
-       newSubScores.growth * 0.2)
-    );
-    
-    setReputationScore(overallScore);
-    
-    // Determine current tier
-    const tier = getScoreTier(overallScore);
-    setCurrentTier(tier);
-    
-    // Generate real insights based on data
-    generateRealInsights(newSubScores, totalPosts, scheduledPosts, posts);
-    
-    // Generate trend data based on actual posts
-    generateRealTrendData(posts);
-    
-    setTimeout(() => setIsCalculating(false), 1500);
-  };
+    setInsightsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const res = await fetch(`${API_URL}/reputation-score`, { headers });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server error ${res.status}: ${text.slice(0, 200)}`);
+      }
+      const data = await res.json();
 
-  const calculateConsistencyScore = (posts) => {
-    if (!posts || posts.length === 0) return 0;
-    
-    const now = new Date();
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    // Count posts in the last month
-    const recentPosts = posts.filter(post => {
-      const postDate = new Date(post.createdAt || post.created_at || now);
-      return postDate > oneMonthAgo;
-    }).length;
-    
-    // Calculate weekly average (30 days = ~4.3 weeks)
-    const weeklyAverage = recentPosts / 4.3;
-    
-    // Score based on weekly posting frequency
-    // 5+ posts/week = 100%, 3-4 posts/week = 80%, 1-2 posts/week = 60%, <1 post/week = 40%
-    if (weeklyAverage >= 5) return 100;
-    if (weeklyAverage >= 3) return 80;
-    if (weeklyAverage >= 1) return 60;
-    return 40;
-  };
+      setReputationScore(data.score || 0);
+      setSubScores(data.sub_scores || { consistency: 0, engagement: 0, clarity: 0, growth: 0 });
+      setTotalInteractions(data.total_interactions || 0);
+      setAvgEngagement(data.avg_engagement_weighted || 0);
 
-  const calculateEngagementScore = (publishedPosts, totalPosts) => {
-    if (totalPosts === 0) return 0;
-    
-    // Score based on publish rate
-    const publishRate = (publishedPosts / totalPosts) * 100;
-    
-    // High publish rate = high engagement
-    if (publishRate >= 80) return 95;
-    if (publishRate >= 60) return 85;
-    if (publishRate >= 40) return 70;
-    if (publishRate >= 20) return 55;
-    return 40;
-  };
-
-  const calculateClarityScore = (posts) => {
-    if (!posts || posts.length === 0) return 0;
-    
-    let totalScore = 0;
-    posts.forEach(post => {
-      const content = post.content || post.idea || '';
-      const contentLength = content.length;
-      
-      // Score based on content length
-      let lengthScore = 0;
-      if (contentLength > 200) lengthScore = 40;
-      else if (contentLength > 100) lengthScore = 30;
-      else if (contentLength > 50) lengthScore = 20;
-      else lengthScore = 10;
-      
-      // Score based on structure (hashtags, mentions, etc.)
-      const hasHashtags = content.includes('#');
-      const hasMentions = content.includes('@');
-      const hasEmojis = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/u.test(content);
-      const structureScore = (hasHashtags ? 20 : 0) + (hasMentions ? 20 : 0) + (hasEmojis ? 20 : 0);
-      
-      totalScore += Math.min(100, lengthScore + structureScore);
-    });
-    
-    return Math.round(totalScore / posts.length);
-  };
-
-  const calculateGrowthScore = (posts, scheduledPosts) => {
-    if (!posts || posts.length === 0) return 0;
-    
-    // Base score from scheduled posts
-    const scheduledScore = Math.min(50, (scheduledPosts / Math.max(1, posts.length)) * 100);
-    
-    // Activity trend score
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    const recentPosts = posts.filter(post => {
-      const postDate = new Date(post.createdAt || post.created_at || now);
-      return postDate > oneWeekAgo;
-    }).length;
-    
-    const activityScore = Math.min(50, recentPosts * 10); // 5 posts in a week = 50 points
-    
-    return Math.round(scheduledScore + activityScore);
-  };
-
-  const getScoreTier = (score) => {
-    if (score >= 91) return { name: "Platinum", color: COLORS.violet, range: "91-100" };
-    if (score >= 71) return { name: "Gold", color: COLORS.yellow, range: "71-90" };
-    if (score >= 41) return { name: "Silver", color: COLORS.gray, range: "41-70" };
-    return { name: "Bronze", color: COLORS.amber, range: "0-40" };
-  };
-
-  const generateRealInsights = (scores, totalPosts, scheduledPosts, posts) => {
-    const newInsights = [];
-    
-    // Consistency insights
-    if (scores.consistency < 70) {
-      const postsNeeded = Math.ceil((70 - scores.consistency) / 3.33);
-      newInsights.push({
-        type: "consistency",
-        title: `Post ${postsNeeded} more times per week`,
-        description: `Your current posting frequency is ${scores.consistency}% of optimal. Increase to boost consistency.`,
-        impact: `+${Math.round((70 - scores.consistency) * 0.3)} points`,
-        confidence: "High",
-        icon: "fa-plus",
-        color: COLORS.cyan
-      });
-    }
-    
-    // Engagement insights
-    if (scores.engagement < 80) {
-      const draftsCount = posts.filter(p => p.status === 'draft').length;
-      newInsights.push({
-        type: "engagement",
-        title: "Publish your draft content",
-        description: draftsCount > 0 
-          ? `You have ${draftsCount} draft${draftsCount > 1 ? 's' : ''} ready to publish`
-          : "Focus on creating more publish-ready content",
-        impact: `+${Math.round((80 - scores.engagement) * 0.3)} points`,
-        confidence: draftsCount > 0 ? "High" : "Medium",
-        icon: "fa-clock",
-        color: COLORS.violet
-      });
-    }
-    
-    // Clarity insights
-    if (scores.clarity < 85) {
-      const postsWithoutHashtags = posts.filter(p => !p.content?.includes('#')).length;
-      newInsights.push({
-        type: "clarity",
-        title: "Add hashtags to increase reach",
-        description: postsWithoutHashtags > 0
-          ? `${postsWithoutHashtags} post${postsWithoutHashtags > 1 ? 's' : ''} missing hashtags`
-          : "Strategic hashtag use improves content discoverability",
-        impact: `+${Math.round((85 - scores.clarity) * 0.2)} points`,
-        confidence: "Medium",
-        icon: "fa-hashtag",
-        color: COLORS.yellow
-      });
-    }
-    
-    // Growth insights
-    if (scores.growth < 75) {
-      newInsights.push({
-        type: "growth",
-        title: "Schedule more future content",
-        description: scheduledPosts > 0 
-          ? `You have ${scheduledPosts} scheduled. Add more for consistent growth`
-          : "Start scheduling posts to maintain audience engagement",
-        impact: `+${Math.round((75 - scores.growth) * 0.2)} points`,
-        confidence: scheduledPosts > 0 ? "High" : "Medium",
-        icon: "fa-image",
-        color: COLORS.green
-      });
-    }
-    
-    // Add positive insight if doing well
-    if (newInsights.length === 0) {
-      newInsights.push({
-        type: "general",
-        title: "Excellent performance!",
-        description: "Your content strategy is working well. Keep up the great work!",
-        impact: "Maintain",
-        confidence: "High",
-        icon: "fa-star",
-        color: COLORS.green
-      });
-    }
-    
-    setInsights(newInsights.slice(0, 6));
-  };
-
-  const generateRealTrendData = (posts) => {
-    if (!posts || posts.length === 0) {
-      setTrendData([
-        { week: "1", score: 65 },
-        { week: "5", score: 68 },
-        { week: "10", score: 70 },
-        { week: "15", score: 75 },
-        { week: "20", score: 78 },
-        { week: "25", score: 80 },
-        { week: "30", score: reputationScore || 82 }
-      ]);
-      return;
-    }
-    
-    const now = new Date();
-    const days = ["1", "5", "10", "15", "20", "25", "30"];
-    
-    const trendData = days.map((day, index) => {
-      const targetDay = parseInt(day);
-      const dayStart = new Date(now.getTime() - (30 - targetDay) * 24 * 60 * 60 * 1000);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      
-      const dayPosts = posts.filter(post => {
-        const postDate = new Date(post.createdAt || post.created_at || now);
-        return postDate >= dayStart && postDate < dayEnd;
-      });
-      
-      // Calculate score based on day activity
-      const baseScore = (reputationScore || 82) * 0.7; // 70% of current score as base
-      const dayBonus = Math.min(30, dayPosts.length * 6); // Each post adds up to 6 points
-      
-      return {
-        week: day,
-        score: Math.round(baseScore + dayBonus + (index * 2)) // Slight upward trend
+      // Map tier
+      const tierName = data.tier?.name || "Bronze";
+      const tierColors = {
+        Platinum: COLORS.violet,
+        Gold: COLORS.yellow,
+        Silver: COLORS.cyan,
+        Bronze: COLORS.amber,
       };
-    });
-    
-    setTrendData(trendData);
+      setCurrentTier({
+        name: tierName,
+        color: tierColors[tierName] || COLORS.amber,
+        range: data.tier?.range || "0-40",
+      });
+
+      // Evolution → trend chart data
+      if (data.evolution && data.evolution.length > 0) {
+        setTrendData(data.evolution.map((e) => ({
+          week: e.date,
+          score: e.score,
+          likes: e.likes,
+          comments: e.comments,
+          shares: e.shares,
+        })));
+      }
+
+      // Post details
+      setPostDetails(data.post_details || []);
+
+      // Advice → insights
+      setInsights((data.advice || []).map((a) => ({
+        type: a.criterion,
+        title: a.title,
+        description: a.description,
+        impact: a.impact,
+        confidence: "High",
+        icon: a.icon,
+        color: { cyan: COLORS.cyan, violet: COLORS.violet, teal: COLORS.teal, green: COLORS.green, yellow: COLORS.yellow }[a.color] || COLORS.cyan,
+      })));
+    } catch (err) {
+      console.error("Failed to fetch reputation score:", err);
+    } finally {
+      setIsCalculating(false);
+      setInsightsLoading(false);
+    }
   };
 
-  const initializeCharts = () => {
-    // This would initialize Highcharts if we had the library
-    // For now, we'll simulate the charts with CSS animations
-    console.log('Charts initialized');
+  // Keep for backward compat — no longer used as primary
+  const calculateReputationScore = () => {
+    fetchReputationScore();
   };
+
+  const insightIconMap = {
+    'fa-calendar-check': faCalendarCheck,
+    'fa-heart': faHeart,
+    'fa-brain': faBrain,
+    'fa-rocket': faRocket,
+    'fa-star': faStar,
+    'fa-plus': faPlus,
+    'fa-clock': faClock,
+    'fa-hashtag': faHashtag,
+    'fa-image': faImage,
+    'fa-lightbulb': faLightbulb,
+    'fa-fire': faFire,
+    'fa-users': faUsers,
+    'fa-chart-line': faChartLine,
+  };
+
+  const getInsightIcon = (iconName) => insightIconMap[iconName] || faLightbulb;
 
   const animateProgressBars = () => {
     setTimeout(() => {
@@ -401,13 +214,51 @@ export default function AIReputationPage() {
     setShowOptimizeModal(true);
   };
 
-  const handleConfirmOptimize = () => {
-    setShowOptimizeModal(false);
-    setOptimizeApplied(true);
-    
-    setTimeout(() => {
-      setOptimizeApplied(false);
-    }, 3000);
+  const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [showGoalsModal, setShowGoalsModal] = useState(false);
+  const [goalTier, setGoalTier] = useState(null);
+  const [scoreCopied, setScoreCopied] = useState(false);
+
+  const handleConfirmOptimize = async () => {
+    setOptimizeLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const bestType = postDetails.length > 0 ? postDetails[0].content_type : "insight";
+
+      const res = await fetch(`${API_URL}/generate-optimized-post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          tips: insights.map(i => ({ title: i.title, description: i.description })),
+          score: reputationScore,
+          tier: currentTier.name,
+          best_post_type: bestType,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+
+      if (data.success && data.content) {
+        setShowOptimizeModal(false);
+        setOptimizeApplied(true);
+        setTimeout(() => {
+          setOptimizeApplied(false);
+          navigate(`/dashboard/CreatePostPage?content=${encodeURIComponent(data.content)}`);
+        }, 600);
+      } else {
+        throw new Error(data.error || "Failed to generate post");
+      }
+    } catch (err) {
+      console.error("Optimize error:", err);
+      alert("Failed to generate optimized post. Please try again.");
+    } finally {
+      setOptimizeLoading(false);
+    }
   };
 
   if (loading) {
@@ -448,7 +299,7 @@ export default function AIReputationPage() {
             </div>
             <h1 className="text-4xl font-bold text-white mb-4">AI Reputation Score â How Strong Is Your Online Presence?</h1>
             <p className="text-xl text-gray-300 mb-2">Your consistency, engagement, and clarity converted into one simple score.</p>
-            <p className="text-gray-400">Based on {posts.length} post{posts.length !== 1 ? 's' : ''} across multiple platforms â Updated in real-time</p>
+            <p className="text-gray-400">Based on {posts.length} post{posts.length !== 1 ? 's' : ''} &middot; {totalInteractions.toLocaleString()} interactions &middot; Updated in real-time</p>
           </div>
         </div>
         
@@ -500,7 +351,7 @@ export default function AIReputationPage() {
               {/* Trend Chart */}
               <div className="glass-effect rounded-3xl p-6 slide-up">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-white">Reputation Over Time</h4>
+                  <h4 className="text-lg font-semibold text-white">Post Evolution</h4>
                   <div className="flex items-center space-x-1 text-green-400 text-sm">
                     <FontAwesomeIcon icon={faArrowTrendUp} />
                     <span>
@@ -514,30 +365,27 @@ export default function AIReputationPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="week" stroke="#aaa" />
+                    <XAxis dataKey="week" stroke="#aaa" fontSize={10} />
                     <YAxis stroke="#aaa" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "#1a1f26",
-                        border: "none",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "12px",
                         color: "#fff",
                       }}
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="score"
-                      stroke="#00C2FF"
-                      strokeWidth={3}
-                    />
+                    <Line type="monotone" dataKey="score" stroke="#00C2FF" strokeWidth={3} name="Score" dot={false} />
+                    <Line type="monotone" dataKey="likes" stroke="#a78bfa" strokeWidth={1.5} name="Likes" dot={false} strokeDasharray="4 2" />
+                    <Line type="monotone" dataKey="comments" stroke="#2dd4bf" strokeWidth={1.5} name="Comments" dot={false} strokeDasharray="4 2" />
+                    <Line type="monotone" dataKey="shares" stroke="#facc15" strokeWidth={1.5} name="Shares" dot={false} strokeDasharray="4 2" />
                   </LineChart>
                 </ResponsiveContainer>
-                <div className="mt-3 text-center text-gray-400 text-sm">
-                  30-day improvement: <span className="text-cyan-400 font-medium">
-                    {trendData.length > 1 ? 
-                      `+${Math.round(trendData[trendData.length - 1].score - trendData[0].score)} points` : 
-                      'No data yet'
-                    }
-                  </span>
+                <div className="mt-3 flex items-center justify-center gap-4 text-xs text-gray-400">
+                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-cyan-400 inline-block rounded"></span> Score</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-violet-400 inline-block rounded"></span> Likes</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-teal-400 inline-block rounded"></span> Comments</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-yellow-400 inline-block rounded"></span> Shares</span>
                 </div>
               </div>
 
@@ -548,44 +396,28 @@ export default function AIReputationPage() {
                   Achievement Tiers
                 </h4>
                 <div className="space-y-3">
-                  <div className="badge-tier flex items-center justify-between p-3 rounded-2xl bg-amber-400/10 border border-amber-400/30">
-                    <div className="flex items-center space-x-3">
-                      <FontAwesomeIcon icon={faMedal} className="text-amber-400 text-xl" />
-                      <div>
-                        <div className="text-amber-400 font-medium">Bronze</div>
-                        <div className="text-gray-400 text-xs">0-40 points</div>
+                  {[
+                    { name: "Bronze", range: "0-40", color: "amber", icon: faMedal },
+                    { name: "Silver", range: "41-70", color: "gray", icon: faMedal },
+                    { name: "Gold",   range: "71-90", color: "yellow", icon: faMedal },
+                    { name: "Platinum", range: "91-100", color: "violet", icon: faCrown },
+                  ].map((t) => {
+                    const isCurrent = currentTier.name === t.name;
+                    const isAbove = ["Bronze","Silver","Gold","Platinum"].indexOf(currentTier.name) >= ["Bronze","Silver","Gold","Platinum"].indexOf(t.name);
+                    return (
+                      <div key={t.name} className={`badge-tier ${isCurrent ? 'active' : ''} flex items-center justify-between p-3 rounded-2xl bg-${t.color}-400/10 border border-${t.color}-400/30 ${!isAbove ? 'opacity-60' : ''}`}>
+                        <div className="flex items-center space-x-3">
+                          <FontAwesomeIcon icon={t.icon} className={`text-${t.color}-400 text-xl`} />
+                          <div>
+                            <div className={`text-${t.color}-400 font-medium`}>{t.name}</div>
+                            <div className="text-gray-400 text-xs">{t.range} points</div>
+                          </div>
+                        </div>
+                        {isCurrent && <div className="text-cyan-400 text-sm font-medium">Current</div>}
+                        {!isAbove && <div className="text-gray-500 text-xs">{Math.max(0, parseInt(t.range) - reputationScore)} pts to go</div>}
                       </div>
-                    </div>
-                  </div>
-                  <div className="badge-tier flex items-center justify-between p-3 rounded-2xl bg-gray-400/10 border border-gray-400/30">
-                    <div className="flex items-center space-x-3">
-                      <FontAwesomeIcon icon={faMedal} className="text-gray-400 text-xl" />
-                      <div>
-                        <div className="text-gray-400 font-medium">Silver</div>
-                        <div className="text-gray-400 text-xs">41-70 points</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="badge-tier active flex items-center justify-between p-3 rounded-2xl bg-yellow-400/10 border border-yellow-400/30">
-                    <div className="flex items-center space-x-3">
-                      <FontAwesomeIcon icon={faMedal} className="text-yellow-400 text-xl" />
-                      <div>
-                        <div className="text-yellow-400 font-medium">Gold</div>
-                        <div className="text-gray-400 text-xs">71-90 points</div>
-                      </div>
-                    </div>
-                    <div className="text-cyan-400 text-sm font-medium">Current</div>
-                  </div>
-                  <div className="badge-tier flex items-center justify-between p-3 rounded-2xl bg-violet-400/10 border border-violet-400/30 opacity-60">
-                    <div className="flex items-center space-x-3">
-                      <FontAwesomeIcon icon={faCrown} className="text-violet-400 text-xl" />
-                      <div>
-                        <div className="text-violet-400 font-medium">Platinum</div>
-                        <div className="text-gray-400 text-xs">91-100 points</div>
-                      </div>
-                    </div>
-                    <div className="text-gray-500 text-xs">8 points to go</div>
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -692,6 +524,61 @@ export default function AIReputationPage() {
           </div>
         </div>
 
+        {/* Top & Worst Performing Posts */}
+        {postDetails.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-6 mb-12 max-w-7xl mx-auto">
+            {/* Best Posts */}
+            <div className="glass-effect rounded-3xl p-6 slide-up">
+              <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <FontAwesomeIcon icon={faFire} className="text-amber-400 mr-2" />
+                Top Performing Posts
+              </h4>
+              <div className="space-y-3">
+                {postDetails.slice(0, 3).map((post, idx) => (
+                  <div key={idx} className="bg-black/20 rounded-2xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-400">{post.content_type?.replace("_"," ") || "N/A"}</span>
+                      <span className="text-green-400 text-sm font-bold">{post.weighted} pts</span>
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2 line-clamp-2">{post.content_preview}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                      <span>❤️ {post.likes}</span>
+                      <span>💬 {post.comments}</span>
+                      <span>🔁 {post.shares}</span>
+                      <span className="text-gray-500">({post.total} total)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Worst Posts */}
+            <div className="glass-effect rounded-3xl p-6 slide-up">
+              <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <FontAwesomeIcon icon={faLightbulb} className="text-violet-400 mr-2" />
+                Posts to Improve
+              </h4>
+              <div className="space-y-3">
+                {postDetails.slice(-3).reverse().map((post, idx) => (
+                  <div key={idx} className="bg-black/20 rounded-2xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-violet-400/20 text-violet-400">{post.content_type?.replace("_"," ") || "N/A"}</span>
+                      <span className="text-amber-400 text-sm font-bold">{post.weighted} pts</span>
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2 line-clamp-2">{post.content_preview}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                      <span>❤️ {post.likes}</span>
+                      <span>💬 {post.comments}</span>
+                      <span>🔁 {post.shares}</span>
+                      <span className="text-gray-500">({post.total} total)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* AI Insights Panel */}
         <div className="glass-effect rounded-3xl p-8 mb-8 max-w-7xl mx-auto slide-up">
           <div className="flex items-center justify-between mb-8">
@@ -702,9 +589,11 @@ export default function AIReputationPage() {
               </h3>
               <p className="text-gray-400">Personalized recommendations to boost your reputation score</p>
             </div>
-            <div className="flex items-center space-x-2 bg-black/30 rounded-2xl px-4 py-2">
-              <div className="w-2 h-2 bg-cyan-400 rounded-full ai-typing"></div>
-              <span className="text-cyan-400 text-sm font-medium">AI Analyzing</span>
+            <div className={`flex items-center space-x-2 rounded-2xl px-4 py-2 ${insightsLoading ? 'bg-black/30' : 'bg-green-400/10'}`}>
+              <div className={`w-2 h-2 rounded-full ${insightsLoading ? 'bg-cyan-400 ai-typing' : 'bg-green-400'}`}></div>
+              <span className={`text-sm font-medium ${insightsLoading ? 'text-cyan-400' : 'text-green-400'}`}>
+                {insightsLoading ? 'AI Analyzing...' : `${insights.length} Insights Generated`}
+              </span>
             </div>
           </div>
 
@@ -717,18 +606,18 @@ export default function AIReputationPage() {
                 Posting Strategy
               </h4>
               
-              {insights.filter((_, i) => i < 3).map((insight, index) => (
+              {insights.filter((_, i) => i < Math.ceil(insights.length / 2)).map((insight, index) => (
                 <div key={index} className="insight-item bg-black/20 rounded-2xl p-4">
                   <div className="flex items-start space-x-3">
                     <div className={`w-8 h-8 rounded-xl ${insight.color.bg} flex items-center justify-center mt-1`}>
-                      <FontAwesomeIcon icon={insight.icon === 'fa-plus' ? faPlus : insight.icon === 'fa-clock' ? faClock : faSmile} className={`${insight.color.text} text-sm`} />
+                      <FontAwesomeIcon icon={getInsightIcon(insight.icon)} className={`${insight.color.text} text-sm`} />
                     </div>
                     <div className="flex-1">
                       <h5 className="text-white font-medium mb-1">{insight.title}</h5>
                       <p className="text-gray-400 text-sm mb-2">{insight.description}</p>
                       <div className="flex items-center space-x-2 mt-2">
                         <div className={`${insight.color.text} text-xs font-medium`}>Impact: {insight.impact}</div>
-                        <div className="text-gray-500">â¢</div>
+                        <div className="text-gray-500">&bull;</div>
                         <div className="text-gray-500 text-xs">{insight.confidence} confidence</div>
                       </div>
                     </div>
@@ -744,18 +633,18 @@ export default function AIReputationPage() {
                 Content Quality
               </h4>
               
-              {insights.filter((_, i) => i >= 3).map((insight, index) => (
+              {insights.filter((_, i) => i >= Math.ceil(insights.length / 2)).map((insight, index) => (
                 <div key={index} className="insight-item bg-black/20 rounded-2xl p-4">
                   <div className="flex items-start space-x-3">
                     <div className={`w-8 h-8 rounded-xl ${insight.color.bg} flex items-center justify-center mt-1`}>
-                      <FontAwesomeIcon icon={insight.icon === 'fa-hashtag' ? faHashtag : insight.icon === 'fa-question-circle' ? faQuestionCircle : faImage} className={`${insight.color.text} text-sm`} />
+                      <FontAwesomeIcon icon={getInsightIcon(insight.icon)} className={`${insight.color.text} text-sm`} />
                     </div>
                     <div className="flex-1">
                       <h5 className="text-white font-medium mb-1">{insight.title}</h5>
                       <p className="text-gray-400 text-sm mb-2">{insight.description}</p>
                       <div className="flex items-center space-x-2 mt-2">
                         <div className={`${insight.color.text} text-xs font-medium`}>Impact: {insight.impact}</div>
-                        <div className="text-gray-500">â¢</div>
+                        <div className="text-gray-500">&bull;</div>
                         <div className="text-gray-500 text-xs">{insight.confidence} confidence</div>
                       </div>
                     </div>
@@ -768,31 +657,27 @@ export default function AIReputationPage() {
           {/* Summary Stats */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
             <div className="bg-black/30 rounded-2xl p-4 text-center">
-              <div className="text-2xl font-bold text-cyan-400 mb-1">{insights.length}</div>
-              <div className="text-gray-400 text-sm">Active Insights</div>
+              <div className="text-2xl font-bold text-cyan-400 mb-1">{totalInteractions.toLocaleString()}</div>
+              <div className="text-gray-400 text-sm">Total Interactions</div>
             </div>
             <div className="bg-black/30 rounded-2xl p-4 text-center">
-              <div className="text-2xl font-bold text-violet-400 mb-1">
+              <div className="text-2xl font-bold text-violet-400 mb-1">{avgEngagement}</div>
+              <div className="text-gray-400 text-sm">Avg Engagement / Post</div>
+            </div>
+            <div className="bg-black/30 rounded-2xl p-4 text-center">
+              <div className="text-2xl font-bold text-teal-400 mb-1">
                 +{insights.reduce((total, insight) => {
-                  const match = insight.impact.match(/\+(\d+)/);
+                  const match = (insight.impact || "").match(/\+(\d+)/);
                   return total + (match ? parseInt(match[1]) : 0);
                 }, 0)}
               </div>
               <div className="text-gray-400 text-sm">Potential Points</div>
             </div>
             <div className="bg-black/30 rounded-2xl p-4 text-center">
-              <div className="text-2xl font-bold text-teal-400 mb-1">
-                {insights.length > 0 ? Math.round(
-                  insights.filter(i => i.confidence === 'High').length / insights.length * 100
-                ) : 0}%
-              </div>
-              <div className="text-gray-400 text-sm">Avg Confidence</div>
-            </div>
-            <div className="bg-black/30 rounded-2xl p-4 text-center">
               <div className="text-2xl font-bold text-yellow-400 mb-1">
-                {Math.max(1, Math.ceil((91 - reputationScore) / 5))}
+                {reputationScore >= 91 ? '🏆' : Math.max(1, Math.ceil((91 - reputationScore) / 5))}
               </div>
-              <div className="text-gray-400 text-sm">Days to Platinum</div>
+              <div className="text-gray-400 text-sm">{reputationScore >= 91 ? 'Platinum Reached!' : 'Days to Platinum'}</div>
             </div>
           </div>
 
@@ -813,39 +698,145 @@ export default function AIReputationPage() {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          <div className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
+          <div 
+            onClick={() => navigate("/dashboard/analytics")}
+            className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer group"
+          >
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <FontAwesomeIcon icon={faChartLine} className="text-cyan-400" />
             </div>
             <h4 className="text-white font-medium mb-2">Detailed Analytics</h4>
-            <p className="text-gray-400 text-sm">View comprehensive reports</p>
+            <p className="text-gray-400 text-sm">{totalInteractions.toLocaleString()} interactions across {posts.length} posts</p>
           </div>
 
-          <div className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center">
+          <div 
+            onClick={() => navigate("/dashboard/scheduling")}
+            className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer group"
+          >
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <FontAwesomeIcon icon={faCalendarPlus} className="text-violet-400" />
             </div>
             <h4 className="text-white font-medium mb-2">Schedule Optimal Content</h4>
-            <p className="text-gray-400 text-sm">Auto-schedule for best times</p>
+            <p className="text-gray-400 text-sm">{stats.scheduled || 0} posts scheduled</p>
           </div>
 
-          <div className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-teal-400/20 flex items-center justify-center">
-              <FontAwesomeIcon icon={faShare} className="text-teal-400" />
+          <div 
+            onClick={() => {
+              const shareText = `🏆 My AI Reputation Score: ${reputationScore}/100 (${currentTier.name} Tier)\n📊 Consistency: ${subScores.consistency}% | Engagement: ${subScores.engagement}% | Clarity: ${subScores.clarity}% | Growth: ${subScores.growth}%\n🔥 ${totalInteractions.toLocaleString()} total interactions across ${posts.length} posts`;
+              navigator.clipboard.writeText(shareText).then(() => {
+                setScoreCopied(true);
+                setTimeout(() => setScoreCopied(false), 2000);
+              });
+            }}
+            className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer group"
+          >
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-teal-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <FontAwesomeIcon icon={scoreCopied ? faCheckCircle : faShare} className={scoreCopied ? "text-green-400" : "text-teal-400"} />
             </div>
-            <h4 className="text-white font-medium mb-2">Share Score</h4>
-            <p className="text-gray-400 text-sm">Show off your achievement</p>
+            <h4 className="text-white font-medium mb-2">{scoreCopied ? 'Copied!' : 'Share Score'}</h4>
+            <p className="text-gray-400 text-sm">{scoreCopied ? 'Score copied to clipboard' : `${currentTier.name} tier — ${reputationScore}/100`}</p>
           </div>
 
-          <div className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-yellow-400/20 flex items-center justify-center">
+          <div 
+            onClick={() => setShowGoalsModal(true)}
+            className="glass-effect rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer group"
+          >
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-yellow-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <FontAwesomeIcon icon={faBullseye} className="text-yellow-400" />
             </div>
             <h4 className="text-white font-medium mb-2">Set Goals</h4>
-            <p className="text-gray-400 text-sm">Define reputation targets</p>
+            <p className="text-gray-400 text-sm">
+              {goalTier ? `Target: ${goalTier} — ${Math.max(0, (goalTier === 'Platinum' ? 91 : goalTier === 'Gold' ? 71 : 41) - reputationScore)} pts to go` : 'Define reputation targets'}
+            </p>
           </div>
         </div>
       </div>
+
+      {/* Goals Modal */}
+      {showGoalsModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+          <div className="glass-effect rounded-3xl p-8 max-w-lg w-full border border-yellow-400/30">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-400/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faBullseye} className="text-yellow-400 text-2xl" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Set Your Goal</h3>
+              <p className="text-gray-400">Choose a tier to aim for. Current score: <span className="text-cyan-400 font-bold">{reputationScore}/100</span></p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              {[
+                { name: "Silver", min: 41, color: "gray", icon: faMedal },
+                { name: "Gold", min: 71, color: "yellow", icon: faMedal },
+                { name: "Platinum", min: 91, color: "violet", icon: faCrown },
+              ].map((t) => {
+                const ptsNeeded = Math.max(0, t.min - reputationScore);
+                const reached = reputationScore >= t.min;
+                const isSelected = goalTier === t.name;
+                return (
+                  <button
+                    key={t.name}
+                    onClick={() => setGoalTier(t.name)}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                      isSelected
+                        ? `bg-${t.color}-400/20 border-${t.color}-400/60`
+                        : 'bg-black/20 border-gray-700 hover:border-gray-500'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <FontAwesomeIcon icon={t.icon} className={`text-${t.color}-400 text-xl`} />
+                      <div className="text-left">
+                        <div className={`text-${t.color}-400 font-medium`}>{t.name}</div>
+                        <div className="text-gray-400 text-xs">{t.min}+ points required</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {reached ? (
+                        <span className="text-green-400 text-sm font-medium flex items-center gap-1">
+                          <FontAwesomeIcon icon={faCheckCircle} /> Reached
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">{ptsNeeded} pts to go</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {goalTier && (
+              <div className="bg-yellow-400/10 rounded-2xl p-4 mb-6 border border-yellow-400/20">
+                <div className="text-yellow-400 font-medium text-sm mb-1">Your path to {goalTier}</div>
+                <div className="text-gray-300 text-sm">
+                  {reputationScore >= (goalTier === 'Platinum' ? 91 : goalTier === 'Gold' ? 71 : 41)
+                    ? `You've already reached ${goalTier}! Set a higher goal to keep pushing.`
+                    : `Focus on ${subScores.consistency <= subScores.engagement ? 'consistency' : 'engagement'} — your lowest score at ${Math.min(subScores.consistency, subScores.engagement, subScores.clarity, subScores.growth)}%. Apply the AI insights above to improve.`
+                  }
+                </div>
+              </div>
+            )}
+
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowGoalsModal(false)}
+                className="flex-1 p-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 transition-all"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowGoalsModal(false);
+                  // Scroll to insights section
+                  document.querySelector('.slide-up')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="flex-1 p-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                View Action Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Optimize Modal */}
       {showOptimizeModal && (
@@ -862,33 +853,39 @@ export default function AIReputationPage() {
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-3">
                 <h4 className="text-white font-medium mb-2">Content Improvements</h4>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Add engaging question at end</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Include 2-3 relevant hashtags</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Add visual element</span>
-                </div>
+                {insights.filter(i => i.type === 'clarity' || i.type === 'engagement').map((insight, idx) => (
+                  <div key={idx} className="flex items-start space-x-3 p-3 bg-black/30 rounded-xl">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-green-400 mt-0.5" />
+                    <div>
+                      <span className="text-gray-200 text-sm font-medium">{insight.title}</span>
+                      <p className="text-gray-400 text-xs mt-1">{insight.description}</p>
+                    </div>
+                  </div>
+                ))}
+                {insights.filter(i => i.type === 'clarity' || i.type === 'engagement').length === 0 && (
+                  <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
+                    <span className="text-gray-300 text-sm">Content quality is excellent!</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-3">
-                <h4 className="text-white font-medium mb-2">Timing Optimization</h4>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Schedule for Monday 2:00 PM</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Target 150+ word count</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
-                  <span className="text-gray-300 text-sm">Use strategic emoji</span>
-                </div>
+                <h4 className="text-white font-medium mb-2">Strategy & Growth</h4>
+                {insights.filter(i => i.type === 'consistency' || i.type === 'growth' || i.type === 'general').map((insight, idx) => (
+                  <div key={idx} className="flex items-start space-x-3 p-3 bg-black/30 rounded-xl">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-green-400 mt-0.5" />
+                    <div>
+                      <span className="text-gray-200 text-sm font-medium">{insight.title}</span>
+                      <p className="text-gray-400 text-xs mt-1">{insight.description}</p>
+                    </div>
+                  </div>
+                ))}
+                {insights.filter(i => i.type === 'consistency' || i.type === 'growth' || i.type === 'general').length === 0 && (
+                  <div className="flex items-center space-x-3 p-3 bg-black/30 rounded-xl">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-green-400" />
+                    <span className="text-gray-300 text-sm">Growth strategy is on track!</span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -897,22 +894,38 @@ export default function AIReputationPage() {
                 <FontAwesomeIcon icon={faChartLine} className="text-cyan-400" />
                 <span className="text-cyan-400 font-medium text-sm">Predicted Impact</span>
               </div>
-              <div className="text-white font-bold text-lg">+12 reputation points</div>
-              <div className="text-gray-400 text-sm">Moving you closer to Platinum tier</div>
+              <div className="text-white font-bold text-lg">
+                +{insights.reduce((total, insight) => {
+                  const match = (insight.impact || "").match(/\+(\d+)/);
+                  return total + (match ? parseInt(match[1]) : 0);
+                }, 0)} reputation points
+              </div>
+              <div className="text-gray-400 text-sm">
+                {reputationScore < 91 
+                  ? `Moving you from ${currentTier.name} toward ${reputationScore >= 71 ? 'Platinum' : reputationScore >= 41 ? 'Gold' : 'Silver'} tier`
+                  : 'Maintaining your Platinum status'}
+              </div>
             </div>
             
             <div className="flex space-x-4">
               <button 
                 onClick={() => setShowOptimizeModal(false)}
-                className="flex-1 p-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 transition-all"
+                disabled={optimizeLoading}
+                className="flex-1 p-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 transition-all disabled:opacity-50"
               >
                 Maybe Later
               </button>
               <button 
                 onClick={handleConfirmOptimize}
-                className="flex-1 p-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+                disabled={optimizeLoading}
+                className="flex-1 p-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-70"
               >
-                Apply Optimizations
+                {optimizeLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    AI Writing Post...
+                  </span>
+                ) : 'Generate & Create Post'}
               </button>
             </div>
           </div>

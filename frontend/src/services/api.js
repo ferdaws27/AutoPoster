@@ -65,6 +65,36 @@ export async function deleteABTest(testId) {
   return apiFetch(`/api/ab-tests/${testId}`, { method: "DELETE" });
 }
 
+export async function pauseABTest(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/pause`, { method: "POST" });
+}
+
 export async function getABStats() {
   return apiFetch("/api/ab-tests/stats");
+}
+
+export async function aiAssistABTest(content, action) {
+  return apiFetch("/api/ab-tests/ai-assist", {
+    method: "POST",
+    body: JSON.stringify({ content, action }),
+  });
+}
+
+export async function getABTestAnalysis(testId) {
+  return apiFetch(`/api/ab-tests/${testId}/analysis`);
+}
+
+export async function getABInsights() {
+  return apiFetch("/api/ab-tests/insights");
+}
+
+export async function getABSettings() {
+  return apiFetch("/api/ab-tests/settings");
+}
+
+export async function saveABSettings(settings) {
+  return apiFetch("/api/ab-tests/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
 }
