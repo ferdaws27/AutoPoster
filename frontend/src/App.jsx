@@ -14,7 +14,6 @@ import PostsLibrary from "./pages/PostsLibrary";
 import Trendradar from "./pages/Trendradar";
 import PerformanceOptimizer from "./pages/PerformanceOptimizer";
 import Analytics from "./pages/Analytics";
-import ABTesterPage from "./pages/ABTesterPage";
 import QuoteTemplateGenerator from "./pages/QuoteTemplateGenerator";
 import AIReputationPage from "./pages/AIReputationPage";
 import OAuthCallback from "./pages/OAuthCallback";
@@ -43,7 +42,6 @@ export default function App() {
           <Route path="voicetrainer" element={<VoiceTrainer />} />
           <Route path="HookGeneratorPage" element={<HookGeneratePage />} />
           <Route path="mediacompanion" element={<MediaCompanionPage />} />
-          <Route path="ABTesterPage" element={<ABTesterPage />} />
           <Route path="trendradar" element={<Trendradar />} />
           <Route path="clone" element={<VoiceCloner />} />
           <Route path="AIReputationPage" element={<AIReputationPage />} />

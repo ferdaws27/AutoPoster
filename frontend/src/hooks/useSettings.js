@@ -62,6 +62,7 @@ export default function useSettings() {
   const creativity = ai.creativity || "Balanced";
   const temperature = creativityToTemp(creativity);
   const contentLength = ai.contentLength || "Medium (100–200 words)";
+  const language = ai.language || "en";
 
   // --- Posting Preferences ---
   const posting = settings.posting || {};
@@ -113,6 +114,7 @@ export default function useSettings() {
     creativity,
     temperature,
     contentLength,
+    language,
 
     // Posting
     timezone,
@@ -147,8 +149,11 @@ export function getSettings() {
   return {
     modelId: MODEL_MAP[model] || MODEL_MAP.deepseek,
     toneLabel: toneToLabel(ai.tone ?? 60),
+    creativity: ai.creativity || "Balanced",
     temperature: creativityToTemp(ai.creativity || "Balanced"),
     contentLength: ai.contentLength || "Medium (100–200 words)",
+    language: ai.language || "en",
+    voiceProfile: raw.voiceProfile || null,
     timezone: raw.posting?.timezone || "UTC (GMT+0)",
     maxPostsPerDay: raw.posting?.maxPosts || 3,
     openRouterKey: raw.api?.keys?.openrouter || "",

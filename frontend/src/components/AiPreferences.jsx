@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import useSettings from "../hooks/useSettings";
 
 export default function AiPreferences({ initialData, onChange }) {
+  const navigate = useNavigate();
+  const { voiceProfile } = useSettings();
   const [selectedModel, setSelectedModel] = useState(
     initialData?.model || "deepseek"
   );
@@ -195,6 +199,69 @@ export default function AiPreferences({ initialData, onChange }) {
     </select>
   </div>
 </div>
+
+        {/* ACTIVE VOICE PROFILE */}
+        <div className="space-y-4">
+          <label className="block text-white font-semibold text-lg">
+            Writing Voice
+          </label>
+
+          {voiceProfile ? (
+            <div className="p-5 bg-black/20 rounded-2xl border border-cyan-400/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
+                    <i className="fa-solid fa-fingerprint text-cyan-400 text-xl"></i>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white font-semibold">{voiceProfile.name}</h3>
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-400/10 text-green-400 text-xs font-medium rounded-full">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Active
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-0.5">
+                      {voiceProfile.tone || "—"} · {voiceProfile.sentenceStyle || "—"} · {voiceProfile.emojiUsage || "—"} emoji
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate("/dashboard/Clone")}
+                  className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white border border-gray-600 hover:border-cyan-400/50 transition-all text-sm"
+                >
+                  <i className="fa-solid fa-pen mr-1.5"></i>Manage
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-cyan-400 text-xs font-medium mb-1">Hook</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.hookStyle || "—"}</p>
+                </div>
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-violet-400 text-xs font-medium mb-1">Vocabulary</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.vocabularyLevel || "—"}</p>
+                </div>
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-green-400 text-xs font-medium mb-1">Platform</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.platform || "—"}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 bg-black/20 rounded-2xl border border-gray-700/30 text-center">
+              <i className="fa-solid fa-fingerprint text-3xl text-gray-600 mb-3"></i>
+              <p className="text-gray-400 mb-1">No active voice profile</p>
+              <p className="text-gray-500 text-sm mb-4">Clone a creator's voice or train your own for personalized AI content</p>
+              <button
+                onClick={() => navigate("/dashboard/Clone")}
+                className="px-5 py-2.5 gradient-accent rounded-xl text-white font-medium hover:opacity-90 transition-opacity text-sm"
+              >
+                <i className="fa-solid fa-brain mr-2"></i>Set Up Voice
+              </button>
+            </div>
+          )}
+        </div>
 
       </div>
     </div>

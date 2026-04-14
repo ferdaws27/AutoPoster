@@ -1,42 +1,46 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
+import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 
 export default function Layout() {
+  const t = useTranslation();
+  const { language } = useSettings();
+
   const navSections = [
     {
-      label: "Main",
+      label: t("nav.main"),
       items: [
-        ["fa-chart-line", "Dashboard", ""],
-        ["fa-plus", "Create Post", "CreatePostPage"],
-        ["fa-calendar", "Scheduler", "scheduling"],
-        ["fa-folder", "Posts Library", "PostsLibrary"],
+        ["fa-chart-line", t("nav.dashboard"), ""],
+        ["fa-plus", t("nav.createPost"), "CreatePostPage"],
+        ["fa-calendar", t("nav.scheduler"), "scheduling"],
+        ["fa-folder", t("nav.postsLibrary"), "PostsLibrary"],
       ],
     },
     {
-      label: "AI Tools",
+      label: t("nav.aiTools"),
       items: [
-        ["fa-magic", "Hook Generator", "HookGeneratorPage "],
-        ["fa-quote-left", "Quote Template", "QuoteTemplateGenerator"],
-        ["fa-microphone-alt", "Voice Trainer", "voicetrainer"],
-        ["fa-clone", "Clone", "Clone"],
-        ["fa-photo-video", "Media Companion", "MediaCompanion"],
+        ["fa-magic", t("nav.hookGenerator"), "HookGeneratorPage "],
+        ["fa-quote-left", t("nav.quoteTemplate"), "QuoteTemplateGenerator"],
+        ["fa-microphone-alt", t("nav.voiceTrainer"), "voicetrainer"],
+        ["fa-brain", t("nav.clone"), "Clone"],
+        ["fa-photo-video", t("nav.mediaCompanion"), "MediaCompanion"],
       ],
     },
     {
-      label: "Analytics",
+      label: t("nav.analytics"),
       items: [
-        ["fa-chart-line", "Analytics", "analytics"],
-        ["fa-bolt", "Performance Optimizer", "PerformanceOptimizer"],
-        ["fa-flask", "AB Tester", "ABTesterPage"],
-        ["fa-users", "Audience Analyzer", "audience-analyzer"],
-        ["fa-satellite-dish", "Trendradar", "Trendradar"],
-        ["fa-star", "AI Reputation", "AIReputationPage"],
+        ["fa-chart-line", t("nav.analytics"), "analytics"],
+        ["fa-bolt", t("nav.performanceOptimizer"), "PerformanceOptimizer"],
+        ["fa-users", t("nav.audienceAnalyzer"), "audience-analyzer"],
+        ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
+        ["fa-star", t("nav.aiReputation"), "AIReputationPage"],
       ],
     },
     {
-      label: "System",
+      label: t("nav.system"),
       items: [
-        ["fa-cog", "Settings", "settings"],
+        ["fa-cog", t("nav.settings"), "settings"],
       ],
     },
   ];
@@ -94,7 +98,7 @@ export default function Layout() {
     <div className="gradient-bg min-h-screen">
       <aside className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30 flex flex-col">
         <div className="p-6">
-          <div className="flex items-center space-x-3 mb-8">
+          <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
               <i className="fa-solid fa-pen-nib text-white" />
             </div>

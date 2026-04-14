@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import { aiGenerate } from "../services/api";
+import useSettings from "../hooks/useSettings";
 
 // Standard platform icon colors
 const ICON_COLORS = {
@@ -36,6 +37,7 @@ const MiniLineChart = ({ data, color }) => {
 
 export default function TrendRadar() {
   const navigate = useNavigate();
+  const { voiceProfile } = useSettings();
   const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -256,6 +258,14 @@ CURRENT TRENDS: ${currentTrends || 'No trends available'}
 KEYWORDS: ${currentKeywords || 'No keywords available'}
 HASHTAGS: ${currentHashtags || 'No hashtags available'}
 
+${voiceProfile ? `
+WRITING VOICE PROFILE (adapt insights to match this style):
+- Tone: ${voiceProfile.tone || 'Neutral'}
+- Structure: ${voiceProfile.structure || ''}
+- Hook Style: ${voiceProfile.hookStyle || ''}
+- Writing Patterns: ${(voiceProfile.writingPatterns || []).join(', ')}
+- Unique Traits: ${(voiceProfile.uniqueTraits || []).join(', ')}
+` : ''}
 Generate a JSON array with 3 objects (Twitter, LinkedIn, Medium) with these properties:
 - platform: platform name
 - engagement: realistic engagement percentage based on the trends (e.g., "+25%", "+18%", "+12%")

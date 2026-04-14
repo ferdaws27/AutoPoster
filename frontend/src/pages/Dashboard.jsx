@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import UpcomingPosts from "../components/UpcomingPosts";
 import useDashboardStore from "../store/useDashboardStore";
 import { usePosts } from "../hooks/usePosts";
+import useTranslation from "../i18n/useTranslation";
 
 /* ================= COLORS ================= */
 const COLORS = {
@@ -38,6 +39,8 @@ export default function Dashboard() {
     createScheduled,
   } = useDashboardStore();
 
+  const t = useTranslation();
+
   const {
     posts,
     stats,
@@ -51,6 +54,15 @@ export default function Dashboard() {
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  // Auto-refresh AI Ideas every 5 minutes
+  useEffect(() => {
+    refreshAIIdeas();
+    const interval = setInterval(() => {
+      refreshAIIdeas();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [refreshAIIdeas]);
 
   // Add a manual refresh handler
   const handleManualRefresh = async () => {
@@ -66,13 +78,13 @@ export default function Dashboard() {
             <div className="flex items-start space-x-4">
               <div className="text-red-400 text-2xl">⚠️</div>
               <div>
-                <h3 className="text-xl font-bold text-red-400 mb-2">Error Loading Posts</h3>
+                <h3 className="text-xl font-bold text-red-400 mb-2">{t("dashboard.errorLoadingPosts")}</h3>
                 <p className="text-gray-300 mb-4">{error}</p>
                 <button 
                   onClick={() => window.location.reload()}
                   className="px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
                 >
-                  Try Again
+                  {t("dashboard.tryAgain")}
                 </button>
               </div>
             </div>
@@ -227,15 +239,15 @@ export default function Dashboard() {
         <header className="mb-8 flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold">
-              {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"},{" "}
+              {new Date().getHours() < 12 ? t("dashboard.goodMorning") : new Date().getHours() < 18 ? t("dashboard.goodAfternoon") : t("dashboard.goodEvening")},{" "}
               {user?.first_name && user?.last_name
                 ? `${user.first_name} ${user.last_name}`
                 : user?.full_name || "there"}
             </h2>
-            <p className="text-gray-400">Let's create something amazing today</p>
+            <p className="text-gray-400">{t("dashboard.subtitle")}</p>
           </div>
           <div className="flex items-center space-x-4">
-            <Status />
+            <Status t={t} />
             <IconButton icon="fa-bell" />
           </div>
         </header>
@@ -250,15 +262,15 @@ export default function Dashboard() {
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-white">{loading ? "..." : totalPosts}</div>
-                <div className="text-sm text-gray-400">This week</div>
+                <div className="text-sm text-gray-400">{t("dashboard.thisWeek")}</div>
               </div>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Total Posts</h3>
+              <h3 className="text-white font-semibold mb-1">{t("dashboard.totalPosts")}</h3>
               <div className="flex items-center text-sm">
                 <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
                 <span className="text-green-400">+18%</span>
-                <span className="text-gray-400 ml-1">vs last week</span>
+                <span className="text-gray-400 ml-1">{t("dashboard.vsLastWeek")}</span>
               </div>
             </div>
           </div>
@@ -271,15 +283,15 @@ export default function Dashboard() {
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-white">{loading ? "..." : `${Math.min(100, (scheduledCount + publishedCount) * 4)}%`}</div>
-                <div className="text-sm text-gray-400">Avg rate</div>
+                <div className="text-sm text-gray-400">{t("dashboard.avgRate")}</div>
               </div>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Engagement</h3>
+              <h3 className="text-white font-semibold mb-1">{t("dashboard.engagement")}</h3>
               <div className="flex items-center text-sm">
                 <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
                 <span className="text-green-400">+2.1%</span>
-                <span className="text-gray-400 ml-1">vs last week</span>
+                <span className="text-gray-400 ml-1">{t("dashboard.vsLastWeek")}</span>
               </div>
             </div>
           </div>
@@ -291,12 +303,12 @@ export default function Dashboard() {
                 <i className="fa-solid fa-clock text-green-400 text-xl"></i>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-white">{loading ? "..." : nextPostTime ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : "No post"}</div>
-                <div className="text-sm text-gray-400">{nextPostTime ? "Today" : "Scheduled"}</div>
+                <div className="text-2xl font-bold text-white">{loading ? "..." : nextPostTime ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : t("dashboard.noPost")}</div>
+                <div className="text-sm text-gray-400">{nextPostTime ? t("dashboard.today") : t("dashboard.scheduled")}</div>
               </div>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Next Post</h3>
+              <h3 className="text-white font-semibold mb-1">{t("dashboard.nextPost")}</h3>
               <div className="flex items-center text-sm">
                 {nextPostTime ? (() => {
                   const p = nextPostTime.platforms || {};
@@ -309,13 +321,13 @@ export default function Dashboard() {
                         {active.includes('linkedin') && <i className="fa-brands fa-linkedin-in text-blue-400 text-xs"></i>}
                         {active.includes('medium') && <i className="fa-brands fa-medium text-green-400 text-xs"></i>}
                       </div>
-                      <span className="text-gray-400">{count} platform{count > 1 ? 's' : ''}</span>
+                      <span className="text-gray-400">{count} {count > 1 ? t("dashboard.platformsPlural") : t("dashboard.platforms")}</span>
                     </>
                   ) : (
-                    <span className="text-gray-400">No platform selected</span>
+                    <span className="text-gray-400">{t("dashboard.noPlatformSelected")}</span>
                   );
                 })() : (
-                  <span className="text-gray-400">Schedule one now</span>
+                  <span className="text-gray-400">{t("dashboard.scheduleOneNow")}</span>
                 )}
               </div>
             </div>
@@ -324,7 +336,7 @@ export default function Dashboard() {
 
         <section className="grid grid-cols-2 gap-8">
           <UpcomingPosts posts={scheduledPosts} onPublish={handleMarkPublished} onScheduleNew={handleScheduleNew} />
-          <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} onGenerateMore={handleGenerateMoreIdeas} navigate={navigate} />
+          <AIIdeas ideas={aiIdeas} onRefresh={handleRefreshAIIdeas} onUseIdea={handleUseAIdea} onGenerateMore={handleGenerateMoreIdeas} navigate={navigate} t={t} />
         </section>
 
         <section className="mt-8">
@@ -337,6 +349,7 @@ export default function Dashboard() {
             }}
             posts={normalizedPosts}
             navigate={navigate}
+            t={t}
           />
         </section>
 
@@ -345,10 +358,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-white mb-1">
-                  Quick Actions
+                  {t("dashboard.quickActions")}
                 </h3>
                 <p className="text-gray-400 text-sm">
-                  Streamline your content workflow
+                  {t("dashboard.streamlineWorkflow")}
                 </p>
               </div>
 
@@ -358,7 +371,7 @@ export default function Dashboard() {
                   className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
                 >
                   <i className="fa-solid fa-upload mr-2"></i>
-                  Import Content
+                  {t("dashboard.importContent")}
                 </button>
 
                 <button
@@ -366,7 +379,7 @@ export default function Dashboard() {
                   className="flex items-center px-4 py-2 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-all"
                 >
                   <i className="fa-solid fa-download mr-2"></i>
-                  Export Data
+                  {t("dashboard.exportData")}
                 </button>
 
                 <button
@@ -374,7 +387,7 @@ export default function Dashboard() {
                   className="flex items-center px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
                 >
                   <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
-                  AI Optimize
+                  {t("dashboard.aiOptimize")}
                 </button>
 
                 <input
@@ -406,15 +419,15 @@ export default function Dashboard() {
           <div className="glass-effect rounded-3xl p-8 max-w-4xl w-full relative">
             <div className="flex justify-between mb-6">
               <div>
-                <h3 className="text-2xl font-bold">Create New Post</h3>
-                <p className="text-gray-400">Write once, post everywhere</p>
+                <h3 className="text-2xl font-bold">{t("dashboard.createNewPost")}</h3>
+                <p className="text-gray-400">{t("dashboard.writeOncePostEverywhere")}</p>
               </div>
               <button onClick={() => setShowCreateModal(false)}>
                 <i className="fa-solid fa-xmark text-xl text-gray-400 hover:text-white"></i>
               </button>
             </div>
 
-            <Section title="Select Platforms">
+            <Section title={t("dashboard.selectPlatforms")}>
               <Platform
                 label="Twitter/X"
                 icon="fa-x-twitter"
@@ -437,16 +450,16 @@ export default function Dashboard() {
               />
             </Section>
 
-            <Section title="Your Content Idea">
+            <Section title={t("dashboard.yourContentIdea")}>
               <textarea
                 className="w-full min-h-32 p-4 rounded-2xl bg-gray-800/60 border border-gray-600 focus:border-cyan-400 outline-none"
-                placeholder="Share your thoughts, insights, or ideas..."
+                placeholder={t("dashboard.contentPlaceholder")}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
               />
             </Section>
 
-            <AIOptions aiOptions={aiOptions} setAiOptions={setAiOptions} />
+            <AIOptions aiOptions={aiOptions} setAiOptions={setAiOptions} t={t} />
 
             <div className="flex gap-4 mt-6">
               <button
@@ -474,10 +487,10 @@ export default function Dashboard() {
                 {isSaving ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
-                    Saving...
+                    {t("dashboard.saving")}
                   </>
                 ) : (
-                  'Save Draft'
+                  t("dashboard.saveDraft")
                 )}
               </button>
 
@@ -506,10 +519,10 @@ export default function Dashboard() {
                 {isSaving ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
-                    Saving...
+                    {t("dashboard.saving")}
                   </>
                 ) : (
-                  'Generate & Preview'
+                  t("dashboard.generatePreview")
                 )}
               </button>
             </div>
@@ -591,10 +604,10 @@ const ActionButton = ({ icon, label, primary }) => (
   </button>
 );
 
-const Status = () => (
+const Status = ({ t }) => (
   <div className="glass-effect rounded-2xl px-4 py-2 flex items-center space-x-2">
     <div className="w-2 h-2 rounded-full bg-green-400"></div>
-    <span className="text-sm">All systems operational</span>
+    <span className="text-sm">{t("dashboard.allSystemsOperational")}</span>
   </div>
 );
 
@@ -604,7 +617,7 @@ const IconButton = ({ icon }) => (
   </button>
 );
 
-const RecentActivity = ({ stats, posts, navigate }) => {
+const RecentActivity = ({ stats, posts, navigate, t }) => {
   // Calculer les métriques dynamiques basées sur les posts réels
   const calculateMetrics = (posts, period = '7days') => {
     const now = new Date();
@@ -676,7 +689,7 @@ const RecentActivity = ({ stats, posts, navigate }) => {
   return (
     <div className="glass-effect rounded-3xl p-6 glow-card">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">Recent Activity</h2>
+        <h2 className="text-xl font-bold text-white">{t("dashboard.recentActivity")}</h2>
 
         <div className="flex items-center space-x-4">
           <select 
@@ -684,9 +697,9 @@ const RecentActivity = ({ stats, posts, navigate }) => {
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="bg-gray-800 border border-gray-600 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-cyan-400"
           >
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="90days">Last 90 days</option>
+            <option value="7days">{t("dashboard.last7Days")}</option>
+            <option value="30days">{t("dashboard.last30Days")}</option>
+            <option value="90days">{t("dashboard.last90Days")}</option>
           </select>
         </div>
       </div>
@@ -695,7 +708,7 @@ const RecentActivity = ({ stats, posts, navigate }) => {
         <ActivityItem
           icon="fa-paper-plane"
           value={metrics.postsPublished}
-          label="Posts Published"
+          label={t("dashboard.postsPublished")}
           color="green"
           growth={metrics.growthRate}
         />
@@ -703,7 +716,7 @@ const RecentActivity = ({ stats, posts, navigate }) => {
         <ActivityItem
           icon="fa-eye"
           value={metrics.totalViews > 1000 ? `${(metrics.totalViews/1000).toFixed(1)}K` : metrics.totalViews}
-          label="Total Views"
+          label={t("dashboard.totalViews")}
           color="cyan"
           growth={metrics.totalViews > 0 ? Math.floor(Math.random() * 25) + 5 : 0}
         />
@@ -711,7 +724,7 @@ const RecentActivity = ({ stats, posts, navigate }) => {
         <ActivityItem
           icon="fa-heart"
           value={metrics.totalEngagement}
-          label="Engagements"
+          label={t("dashboard.engagements")}
           color="violet"
           growth={metrics.totalEngagement > 0 ? Math.floor(Math.random() * 20) + 3 : 0}
         />
@@ -719,7 +732,7 @@ const RecentActivity = ({ stats, posts, navigate }) => {
         <ActivityItem
           icon="fa-star"
           value={metrics.avgRating}
-          label="Avg Rating"
+          label={t("dashboard.avgRating")}
           color="yellow"
           growth={parseFloat(metrics.avgRating) > 4.0 ? Math.floor(Math.random() * 10) + 1 : 0}
         />
@@ -741,21 +754,21 @@ const ActivityItem = ({ icon, value, label, color, growth }) => (
   </div>
 );
 
-const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore, navigate }) => (
+const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore, navigate, t }) => (
   <div id="ai-ideas-section" className="glass-effect rounded-3xl p-6 glow-card">
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center">
         <div className="w-8 h-8 rounded-xl gradient-accent flex items-center justify-center mr-3">
           <i className="fa-solid fa-lightbulb text-white text-sm"></i>
         </div>
-        <h2 className="text-xl font-bold text-white">AI Ideas</h2>
+        <h2 className="text-xl font-bold text-white">{t("dashboard.aiIdeas")}</h2>
       </div>
-      <button onClick={onRefresh} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">Refresh</button>
+      <button onClick={onRefresh} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">{t("dashboard.refresh")}</button>
     </div>
 
     <div className="space-y-4 mb-6">
       {ideas.length === 0 ? (
-        <p className="text-gray-400 text-sm">No AI ideas available.</p>
+        <p className="text-gray-400 text-sm">{t("dashboard.noAiIdeas")}</p>
       ) : (
         ideas.slice(0, 3).map((idea, index) => {
           const gradients = [
@@ -791,7 +804,7 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore, navigate })
                 onClick={() => navigate(`/dashboard/CreatePostPage?content=${encodeURIComponent(idea.title)}&description=${encodeURIComponent(idea.desc)}`)}
                 className={`w-full p-2 rounded-xl ${index === 0 ? 'gradient-accent' : index === 1 ? 'gradient-accent-reverse' : 'bg-gradient-to-r from-green-400 to-blue-400'} text-white text-sm font-medium hover:opacity-90 transition-opacity`}
               >
-                Generate Post
+                {t("dashboard.generatePost")}
               </button>
             </div>
           );
@@ -802,15 +815,15 @@ const AIIdeas = ({ ideas = [], onRefresh, onUseIdea, onGenerateMore, navigate })
     <div className="pt-4 border-t border-gray-700/50">
       <button onClick={onGenerateMore} className="w-full p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 transition-all text-sm font-medium">
         <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
-        Generate More Ideas
+        {t("dashboard.generateMoreIdeas")}
       </button>
     </div>
   </div>
 );
 
-const AIOptions = ({ aiOptions, setAiOptions }) => (
+const AIOptions = ({ aiOptions, setAiOptions, t }) => (
   <div className="mb-6">
-    <h3 className="font-semibold mb-3">AI Enhancement Options</h3>
+    <h3 className="font-semibold mb-3">{t("dashboard.aiEnhancement")}</h3>
     <div className="grid grid-cols-2 gap-4">
       <label
         onClick={() => setAiOptions({ ...aiOptions, optimize: !aiOptions.optimize })}

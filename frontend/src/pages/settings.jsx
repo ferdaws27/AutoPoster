@@ -8,11 +8,13 @@ import ApiKeysStorage from "../components/ApiKeysStorage";
 import ExportDanger from "../components/ExportDanger";
 import { apiFetch } from "../services/api";
 import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState("integrations");
   const { user } = useOutletContext();
-  const { updateSettings } = useSettings();
+  const { updateSettings, voiceProfile } = useSettings();
+  const t = useTranslation();
 
   // Load settings synchronously to avoid initialData being null on first render
   const [initialSettings] = useState(() => {
@@ -79,6 +81,7 @@ export default function SettingsPage() {
       posting: postingData,
       api: apiData,
       danger: dangerData,
+      ...(voiceProfile ? { voiceProfile } : {}),
       lastUpdated: new Date().toISOString(),
     };
     updateSettings(payload);
@@ -98,6 +101,7 @@ export default function SettingsPage() {
         posting: postingData,
         api: apiData,
         danger: dangerData,
+        ...(voiceProfile ? { voiceProfile } : {}),
         lastUpdated: new Date().toISOString(),
       };
 
@@ -173,10 +177,10 @@ export default function SettingsPage() {
       {/* HEADER */}
       <div className="flex items-center justify-between mb-8 px-8 pt-8">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">{t("settings.title")}</h1>
           <p className="text-gray-400">
-            Manage your account preferences and integrations
-            {hasChanges && <span className="ml-3 text-yellow-400">• Unsaved changes</span>}
+            {t("settings.subtitle")}
+            {hasChanges && <span className="ml-3 text-yellow-400">• {t("settings.unsavedChanges")}</span>}
           </p>
         </div>
 
@@ -187,7 +191,7 @@ export default function SettingsPage() {
             className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <i className={`fa-solid fa-sync text-sm ${saving && "fa-spin"}`}></i>
-            <span className="text-sm">Sync Settings</span>
+            <span className="text-sm">{t("settings.syncSettings")}</span>
           </button>
 
           <button
@@ -197,7 +201,7 @@ export default function SettingsPage() {
             className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <i className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-save"}`}></i>
-            <span>{saving ? "Saving..." : "Save Changes"}</span>
+            <span>{saving ? t("settings.saving") : t("settings.saveChanges")}</span>
           </button>
         </div>
       </div>
@@ -208,7 +212,7 @@ export default function SettingsPage() {
           {/* LEFT NAV */}
           <div className="col-span-3">
             <div className="glass-effect rounded-3xl p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-white mb-4">Categories</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">{t("nav.main") === "Principal" ? "Catégories" : "Categories"}</h2>
               <nav className="space-y-2">
                 <button
                   onClick={() => handleCategoryClick("integrations", integrationsRef)}
@@ -219,7 +223,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-plug w-5" />
-                  <span>Integrations</span>
+                  <span>{t("settings.integrations")}</span>
                 </button>
 
                 <button
@@ -231,7 +235,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-brain w-5" />
-                  <span>AI Preferences</span>
+                  <span>{t("settings.aiPreferences")}</span>
                 </button>
 
                 <button
@@ -243,7 +247,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-clock w-5" />
-                  <span>Posting</span>
+                  <span>{t("settings.posting")}</span>
                 </button>
 
                 <button
@@ -255,7 +259,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-key w-5" />
-                  <span>API & Storage</span>
+                  <span>{t("settings.apiStorage")}</span>
                 </button>
 
                 <button
@@ -267,7 +271,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-exclamation-triangle w-5" />
-                  <span>Export & Danger</span>
+                  <span>{t("settings.exportDanger")}</span>
                 </button>
               </nav>
         </div>

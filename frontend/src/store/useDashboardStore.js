@@ -138,7 +138,7 @@ const useDashboardStore = create((set, get) => ({
 
   refreshAIIdeas: async () => {
     try {
-      set({ aiSuggestion: "Génération d'idées AI en cours..." });
+      set({ aiSuggestion: "Generating AI ideas..." });
       
       // Incrémenter le compteur de générations
       const currentCount = get().generationCount + 1;
@@ -152,6 +152,11 @@ const useDashboardStore = create((set, get) => ({
           generationCount: currentCount,
           model: settings.modelId,
           temperature: settings.temperature,
+          tone: settings.toneLabel,
+          creativity: settings.creativity,
+          contentLength: settings.contentLength,
+          voiceProfile: settings.voiceProfile,
+          language: settings.language || "en",
         }),
       });
 
@@ -167,63 +172,63 @@ const useDashboardStore = create((set, get) => ({
 
       set({ 
         aiIdeas: formattedIdeas, 
-        aiSuggestion: `✅ Génération ${currentCount} complétée : 5 nouvelles idées ${data.phase} !` 
+        aiSuggestion: `✅ Generation ${currentCount} completed: 5 new ${data.phase} ideas!` 
       });
       
     } catch (error) {
-      console.error("Erreur lors de la génération des idées AI:", error);
+      console.error("Error generating AI ideas:", error);
       
-      // En cas d'erreur, générer des idées de fallback dynamiques basées sur la génération
-      const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long' });
+      // On error, generate dynamic fallback ideas based on generation count
+      const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long' });
       const fallbackThemes = [
         {
-          phase: "découverte",
+          phase: "discovery",
           topics: [
-            `IA ${currentMonth}: nouveautés à découvrir`,
-            `Tech émergentes: ce qui est nouveau`,
-            `Outils IA: dernières sorties`,
-            `Tendances: innovations récentes`,
-            `Découverte: technologies fraîches`
+            `AI in ${currentMonth}: new tools to explore`,
+            `Emerging tech: what's new and exciting`,
+            `AI tools: latest releases`,
+            `Trends: recent innovations`,
+            `Discovery: fresh technologies`
           ]
         },
         {
-          phase: "approfondissement",
+          phase: "deep-dive",
           topics: [
-            `Productivité: optimiser 80% du travail`,
-            `Stratégies IA avancées`,
-            `Workflow: techniques concrètes`,
-            `Optimisation: méthodes éprouvées`,
-            `Performance: comment améliorer`
+            `Productivity: optimize 80% of your workflow`,
+            `Advanced AI strategies`,
+            `Workflow: concrete techniques`,
+            `Optimization: proven methods`,
+            `Performance: how to improve`
           ]
         },
         {
-          phase: "spécialisation",
+          phase: "specialization",
           topics: [
-            `Prompts experts pour développeurs`,
-            `Niches techniques pointues`,
-            `Spécialisation: sujets avancés`,
-            `Expertise: compétences rares`,
-            `Maitrise: techniques pro`
+            `Expert prompts for developers`,
+            `Advanced technical niches`,
+            `Specialization: advanced topics`,
+            `Expertise: rare skills`,
+            `Mastery: pro techniques`
           ]
         },
         {
-          phase: "expérimentation",
+          phase: "experimentation",
           topics: [
-            `Test: 30 jours sans réseaux sociaux`,
-            `Approches non conventionnelles`,
-            `Expérimentation: essayer l'inattendu`,
-            `Innovation: sortir du cadre`,
-            `Test: méthodes originales`
+            `Challenge: 30 days without social media`,
+            `Unconventional approaches`,
+            `Experimentation: try the unexpected`,
+            `Innovation: think outside the box`,
+            `Testing: original methods`
           ]
         },
         {
           phase: "domination",
           topics: [
-            `Leadership: devenir référent IA`,
-            `Autorité: expertise LinkedIn`,
-            `Domination: stratégie market`,
-            `Influence: construire sa marque`,
-            `Excellence: leader du domaine`
+            `Leadership: become the AI reference`,
+            `Authority: LinkedIn expertise`,
+            `Domination: market strategy`,
+            `Influence: build your brand`,
+            `Excellence: lead the field`
           ]
         }
       ];
@@ -236,13 +241,13 @@ const useDashboardStore = create((set, get) => ({
         category: ["Strategy", "Trend", "Growth", "Tips", "Tech"][index],
         platform: ["twitter", "linkedin", "medium", "twitter", "linkedin"][index],
         title: topic,
-        desc: `Stratégie ${currentFallbackTheme.phase} pour ${currentMonth}.`,
+        desc: `${currentFallbackTheme.phase} strategy for ${currentMonth}.`,
         status: ["Scheduled", "Review", "Draft", "Scheduled", "Review"][index],
       }));
       
       set({ 
         aiIdeas: fallbackIdeas, 
-        aiSuggestion: `⚠️ Erreur: ${error.message}` 
+        aiSuggestion: `⚠️ Error: ${error.message}` 
       });
     }
   },

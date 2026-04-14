@@ -25,7 +25,7 @@ export async function apiFetch(path, options = {}) {
 
   if (!res.ok) {
     const msg =
-      (data && data.message) || (typeof data === "string" ? data : "Erreur API");
+      (data && (data.message || data.error)) || (typeof data === "string" ? data : "Erreur API");
     throw new Error(msg);
   }
 
@@ -45,26 +45,3 @@ export async function aiGenerate({ prompt, model, temperature, max_tokens }) {
   return data.content;
 }
 
-// ─── A/B Test API ───
-export async function createABTest(payload) {
-  return apiFetch("/api/ab-tests/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getABTests() {
-  return apiFetch("/api/ab-tests/");
-}
-
-export async function runABTest(testId) {
-  return apiFetch(`/api/ab-tests/${testId}/run`, { method: "POST" });
-}
-
-export async function deleteABTest(testId) {
-  return apiFetch(`/api/ab-tests/${testId}`, { method: "DELETE" });
-}
-
-export async function getABStats() {
-  return apiFetch("/api/ab-tests/stats");
-}

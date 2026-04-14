@@ -61,6 +61,50 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* ================= VOICE CLONER ================= */
+.neo-card {
+  background: rgba(14, 17, 22, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.neo-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.tab-active {
+  background: linear-gradient(135deg, #00C2FF, #7B61FF);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(0, 194, 255, 0.3);
+}
+
+.tab-inactive {
+  color: #9ca3af;
+}
+
+.tab-inactive:hover {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tone-badge {
+  background: rgba(123, 97, 255, 0.15);
+  color: #c4b5fd;
+}
+
+.voice-card {
+  transition: all 0.3s ease;
+}
+
+.voice-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  border-color: rgba(0, 194, 255, 0.25);
+}
+
 /* ================= GLOW BORDER ================= */
 .glow-border {
   box-shadow: 0 0 20px rgba(0, 194, 255, 0.1);

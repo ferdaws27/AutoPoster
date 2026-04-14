@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
 import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 import { aiGenerate } from "../services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -28,9 +29,14 @@ import {
 
 export default function CreatePostPage() {
   const { createPost, posts, stats: hookStats } = usePosts();
-  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity } = useSettings();
+  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity, language } = useSettings();
+  const t = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const ideaRef = useRef(null);
+
+  // If navigated from Train from Files with a temporary voice, use it instead of saved voice
+  const activeVoice = location.state?.tempVoice || voiceProfile;
 
   const [charCount, setCharCount] = useState(0);
   const [publishTo, setPublishTo] = useState({
@@ -285,18 +291,9 @@ export default function CreatePostPage() {
       return alert("Select at least one platform");
     }
 
+    setLoading(true);
     const newVariations = {};
     const currentCount = generationCount + 1;
-
-    // Build voice style instruction from trained profile
-    const voiceInstruction = voiceProfile
-      ? `\nIMPORTANT - Match this writing style:
-- Tone: ${voiceProfile.tone} / ${voiceProfile.sentiment}
-- Style: ${voiceProfile.writingStyle}
-- Theme: ${voiceProfile.primaryTheme}
-- Keywords to weave in: ${(voiceProfile.keywords || []).slice(0, 5).join(", ")}
-`
-      : "";
 
     const toneDescriptions = {
       professional: "formal language, structured sentences, business vocabulary, no slang, no emojis, data-driven insights",
@@ -314,7 +311,7 @@ export default function CreatePostPage() {
     const systemMessage = `You are an elite social media content creator who has built audiences of 100K+ followers across platforms. You write content that stops the scroll, sparks engagement, and builds authority.
 
 RULE 0 — LANGUAGE (HIGHEST PRIORITY):
-Detect the language of the user's topic/idea. Write ALL content in THAT SAME LANGUAGE.
+Detect the language of the user's topic/idea below. Write ALL content in THAT SAME LANGUAGE.
 - If the topic is in French → write entirely in French
 - If the topic is in English → write entirely in English
 - If the topic is in Arabic → write entirely in Arabic
@@ -339,12 +336,21 @@ RULE 4 — SCROLL-STOPPING QUALITY:
 - Write like a human with opinions, not an AI summarizing information
 
 CREATIVITY LEVEL: ${creativity}
-${voiceProfile ? `
-VOICE PROFILE TO MATCH (this is the user's trained writing style — replicate it):
-- Tone: ${voiceProfile.tone} / ${voiceProfile.sentiment}
-- Style: ${voiceProfile.writingStyle}
-- Theme: ${voiceProfile.primaryTheme}
-- Signature keywords: ${(voiceProfile.keywords || []).slice(0, 5).join(", ")}` : ""}
+${activeVoice ? `
+VOICE PROFILE TO MATCH (this is the user's trained writing style — replicate it closely):
+- Voice: "${activeVoice.name}"
+- Tone: ${activeVoice.tone}
+- Structure: ${activeVoice.structure}
+- Sentence Style: ${activeVoice.sentenceStyle}
+- Emoji Usage: ${activeVoice.emojiUsage}
+- Hashtag Usage: ${activeVoice.hashtagUsage}
+- Vocabulary Level: ${activeVoice.vocabularyLevel}
+- Hook Style: ${activeVoice.hookStyle}
+- CTA Style: ${activeVoice.ctaStyle}
+- Content Themes: ${(activeVoice.contentThemes || []).join(", ")}
+- Writing Patterns: ${(activeVoice.writingPatterns || []).join(", ")}
+- Unique Traits: ${(activeVoice.uniqueTraits || []).join(", ")}
+${activeVoice.samplePost ? `- Example of their writing: "${activeVoice.samplePost}"` : ""}` : ""}
 
 All rules carry EQUAL weight. Never sacrifice format for tone, tone for length, or quality for any constraint.`;
     const isShort = contentLength.toLowerCase().includes("short");
@@ -462,25 +468,13 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
         userPrompt += langReminder;
 
         try {
-          const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-              "HTTP-Referer": "http://localhost:5173",
-              "X-Title": "AutoPoster App",
-            },
-            body: JSON.stringify({
-              model: modelId,
-              messages: [
-                { role: "system", content: systemMessage },
-                { role: "user", content: userPrompt },
-              ],
-              max_tokens: platform === "Twitter" ? 100 : 300,
-              temperature,
-            }),
+          const generatedContent = await aiGenerate({
+            prompt: systemMessage + "\n\n" + userPrompt,
+            model: modelId,
+            max_tokens: platform === "Twitter" ? 100 : 300,
+            temperature,
           });
-          newVariations[platform] = content;
+          newVariations[platform] = generatedContent || "";
         } catch (fetchError) {
           console.warn(`API failed for ${platform}, using fallback`, fetchError);
           newVariations[platform] = generateAlternativeMockContent(platform, idea);
@@ -510,28 +504,6 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
     } catch (err) {
       console.error("Error generating AI idea:", err);
       return null;
-    }
-  };
-
-  const generateMockContent = async (platform, idea, count) => {
-    let prompt = "";
-    if (platform === "Twitter") {
-      prompt = `Write a scroll-stopping Twitter post (STRICT max 280 characters) about: ${idea}. Hook first, value second, CTA last. Use line breaks for rhythm. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — be completely unique.`;
-    } else if (platform === "LinkedIn") {
-      prompt = `Write a professional LinkedIn post about: ${idea}. Start with a bold headline, add 3 key insights with bullet points, end with a discussion question. Use line breaks for readability. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — fresh perspective.`;
-    } else {
-      prompt = `Write a Medium article preview about: ${idea}. SEO-friendly title, compelling intro, 2 section headings with insights, end with a teaser for the full article. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — unique angle.`;
-    }
-
-    try {
-      return await aiGenerate({
-        prompt,
-        model: modelId,
-        max_tokens: platform === "Twitter" ? 100 : 300,
-      });
-    } catch (err) {
-      console.error(`Error generating ${platform} content:`, err);
-      return `Unable to generate ${platform} content.`;
     }
   };
 
@@ -654,21 +626,43 @@ Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
     setLoading(true);
 
     try {
-      let prompt = "";
+      const toneDescriptions = {
+        professional: "formal language, structured sentences, business vocabulary, no slang, no emojis, data-driven insights",
+        friendly: "warm and approachable language, light emojis allowed, conversational but informative, encouraging tone",
+        casual: "relaxed everyday language, emojis encouraged, short punchy sentences, speak like talking to a friend, use humor",
+      };
 
+      const lengthInstructions = {
+        "Short (50–100 words)": "STRICT LIMIT: 50-100 words maximum. Be concise. Cut any filler.",
+        "Medium (100–200 words)": "Target 100-200 words. Balanced detail.",
+        "Long (200+ words)": "Write 200+ words. Go in-depth with details.",
+        "Auto-adjust": "Adjust length naturally to fit the platform.",
+      };
+
+      const systemMessage = `You are an elite social media content creator. Write scroll-stopping content.
+
+VOICE & TONE: Write in a ${toneLabel} tone. ${toneDescriptions[toneLabel] || ""}
+CONTENT LENGTH: ${lengthInstructions[contentLength] || contentLength}
+CREATIVITY LEVEL: ${creativity}
+${activeVoice ? `VOICE PROFILE: ${activeVoice.name} — Tone: ${activeVoice.tone}, Structure: ${activeVoice.structure}, Sentence Style: ${activeVoice.sentenceStyle}, Hook: ${activeVoice.hookStyle}, CTA: ${activeVoice.ctaStyle}, Themes: ${(activeVoice.contentThemes || []).join(", ")}, Traits: ${(activeVoice.uniqueTraits || []).join(", ")}${activeVoice.samplePost ? `, Example: "${activeVoice.samplePost}"` : ""}` : ""}
+
+Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
+
+      let userPrompt = "";
       if (platform === "Twitter") {
-        prompt = `Create a completely different Twitter post about: ${idea}.`;
+        userPrompt = `Create a completely different Twitter post (max 280 chars) about: ${idea}. Write something fresh and unique.`;
       } else if (platform === "LinkedIn") {
-        prompt = `Write a fresh LinkedIn post about: ${idea}.`;
+        userPrompt = `Write a fresh LinkedIn post about: ${idea}. Bold headline, key insights with bullet points, end with a discussion question.`;
       } else {
-        prompt = `Create a unique Medium article preview about: ${idea}.`;
+        userPrompt = `Create a unique Medium article preview about: ${idea}. SEO-friendly title, compelling intro, section headings with insights.`;
       }
 
       try {
         const newContent = await aiGenerate({
-          prompt,
+          prompt: systemMessage + "\n\n" + userPrompt,
           model: modelId,
           max_tokens: platform === "Twitter" ? 100 : 300,
+          temperature,
         });
 
         setVariations((prev) => ({
@@ -713,7 +707,7 @@ Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
     setLoading(true);
 
     try {
-      const prompt = `Enhance and improve this idea: "${idea}".`;
+      const prompt = `Enhance and improve this idea: "${idea}".${activeVoice ? `\nApply this voice style — Tone: ${activeVoice.tone}, Structure: ${activeVoice.structure}, Sentence Style: ${activeVoice.sentenceStyle}, Hook: ${activeVoice.hookStyle}, Emoji: ${activeVoice.emojiUsage}, Traits: ${(activeVoice.uniqueTraits || []).join(', ')}` : ''}`;
 
       const enhancedIdea = await aiGenerate({
         prompt,
@@ -832,7 +826,7 @@ const saveDraft = async () => {
     setLoading(true);
 
     try {
-      const prompt = `Based on this content idea: "${idea}", provide 3 actionable suggestions as JSON.`;
+      const prompt = `Based on this content idea: "${idea}", provide 3 actionable suggestions as JSON.${voiceProfile ? `\nConsider this voice profile — Tone: ${voiceProfile.tone}, Structure: ${voiceProfile.structure}, Hook: ${voiceProfile.hookStyle}, Patterns: ${(voiceProfile.writingPatterns || []).join(', ')}` : ''}`;
 
       const content = await aiGenerate({
         prompt,
@@ -876,31 +870,49 @@ const saveDraft = async () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                Compose & Generate Post
+                {t("create.title")}
               </h1>
               <p className="text-gray-400">
-                Write once, publish everywhere with AI optimization
+                {t("create.subtitle")}
               </p>
             </div>
             <div className="flex items-center space-x-4">
               <button className="px-4 py-2 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all">
                 <FontAwesomeIcon icon={faHistory} className="mr-2" />
-                History
+                {t("create.history")}
               </button>
               <button
                 onClick={() => setShowAiAssistant(true)}
                 className="px-4 py-2 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"
               >
                 <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
-                AI Assist
+                {t("create.aiAssist")}
               </button>
             </div>
           </div>
+
+          {/* Temp voice banner when navigated from Train from Files */}
+          {location.state?.tempVoice && (
+            <div className="mt-4 flex items-center justify-between p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/30">
+              <div className="flex items-center space-x-3">
+                <i className="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+                <span className="text-cyan-300 text-sm font-medium">
+                  Using analyzed voice: <span className="text-white">{location.state.tempVoice.tone}</span> — {location.state.tempVoice.sentenceStyle}
+                </span>
+              </div>
+              <button
+                onClick={() => navigate("/dashboard/CreatePostPage", { replace: true })}
+                className="text-gray-400 hover:text-white text-xs border border-gray-600 px-3 py-1 rounded-lg"
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="p-8 pb-0">
           <div className="flex items-center space-x-6">
-            <span className="text-gray-400 font-medium">Publish to:</span>
+            <span className="text-gray-400 font-medium">{t("create.publishTo")}</span>
             {["Twitter", "LinkedIn", "Medium"].map((platform) => (
               <label key={platform} className="flex items-center cursor-pointer">
                 <input
@@ -945,7 +957,7 @@ const saveDraft = async () => {
                 <div>
                   <p className="text-green-400 text-sm font-medium mb-1">
                     <i className="fa-solid fa-check-circle mr-2"></i>
-                    Hook inséré depuis le HookGenerator
+                    {t("create.hookInserted")}
                   </p>
                   <p className="text-gray-400 text-xs">
                     Score: {hookInfo.score}% | Platform: {hookInfo.platform} | Type: {hookInfo.type}
@@ -956,17 +968,17 @@ const saveDraft = async () => {
                   className="px-3 py-1 bg-cyan-400/20 border border-cyan-400/50 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/30"
                 >
                   <i className="fa-solid fa-arrow-left mr-1"></i>
-                  Retour
+                  {t("create.back")}
                 </button>
               </div>
             </div>
           )}
           <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Your Idea</h2>
+              <h2 className="text-xl font-semibold text-white">{t("create.yourIdea")}</h2>
               <div className="flex items-center space-x-3">
                 <span className="text-gray-400 text-sm">
-                  AI will optimize for each platform
+                  {t("create.aiOptimize")}
                 </span>
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               </div>
@@ -976,26 +988,18 @@ const saveDraft = async () => {
               <textarea
                 ref={ideaRef}
                 className="w-full h-48 bg-gray-800/50 border border-gray-600 rounded-2xl p-6 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none transition-colors"
-                placeholder={`Write your idea or topic here...
-
-Examples:
-• Share insights about AI in content marketing
-• Discuss productivity tips for remote work
-• Review the latest industry trends
-• Tell a story about overcoming challenges
-
-The AI will adapt your content for each platform's unique style and audience.`}
+                placeholder={t("create.placeholder")}
               ></textarea>
               <div className="absolute bottom-4 right-4 flex items-center space-x-4">
                 <span className="text-gray-500 text-sm">
-                  <span id="char-count">{charCount}</span> characters
+                  <span id="char-count">{charCount}</span> {t("create.characters")}
                 </span>
                 <button
                   onClick={enhanceContent}
                   className="px-4 py-2 rounded-xl bg-violet-400/20 text-violet-400 hover:bg-violet-400/30 transition-colors"
                 >
                   <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
-                  AI Enhance
+                  {t("create.aiEnhance")}
                 </button>
               </div>
             </div>
@@ -1121,7 +1125,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                               : "text-green-400"
                           }`}
                         />
-                        Suggested Images
+                        {t("create.suggestedImages")}
                       </h4>
                       <div className="grid grid-cols-3 gap-2">
                         {(selectedImages[platform] || []).map((image, index) => (
@@ -1175,7 +1179,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                         {(!selectedImages[platform] ||
                           selectedImages[platform].length === 0) && (
                           <div className="col-span-3 text-gray-500 text-sm text-center py-4">
-                            Click "Plan Images" to search Google for relevant images
+                            {t("create.clickPlanImages")}
                           </div>
                         )}
                       </div>
@@ -1194,7 +1198,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="flex items-center px-6 py-3 rounded-2xl bg-violet-400/20 border border-violet-400/30 text-violet-400 hover:bg-violet-400/30 transition-all"
             >
               <FontAwesomeIcon icon={faPalette} className="mr-2" />
-              Plan Images
+              {t("create.planImages")}
             </button>
 
             <button
@@ -1202,7 +1206,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="flex items-center px-6 py-3 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"
             >
               <FontAwesomeIcon icon={faComments} className="mr-2" />
-              Generate Text
+              {t("create.generateText")}
             </button>
 
             <button
@@ -1210,7 +1214,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="flex items-center px-6 py-3 rounded-2xl bg-gray-700 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all"
             >
               <FontAwesomeIcon icon={faSave} className="mr-2" />
-              Save Draft
+              {t("create.saveDraft")}
             </button>
 
             <button
@@ -1218,7 +1222,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="flex items-center px-6 py-3 rounded-2xl bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/30 transition-all"
             >
               <FontAwesomeIcon icon={faClock} className="mr-2" />
-              Schedule
+              {t("create.schedule")}
             </button>
           </div>
         </div>
@@ -1231,7 +1235,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                   <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center mr-3">
                     <FontAwesomeIcon icon={faRobot} className="text-white" />
                   </div>
-                  <h3 className="text-white font-semibold">AI Assistant</h3>
+                  <h3 className="text-white font-semibold">{t("create.aiAssistant")}</h3>
                 </div>
                 <div className="flex items-center space-x-2">
                   {loading && (
@@ -1254,7 +1258,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                       className="text-cyan-400 animate-spin text-xl mb-2"
                     />
                     <p className="text-gray-400 text-sm">
-                      Generating AI suggestions...
+                      {t("create.generatingAiSuggestions")}
                     </p>
                   </div>
                 ) : aiSuggestions.length > 0 ? (
@@ -1279,7 +1283,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                 ) : (
                   <div className="p-4 bg-gray-800/50 rounded-2xl text-center">
                     <p className="text-gray-400 text-sm">
-                      Enter an idea and click "Get More Tips" for personalized suggestions
+                      {t("create.enterIdeaForTips")}
                     </p>
                   </div>
                 )}
@@ -1291,7 +1295,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                 className="w-full mt-4 p-3 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
-                Get More Tips
+                {t("create.getMoreTips")}
               </button>
             </div>
           </div>
@@ -1304,7 +1308,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-green-400/50 hover:bg-green-400/5 transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Drafts</span>
+                <span className="text-gray-400 text-sm">{t("create.drafts")}</span>
                 <FontAwesomeIcon icon={faFileText} className="text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-white">{stats.drafts}</div>
@@ -1316,7 +1320,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Scheduled</span>
+                <span className="text-gray-400 text-sm">{t("create.scheduledLabel")}</span>
                 <FontAwesomeIcon icon={faCalendar} className="text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-white">{stats.scheduled}</div>
@@ -1328,7 +1332,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-violet-400/50 hover:bg-violet-400/5 transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Published</span>
+                <span className="text-gray-400 text-sm">{t("create.published")}</span>
                 <FontAwesomeIcon icon={faCheckCircle} className="text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-white">{stats.published}</div>
@@ -1342,7 +1346,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
               className="card-bg rounded-2xl p-6 border border-gray-700 cursor-pointer hover:border-green-400/50 hover:bg-green-400/5 transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Engagement</span>
+                <span className="text-gray-400 text-sm">{t("create.engagementLabel")}</span>
                 <FontAwesomeIcon icon={faHeart} className="text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-white">
@@ -1359,7 +1363,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
             <div className="card-bg rounded-3xl p-8 max-w-2xl w-full border border-gray-700 relative">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Schedule Posts</h2>
+                <h2 className="text-2xl font-bold text-white">{t("create.schedulePosts")}</h2>
                 <button
                   onClick={() => setShowScheduleModal(false)}
                   className="p-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-all"
@@ -1370,7 +1374,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-white font-medium mb-2">Date</label>
+                  <label className="block text-white font-medium mb-2">{t("create.date")}</label>
                   <input
                     type="date"
                     value={scheduleDate}
@@ -1379,7 +1383,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                   />
                 </div>
                 <div>
-                  <label className="block text-white font-medium mb-2">Time</label>
+                  <label className="block text-white font-medium mb-2">{t("create.time")}</label>
                   <input
                     type="time"
                     value={scheduleTime}
@@ -1391,7 +1395,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
 
               <div className="mb-6">
                 <label className="block text-white font-medium mb-2">
-                  Platforms
+                  {t("create.platformsLabel")}
                 </label>
                 <div className="flex space-x-4">
                   {["Twitter", "LinkedIn", "Medium"].map((platform) => (
@@ -1441,7 +1445,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                   onClick={schedulePosts}
                   className="flex-1 p-4 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"
                 >
-                  Schedule Posts
+                  {t("create.schedulePosts")}
                 </button>
               </div>
             </div>
@@ -1455,16 +1459,16 @@ The AI will adapt your content for each platform's unique style and audience.`}
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-400/20 flex items-center justify-center">
                   <FontAwesomeIcon icon={faSave} className="text-green-400 text-2xl" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Save Draft</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">{t("create.saveDraftTitle")}</h2>
                 <p className="text-gray-400">
-                  Give your draft a name to find it easily later
+                  {t("create.saveDraftSubtitle")}
                 </p>
               </div>
 
               <div className="mb-6">
                 <input
                   type="text"
-                  placeholder="Draft name..."
+                  placeholder={t("create.draftNamePlaceholder")}
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                   className="w-full p-4 rounded-2xl bg-gray-800 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none"
@@ -1482,7 +1486,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
                   onClick={saveDraft}
                   className="flex-1 p-4 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"
                 >
-                  Save Draft
+                  {t("create.saveDraft")}
                 </button>
               </div>
             </div>
@@ -1492,7 +1496,7 @@ The AI will adapt your content for each platform's unique style and audience.`}
         {loading && (
           <div className="text-center text-white mb-8">
             <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
-            Generating...
+            {t("create.generating")}
           </div>
         )}
       </div>

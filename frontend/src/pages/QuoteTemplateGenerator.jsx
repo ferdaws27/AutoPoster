@@ -4,7 +4,7 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import useSettings from "../hooks/useSettings";
 
 export default function QuoteTemplate() {
-  const { connectedPlatforms } = useSettings();
+  const { connectedPlatforms, voiceProfile } = useSettings();
   const [quote, setQuote] = useState("");
   const [charCount, setCharCount] = useState(0);
   const defaultPlatforms = Object.entries(connectedPlatforms)
@@ -77,6 +77,7 @@ export default function QuoteTemplate() {
           quote,
           selectedPlatforms,
           brandEnabled,
+          voiceProfile: voiceProfile || null,
         }),
       });
 

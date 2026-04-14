@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import useSettings from "../hooks/useSettings";
 
 export default function Generate({ text, selectedType }) {
+  const { voiceProfile } = useSettings();
   const [uiState, setUiState] = useState("idle"); // idle | loading | results
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -88,7 +90,7 @@ export default function Generate({ text, selectedType }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, type: selectedType }),
+        body: JSON.stringify({ text, type: selectedType, voiceProfile: voiceProfile || null }),
       });
 
       const data = await res.json();
