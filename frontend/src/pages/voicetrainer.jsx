@@ -5,7 +5,7 @@ export default function VoiceTrainer() {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
-  const [phase, setPhase] = useState("upload"); // upload | recording | uploading | analysis | results
+  const [phase, setPhase] = useState("upload"); // upljoad | recording | uploading | analysis | results
   const [progress, setProgress] = useState(0);
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);

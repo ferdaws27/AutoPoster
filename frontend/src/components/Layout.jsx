@@ -35,6 +35,7 @@ export default function Layout() {
         ["fa-users", t("nav.audienceAnalyzer"), "audience-analyzer"],
         ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
         ["fa-star", t("nav.aiReputation"), "AIReputationPage"],
+        ["fa-flask", "A/B Tester", "ABTesterPage"],
       ],
     },
     {
