@@ -33,9 +33,10 @@ export default function Layout() {
         ["fa-chart-line", t("nav.analytics"), "analytics"],
         ["fa-bolt", t("nav.performanceOptimizer"), "PerformanceOptimizer"],
         ["fa-users", t("nav.audienceAnalyzer"), "audience-analyzer"],
+        ["fa-flask", t("nav.abTester"), "ABTesterPage"],
         ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
         ["fa-star", t("nav.aiReputation"), "AIReputationPage"],
-        ["fa-flask", "A/B Tester", "ABTesterPage"],
+        
       ],
     },
     {

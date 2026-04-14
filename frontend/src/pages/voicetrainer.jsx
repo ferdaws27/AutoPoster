@@ -1,7 +1,35 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../services/api";
+import useTranslation from "../i18n/useTranslation";
+
+/* ================= HELPERS ================= */
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const now = new Date();
+  const date = new Date(dateStr);
+  const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+function getUserId() {
+  try {
+    const u = JSON.parse(localStorage.getItem("user") || "{}");
+    return u._id || u.id || "guest";
+  } catch { return "guest"; }
+}
 
 export default function VoiceTrainer() {
+  const t = useTranslation();
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -11,6 +39,11 @@ export default function VoiceTrainer() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [showSaved, setShowSaved] = useState(false);
+
+  /* ================= SAVED PRESETS STATE ================= */
+  const [presets, setPresets] = useState([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [expandedPreset, setExpandedPreset] = useState(null);
 
   /* ================= RECORDING STATE ================= */
   const [isRecording, setIsRecording] = useState(false);
@@ -260,6 +293,50 @@ export default function VoiceTrainer() {
     };
   }, []);
 
+  /* ================= LOAD PRESETS FROM MONGO ================= */
+  useEffect(() => { loadPresets(); }, []);
+
+  const loadPresets = async () => {
+    try {
+      setPresetsLoading(true);
+      const data = await apiFetch(`/api/clone/presets?user_id=${getUserId()}`);
+      if (data.success) {
+        // Show vocal presets (type personal or sourceType vocal)
+        const vocal = (data.presets || []).filter(p =>
+          p.type === "personal" || p.analysis?.sourceType === "vocal" || p.profile?.platform === "Audio"
+        );
+        setPresets(vocal);
+      }
+    } catch (e) {
+      console.error("Failed to load presets:", e);
+    } finally {
+      setPresetsLoading(false);
+    }
+  };
+
+  const handleDeletePreset = async (id) => {
+    try {
+      await apiFetch(`/api/clone/presets/${id}`, { method: "DELETE" });
+      setPresets(prev => prev.filter(p => p._id !== id));
+      if (expandedPreset?._id === id) setExpandedPreset(null);
+    } catch (e) {
+      console.error("Delete failed:", e);
+    }
+  };
+
+  const handleActivatePreset = async (id) => {
+    try {
+      await apiFetch(`/api/clone/presets/${id}/activate`, {
+        method: "POST",
+        body: JSON.stringify({ user_id: getUserId() }),
+      });
+      setPresets(prev => prev.map(p => ({ ...p, active: p._id === id })));
+      if (expandedPreset) setExpandedPreset(prev => ({ ...prev, active: prev._id === id }));
+    } catch (e) {
+      console.error("Activate failed:", e);
+    }
+  };
+
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   /* ================= FILE HANDLING ================= */
@@ -371,26 +448,22 @@ export default function VoiceTrainer() {
         };
 
     try {
-      const token = localStorage.getItem("token");
-      const resp = await fetch("http://127.0.0.1:5000/api/clone/presets", {
+      const presetName = file?.name ? `Vocal: ${file.name}` : `Vocal: Recording ${new Date().toLocaleDateString()}`;
+      const data = await apiFetch("/api/clone/presets", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
-          user_id: JSON.parse(atob(token.split(".")[1])).sub,
-          name: `Vocal: ${file?.name || "Recording"}`,
-          profile: { name: `Vocal: ${file?.name || "Recording"}`, platform: "Audio", imageUrl: null },
+          user_id: getUserId(),
+          name: presetName,
+          profile: { name: presetName, platform: "Audio", imageUrl: null },
           analysis,
           postStats: null,
           url: "",
           type: "personal",
         }),
       });
-      const data = await resp.json();
       if (data.success) {
         setShowSaved(true);
+        loadPresets(); // Refresh presets list
       }
     } catch (e) {
       console.error("Save failed:", e);
@@ -444,9 +517,9 @@ export default function VoiceTrainer() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-rose-500 to-violet-500 flex items-center justify-center shadow-lg">
             <i className="fa-solid fa-microphone-lines text-3xl text-white"></i>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-3">Voice Analyzer</h1>
+          <h1 className="text-4xl font-bold text-white mb-3">{t("voiceTrainer.title")}</h1>
           <p className="text-xl text-gray-300 mb-2">
-            Analyze your speaking voice to create an authentic AI voice profile
+            {t("voiceTrainer.subtitle")}
           </p>
           <p className="text-gray-400">
             Record your voice or upload a recording — our AI will detect your tone, pace, energy, and speaking patterns
@@ -539,7 +612,7 @@ export default function VoiceTrainer() {
                     <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center shadow-lg group-hover:shadow-rose-500/30 transition-shadow">
                       <i className="fa-solid fa-microphone text-3xl text-white"></i>
                     </div>
-                    <h3 className="text-xl font-semibold text-white mb-2">Record Your Voice</h3>
+                    <h3 className="text-xl font-semibold text-white mb-2">{t("voiceTrainer.startRecording")}</h3>
                     <p className="text-gray-400 text-sm">
                       Speak directly into your microphone
                     </p>
@@ -621,7 +694,7 @@ export default function VoiceTrainer() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-400/20 flex items-center justify-center pulse-glow">
                 <i className="fa-solid fa-ear-listen text-2xl text-rose-400"></i>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Analyzing Your Voice</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{t("voiceTrainer.analyzing")}</h2>
               <p className="text-gray-400 analyzing-dots">AI is listening to your recording</p>
             </div>
 
@@ -657,7 +730,7 @@ export default function VoiceTrainer() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-400/20 flex items-center justify-center">
                 <i className="fa-solid fa-check-circle text-2xl text-green-400"></i>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Voice Analysis Complete!</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{t("voiceTrainer.results")}</h2>
               <p className="text-gray-400">Here's what we detected from your voice recording</p>
             </div>
 
@@ -767,9 +840,9 @@ export default function VoiceTrainer() {
                       Topics Mentioned
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {(result.ai?.contentThemes || result.spacy?.keywords?.slice(0, 6) || []).map((t, i) => (
+                      {(result.ai?.contentThemes || result.spacy?.keywords?.slice(0, 6) || []).map((theme, i) => (
                         <span key={i} className="keyword-tag px-3 py-1 rounded-lg text-sm font-medium text-yellow-300">
-                          {t}
+                          {theme}
                         </span>
                       ))}
                     </div>
@@ -802,9 +875,9 @@ export default function VoiceTrainer() {
                       <div>
                         <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">Unique Traits</p>
                         <div className="flex flex-wrap gap-2">
-                          {result.ai.uniqueTraits.map((t, i) => (
+                          {result.ai.uniqueTraits.map((trait, i) => (
                             <span key={i} className="px-3 py-1 rounded-lg text-sm font-medium text-rose-300 bg-rose-400/10 border border-rose-400/20">
-                              {t}
+                              {trait}
                             </span>
                           ))}
                         </div>
@@ -835,7 +908,7 @@ export default function VoiceTrainer() {
                 onClick={saveVoicePreset}
               >
                 <i className="fa-solid fa-bookmark mr-2"></i>
-                Save Voice Preset
+                {t("voiceTrainer.saveVoice")}
               </button>
 
               <button
@@ -843,7 +916,7 @@ export default function VoiceTrainer() {
                 onClick={createPostWithVoice}
               >
                 <i className="fa-solid fa-pen-to-square mr-2"></i>
-                Create Post with this Voice
+                {t("voiceTrainer.createPostWithVoice")}
               </button>
             </div>
           </div>
@@ -859,20 +932,245 @@ export default function VoiceTrainer() {
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Voice Preset Saved!</h3>
                 <p className="text-gray-400 mb-6">
-                  Your vocal profile has been saved. Activate it from the Clone page whenever you're ready.
+                  Your vocal profile has been saved. You can activate it below or from the Clone page.
                 </p>
+                <button
+                  onClick={() => setShowSaved(false)}
+                  className="w-full p-3 gradient-accent rounded-2xl text-white font-medium"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= SAVED PRESETS ================= */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white flex items-center">
+              <i className="fa-solid fa-bookmark text-rose-400 mr-3"></i>
+              {t("voiceTrainer.savedPresets")}
+            </h2>
+            <span className="text-gray-400 text-sm">{presets.length} preset{presets.length !== 1 ? "s" : ""}</span>
+          </div>
+
+          {presetsLoading ? (
+            <div className="glass-effect rounded-2xl p-12 text-center">
+              <i className="fa-solid fa-spinner fa-spin text-2xl text-gray-400 mb-3"></i>
+              <p className="text-gray-400">{t("common.loading")}</p>
+            </div>
+          ) : presets.length === 0 ? (
+            <div className="glass-effect rounded-2xl p-12 text-center">
+              <i className="fa-solid fa-microphone-slash text-3xl text-gray-600 mb-3"></i>
+              <p className="text-gray-400">No vocal presets yet. Record or upload audio to create one.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {presets.map((preset) => (
+                <div
+                  key={preset._id}
+                  onClick={() => setExpandedPreset(preset)}
+                  className={`neo-card rounded-2xl p-6 cursor-pointer relative overflow-hidden transition-all hover:scale-[1.02] ${preset.active ? "border-l-2 border-l-cyan-400" : ""}`}
+                >
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-violet-500 flex items-center justify-center">
+                      <i className="fa-solid fa-microphone text-white"></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold truncate">{preset.name}</h3>
+                      <p className="text-gray-400 text-sm">{preset.analysis?.tone || "Vocal"}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-300 text-sm mb-3">
+                    {preset.analysis?.sentenceStyle || "Conversational"} · {preset.analysis?.vocabularyLevel || "Intermediate"}
+                  </p>
+
+                  {preset.created_at && (
+                    <p className="text-gray-500 text-xs mb-3 flex items-center gap-1">
+                      <i className="fa-regular fa-clock"></i>
+                      {timeAgo(preset.created_at)}
+                    </p>
+                  )}
+
+                  <div className="flex justify-between items-center">
+                    {preset.active ? (
+                      <span className="text-xs text-green-400 flex items-center gap-1">
+                        <i className="fa-solid fa-circle text-[6px]"></i> Active
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Inactive</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeletePreset(preset._id); }}
+                      className="w-8 h-8 bg-black/30 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <i className="fa-solid fa-trash text-xs"></i>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ================= PRESET DETAIL MODAL ================= */}
+        {expandedPreset && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setExpandedPreset(null)}>
+            <div className="glass-effect rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700/50" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="p-6 border-b border-gray-700/30 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-violet-500 flex items-center justify-center">
+                    <i className="fa-solid fa-microphone text-xl text-white"></i>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">{expandedPreset.name}</h3>
+                    <p className="text-gray-400 text-sm flex items-center gap-2">
+                      <i className="fa-solid fa-microphone-lines text-rose-400"></i> Vocal Analysis
+                      {expandedPreset.active && (
+                        <span className="text-green-400 text-xs flex items-center gap-1 ml-2">
+                          <i className="fa-solid fa-circle text-[6px]"></i> Active
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setExpandedPreset(null)} className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                {/* Voice Profile */}
+                {expandedPreset.analysis && (
+                  <>
+                    <div>
+                      <h4 className="text-white font-semibold text-sm mb-3 flex items-center">
+                        <i className="fa-solid fa-palette text-violet-400 mr-2 text-xs"></i> Voice Profile
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          ["Tone", expandedPreset.analysis.tone],
+                          ["Style", expandedPreset.analysis.sentenceStyle],
+                          ["Structure", expandedPreset.analysis.structure],
+                          ["Vocabulary", expandedPreset.analysis.vocabularyLevel],
+                          ["Emoji", expandedPreset.analysis.emojiUsage],
+                          ["Hashtags", expandedPreset.analysis.hashtagUsage],
+                          ["Hook", expandedPreset.analysis.hookStyle],
+                          ["CTA", expandedPreset.analysis.ctaStyle],
+                        ].filter(([, v]) => v).map(([label, value], i) => (
+                          <div key={i} className="flex justify-between items-center p-2 bg-black/20 rounded-lg">
+                            <span className="text-gray-400 text-xs">{label}</span>
+                            <span className="text-white text-xs font-medium">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Content Themes */}
+                    {expandedPreset.analysis.contentThemes?.length > 0 && (
+                      <div>
+                        <h4 className="text-white font-semibold text-sm mb-2 flex items-center">
+                          <i className="fa-solid fa-tags text-yellow-400 mr-2 text-xs"></i> Content Themes
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {expandedPreset.analysis.contentThemes.map((theme, i) => (
+                            <span key={i} className="px-3 py-1 rounded-lg text-xs bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">{theme}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Writing Patterns */}
+                    {expandedPreset.analysis.writingPatterns?.length > 0 && (
+                      <div>
+                        <h4 className="text-white font-semibold text-sm mb-2 flex items-center">
+                          <i className="fa-solid fa-list text-cyan-400 mr-2 text-xs"></i> Speaking Patterns
+                        </h4>
+                        <div className="space-y-1">
+                          {expandedPreset.analysis.writingPatterns.map((p, i) => (
+                            <div key={i} className="flex items-start space-x-2">
+                              <i className="fa-solid fa-circle-dot text-cyan-400 text-[8px] mt-1.5"></i>
+                              <span className="text-gray-300 text-sm">{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Unique Traits */}
+                    {expandedPreset.analysis.uniqueTraits?.length > 0 && (
+                      <div>
+                        <h4 className="text-white font-semibold text-sm mb-2 flex items-center">
+                          <i className="fa-solid fa-fingerprint text-rose-400 mr-2 text-xs"></i> Unique Traits
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {expandedPreset.analysis.uniqueTraits.map((trait, i) => (
+                            <span key={i} className="px-3 py-1 rounded-lg text-xs bg-rose-400/10 text-rose-300 border border-rose-400/20">{trait}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Confidence */}
+                    {expandedPreset.analysis.confidenceScore && (
+                      <div className="flex items-center justify-between p-3 bg-green-400/10 rounded-xl border border-green-400/20">
+                        <span className="text-gray-300 text-sm">AI Confidence</span>
+                        <span className="text-green-400 font-bold">{expandedPreset.analysis.confidenceScore}%</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-700/30 flex justify-between items-center">
+                {expandedPreset.created_at && (
+                  <span className="text-gray-500 text-xs flex items-center gap-1">
+                    <i className="fa-regular fa-clock"></i> Saved {timeAgo(expandedPreset.created_at)}
+                  </span>
+                )}
                 <div className="flex gap-3">
+                  {!expandedPreset.active && (
+                    <button
+                      onClick={() => handleActivatePreset(expandedPreset._id)}
+                      className="px-4 py-2 gradient-accent rounded-xl text-white text-sm font-medium"
+                    >
+                      <i className="fa-solid fa-check mr-1"></i> Set Active
+                    </button>
+                  )}
                   <button
-                    onClick={() => setShowSaved(false)}
-                    className="flex-1 p-3 bg-black/30 rounded-2xl text-gray-300 border border-gray-600"
+                    onClick={() => {
+                      const ai = expandedPreset.analysis;
+                      const tempVoice = {
+                        name: expandedPreset.name,
+                        tone: ai?.tone || "Natural",
+                        sentenceStyle: ai?.sentenceStyle || "Conversational",
+                        structure: ai?.structure || "Free-flowing",
+                        emojiUsage: ai?.emojiUsage || "None",
+                        hashtagUsage: ai?.hashtagUsage || "None",
+                        vocabularyLevel: ai?.vocabularyLevel || "Intermediate",
+                        hookStyle: ai?.hookStyle || "Conversational",
+                        ctaStyle: ai?.ctaStyle || "None",
+                        contentThemes: ai?.contentThemes || [],
+                        writingPatterns: ai?.writingPatterns || [],
+                        uniqueTraits: ai?.uniqueTraits || [],
+                        confidenceScore: ai?.confidenceScore || 60,
+                      };
+                      navigate("/dashboard/CreatePostPage", { state: { tempVoice } });
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl text-white text-sm font-medium"
                   >
-                    Stay Here
+                    <i className="fa-solid fa-pen-to-square mr-1"></i> Create Post
                   </button>
                   <button
-                    onClick={() => navigate("/dashboard/clone")}
-                    className="flex-1 p-3 gradient-accent rounded-2xl text-white font-medium"
+                    onClick={() => { handleDeletePreset(expandedPreset._id); setExpandedPreset(null); }}
+                    className="px-4 py-2 bg-black/30 rounded-xl text-red-400 text-sm border border-red-400/20 hover:border-red-400/50 transition-colors"
                   >
-                    Go to My Voices
+                    <i className="fa-solid fa-trash mr-1"></i> Delete
                   </button>
                 </div>
               </div>

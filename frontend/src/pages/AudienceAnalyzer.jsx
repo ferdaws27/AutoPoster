@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import Highcharts from "highcharts";
 import { apiFetch } from "../services/api";
+import useTranslation from "../i18n/useTranslation";
 
 export default function AudienceAnalyzer() {
+  const t = useTranslation();
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -189,8 +191,8 @@ export default function AudienceAnalyzer() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-r from-cyan-400 to-violet-500 flex items-center justify-center data-point">
             <i className="fa-solid fa-users text-3xl text-white"></i>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-4">Audience Persona Analyzer — Know Your Readers</h1>
-          <p className="text-xl text-gray-300 mb-2">AI analyzes your followers and interactions to reveal audience types and preferences</p>
+          <h1 className="text-4xl font-bold text-white mb-4">{t("audience.title")}</h1>
+          <p className="text-xl text-gray-300 mb-2">{t("audience.subtitle")}</p>
           <p className="text-gray-400">Based on {totalInteractions.toLocaleString()} interactions • {activeUsers.toLocaleString()} active engagers • {analytics?.total_posts || 0} posts analyzed</p>
         </div>
       </div>
@@ -253,7 +255,7 @@ export default function AudienceAnalyzer() {
           </div>
           <div className="mb-2">
             <div className="text-3xl font-bold metric-value">{engagementRate}</div>
-            <div className="text-gray-400 text-sm">Engagement Rate (per post)</div>
+            <div className="text-gray-400 text-sm">{t("audience.engagementRate")}</div>
           </div>
           <div className="text-gray-300 text-xs">
             2x industry average • Strongest on professional content

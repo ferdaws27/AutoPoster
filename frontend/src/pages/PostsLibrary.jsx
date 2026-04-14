@@ -1,8 +1,10 @@
 import { useState , useEffect } from "react";
 import { data, useNavigate, useSearchParams } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
+import useTranslation from "../i18n/useTranslation";
 
 export default function PostsLibrary() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { posts, deletePost, updatePost, duplicatePost } = usePosts();
@@ -358,7 +360,7 @@ export default function PostsLibrary() {
               <i className="fa-solid fa-layer-group text-cyan-400 text-xl"></i>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">Posts Library</h1>
+              <h1 className="text-3xl font-bold text-white">{t("postsLibrary.title")}</h1>
               <p className="text-base text-gray-400">{filteredPosts.length} posts total</p>
             </div>
           </div>
@@ -405,7 +407,7 @@ export default function PostsLibrary() {
               <input
                 type="text"
                 className="w-full bg-gray-800/40 rounded-xl pl-10 pr-4 py-3 text-base text-white placeholder-gray-500 border border-gray-700/40 focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/20 transition-all"
-                placeholder="Search posts..."
+                placeholder={t("postsLibrary.searchPlaceholder")}
                 value={search}
                 onChange={(e) => {
                   const value = e.target.value.toLowerCase();
@@ -447,10 +449,10 @@ export default function PostsLibrary() {
         {/* TABS */}
         <div className="flex items-center gap-2 mb-8">
           {[
-            { label: "All", key: "all", icon: "fa-layer-group" },
-            { label: "Drafts", key: "drafts", icon: "fa-file-pen" },
-            { label: "Scheduled", key: "scheduled", icon: "fa-clock" },
-            { label: "Published", key: "published", icon: "fa-circle-check" },
+            { label: t("common.all"), key: "all", icon: "fa-layer-group" },
+            { label: t("common.drafts"), key: "drafts", icon: "fa-file-pen" },
+            { label: t("common.scheduled"), key: "scheduled", icon: "fa-clock" },
+            { label: t("common.published"), key: "published", icon: "fa-circle-check" },
           ].map((tab) => {
             const count = tab.key === 'all' ? posts.length
               : tab.key === 'drafts' ? posts.filter(p => p.status === 'draft').length
@@ -498,7 +500,7 @@ export default function PostsLibrary() {
               <div className="w-16 h-16 rounded-2xl bg-gray-800/50 ring-1 ring-gray-700/50 flex items-center justify-center mb-4">
                 <i className="fa-solid fa-inbox text-2xl text-gray-600"></i>
               </div>
-              <p className="text-gray-300 text-base font-medium mb-1">No posts found</p>
+              <p className="text-gray-300 text-base font-medium mb-1">{t("postsLibrary.noPosts")}</p>
               <p className="text-gray-500 text-sm mb-5">Try adjusting your filters or create a new post</p>
               <button
                 onClick={() => navigate("/dashboard/CreatePostPage")}

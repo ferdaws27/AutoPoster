@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 const sampleHooksData = [
@@ -19,7 +20,8 @@ const platformsList = [
 
 export default function HookGeneratorPage() {
   const navigate = useNavigate();
-  const { toneLabel, contentLength, connectedPlatforms, temperature, modelId, voiceProfile, creativity } = useSettings();
+  const t = useTranslation();
+  const { toneLabel, contentLength, connectedPlatforms, temperature, modelId, voiceProfile, creativity, language } = useSettings();
   const [topic, setTopic] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -33,8 +35,40 @@ export default function HookGeneratorPage() {
     return validConnected.length > 0 ? validConnected : platformsList.map(p => p.key);
   });
   const [successOpen, setSuccessOpen] = useState(false);
+  const [tips, setTips] = useState([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
 
   useEffect(() => setCharCount(topic.length), [topic]);
+
+  // Load AI tips on mount
+  useEffect(() => { loadTips(); }, []);
+
+  const loadTips = async (topicOverride) => {
+    setTipsLoading(true);
+    try {
+      const API_BASE = "http://localhost:5000";
+      const res = await fetch(`${API_BASE}/api/hook-generator/tips`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {}),
+        },
+        body: JSON.stringify({
+          topic: topicOverride || topic || "",
+          platforms: selectedPlatforms,
+          language: language || "auto",
+          voiceProfile: voiceProfile || null,
+        }),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+      if (data.tips && Array.isArray(data.tips)) setTips(data.tips);
+    } catch (err) {
+      console.error("Error loading tips:", err);
+    } finally {
+      setTipsLoading(false);
+    }
+  };
 
   const togglePlatform = (key) => {
     let updated = [...selectedPlatforms];
@@ -66,7 +100,7 @@ export default function HookGeneratorPage() {
         body: JSON.stringify({
           topic: topic,
           platforms: selectedPlatforms,
-          language: navigator.language?.startsWith("fr") ? "fr" : navigator.language?.split("-")[0] || "auto",
+          language: language || "auto",
           tone: toneLabel,
           contentLength: contentLength,
           temperature: temperature,
@@ -114,7 +148,7 @@ export default function HookGeneratorPage() {
         body: JSON.stringify({
           topic: topic,
           platform: platform,
-          language: navigator.language?.startsWith("fr") ? "fr" : navigator.language?.split("-")[0] || "auto",
+          language: language || "auto",
           tone: toneLabel,
           contentLength: contentLength,
           temperature: temperature,
@@ -195,9 +229,9 @@ export default function HookGeneratorPage() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center pulse-glow">
             <i className="fa-solid fa-fish-fins text-3xl"></i>
           </div>
-          <h1 className="text-4xl font-bold mb-4">Generate Powerful Hooks</h1>
-          <p className="text-xl text-gray-300 mb-2">Create engaging openings for your LinkedIn, X, or Medium posts</p>
-          <p className="text-gray-400">Transform any topic into scroll-stopping content from the first line</p>
+          <h1 className="text-4xl font-bold mb-4">{t("hooks.title")}</h1>
+          <p className="text-xl text-gray-300 mb-2">{t("hooks.subtitle")}</p>
+          <p className="text-gray-400">{t("hooks.description")}</p>
         </div>
 
         {/* SECTION: Input Area */}
@@ -205,18 +239,18 @@ export default function HookGeneratorPage() {
   <div className="mb-6">
     <label className="block text-white font-semibold text-lg mb-3 flex items-center">
       <i className="fa-solid fa-lightbulb text-cyan-400 mr-2"></i>
-      What's your topic or idea?
+      {t("hooks.topicLabel")}
     </label>
     <textarea
       id="topic-input"
       value={topic}
       onChange={e => setTopic(e.target.value)}
       maxLength={500}
-      placeholder="Enter your topic or paragraph idea... (e.g., 'The future of AI in healthcare', 'Why remote work is changing everything', 'My biggest business mistake')"
+      placeholder={t("hooks.topicPlaceholder")}
       className="w-full h-32 bg-black/20 border border-gray-600 rounded-2xl p-4 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none"
     ></textarea>
     <div className="flex justify-between items-center mt-2">
-      <span className="text-gray-400 text-sm">Tip: Be specific about your angle or key message</span>
+      <span className="text-gray-400 text-sm">{t("hooks.topicTip")}</span>
       <span id="char-count" className="text-gray-400 text-sm">{topic.length}/500</span>
     </div>
   </div>
@@ -225,7 +259,7 @@ export default function HookGeneratorPage() {
   <div className="mb-8">
     <label className="block text-white font-semibold text-lg mb-4 flex items-center">
       <i className="fa-solid fa-globe text-violet-400 mr-2"></i>
-      Target Platforms
+      {t("hooks.targetPlatforms")}
     </label>
     <div className="flex flex-wrap gap-4">
       {platformsList.map(p => {
@@ -263,7 +297,7 @@ export default function HookGeneratorPage() {
       className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all transform hover:scale-105"
     >
       <i className="fa-solid fa-bolt mr-2"></i>
-      Generate Hooks
+      {t("hooks.generateHooks")}
     </button>
   </div>
 </div>
@@ -275,13 +309,13 @@ export default function HookGeneratorPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white flex items-center">
                 <i className="fa-solid fa-sparkles text-cyan-400 mr-3"></i>
-                AI-Suggested Hooks (Top 5)
+                {t("hooks.aiSuggested")}
               </h2>
               <button
                 onClick={generateHooks}
                 className="px-4 py-2 bg-black/30 border border-gray-600 rounded-2xl text-gray-300 hover:text-white hover:border-cyan-400 transition-all"
               >
-                <i className="fa-solid fa-refresh mr-2"></i> Regenerate All
+                <i className="fa-solid fa-refresh mr-2"></i> {t("hooks.regenerateAll")}
               </button>
             </div>
 
@@ -342,7 +376,7 @@ export default function HookGeneratorPage() {
   <div id="selected-hook-section" className="glass-effect rounded-3xl p-8 mb-4">
     <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
       <i className="text-green-400 fa-solid fa-circle-check mr-3"></i>
-      Selected Hook
+      {t("hooks.selectedHook")}
     </h3>
     <div id="selected-hook-display" className="bg-black/20 rounded-2xl p-6 border border-cyan-400/30">
       <p id="selected-hook-text" className="text-white text-lg leading-relaxed">
@@ -350,7 +384,7 @@ export default function HookGeneratorPage() {
       </p>
       <div className="flex items-center justify-between mt-4">
         <div className="flex items-center space-x-4">
-          <span className="text-gray-400 text-sm">Platform:</span>
+          <span className="text-gray-400 text-sm">{t("hooks.platform")}:</span>
           <div id="selected-platforms" className="flex space-x-2 items-center">
             {selectedHook.platform === 'twitter' && <><i className="text-white fa-brands fa-x-twitter"></i><span className="text-gray-300 text-sm">Twitter/X</span></>}
             {selectedHook.platform === 'linkedin' && <><i className="text-blue-400 fa-brands fa-linkedin-in"></i><span className="text-gray-300 text-sm">LinkedIn</span></>}
@@ -359,7 +393,7 @@ export default function HookGeneratorPage() {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-gray-400 text-sm">Engagement Score:</span>
+          <span className="text-gray-400 text-sm">{t("hooks.engagementScore")}:</span>
           <span id="selected-score" className="text-cyan-400 font-semibold">{selectedHook.score}%</span>
         </div>
       </div>
@@ -376,7 +410,7 @@ export default function HookGeneratorPage() {
       className="px-8 py-4 gradient-accent rounded-2xl text-white font-semibold text-lg hover:opacity-90 transition-all"
     >
       <i className="fa-solid fa-pen mr-2"></i>
-      Insert Selected Hook Into Post
+      {t("hooks.insertHook")}
     </button>
   </div>
 )}
@@ -389,8 +423,8 @@ export default function HookGeneratorPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center pulse-glow">
               <i className="fa-solid fa-magic-wand-sparkles text-cyan-400 text-2xl"></i>
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2 generating-dots">Crafting your hooks</h3>
-            <p className="text-gray-400">AI is analyzing your topic and creating engaging openings...</p>
+            <h3 className="text-xl font-semibold text-white mb-2 generating-dots">{t("hooks.craftingHooks")}</h3>
+            <p className="text-gray-400">{t("hooks.craftingDesc")}</p>
           </div>
         )}
 
@@ -401,89 +435,70 @@ export default function HookGeneratorPage() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-400/20 flex items-center justify-center">
                 <i className="fa-solid fa-check-circle text-green-400 text-2xl"></i>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Hook Inserted Successfully!</h3>
-              <p className="text-gray-400 mb-6">Your selected hook has been added to the post creator.</p>
+              <h3 className="text-xl font-bold text-white mb-2">{t("hooks.hookInserted")}</h3>
+              <p className="text-gray-400 mb-6">{t("hooks.hookInsertedDesc")}</p>
               <button onClick={() => setSuccessOpen(false)} className="w-full p-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90">
-                Continue Writing Post
+                {t("hooks.continueWriting")}
               </button>
             </div>
           </div>
           
         )}
-        {/* Tips Section */}
+        {/* Tips Section — AI Generated */}
 <div id="tips-section" className="glass-effect rounded-3xl p-8 mt-8">
-  <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-    <i className="fas fa-graduation-cap text-yellow-400 mr-3"></i>
-    Hook Writing Tips
-  </h2>
-
-  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {/* Tip 1 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-question text-cyan-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Ask Questions</h3>
-      <p className="text-gray-400 text-sm">
-        Start with thought-provoking questions that make readers pause and think. Questions create immediate engagement.
-      </p>
-    </div>
-
-    {/* Tip 2 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-exclamation text-violet-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Make Bold Statements</h3>
-      <p className="text-gray-400 text-sm">
-        Controversial or surprising statements grab attention. Back them up with solid reasoning in your content.
-      </p>
-    </div>
-
-    {/* Tip 3 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-teal-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-book-open text-teal-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Tell Stories</h3>
-      <p className="text-gray-400 text-sm">
-        Personal anecdotes and mini-stories create emotional connections. Start with "Last week..." or "I learned..."
-      </p>
-    </div>
-
-    {/* Tip 4 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-yellow-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-list text-yellow-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Use Numbers</h3>
-      <p className="text-gray-400 text-sm">
-        Specific numbers and statistics add credibility. "5 ways...", "73% of people...", "In 30 seconds..."
-      </p>
-    </div>
-
-    {/* Tip 5 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-red-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-triangle-exclamation text-red-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Create Urgency</h3>
-      <p className="text-gray-400 text-sm">
-        Time-sensitive language motivates action. "Before it's too late...", "Right now...", "This changes everything..."
-      </p>
-    </div>
-
-    {/* Tip 6 */}
-    <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
-      <div className="w-12 h-12 rounded-2xl bg-pink-400/20 flex items-center justify-center mb-4">
-        <i className="fas fa-heart text-pink-400"></i>
-      </div>
-      <h3 className="text-white font-semibold mb-2">Appeal to Emotions</h3>
-      <p className="text-gray-400 text-sm">
-        Tap into feelings like curiosity, fear, excitement, or surprise. Emotional hooks drive engagement and shares.
-      </p>
-    </div>
+  <div className="flex items-center justify-between mb-6">
+    <h2 className="text-2xl font-bold text-white flex items-center">
+      <i className="fas fa-graduation-cap text-yellow-400 mr-3"></i>
+      {t("hooks.tipsTitle")}
+    </h2>
+    <button
+      onClick={() => loadTips()}
+      disabled={tipsLoading}
+      className="px-4 py-2 bg-black/30 border border-gray-600 rounded-2xl text-gray-300 hover:text-white hover:border-cyan-400 transition-all disabled:opacity-50"
+    >
+      <i className={`fas ${tipsLoading ? "fa-spinner fa-spin" : "fa-wand-magic-sparkles"} mr-2`}></i>
+      {tipsLoading ? t("common.generating") : t("hooks.regenerateTips")}
+    </button>
   </div>
+
+  {tipsLoading && tips.length === 0 ? (
+    <div className="text-center py-12">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-400/20 flex items-center justify-center pulse-glow">
+        <i className="fas fa-wand-magic-sparkles text-yellow-400 text-2xl"></i>
+      </div>
+      <p className="text-gray-400">{t("hooks.craftingTips")}</p>
+    </div>
+  ) : tips.length > 0 ? (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {tips.map((tip, idx) => {
+        const colorMap = {
+          cyan: { bg: "bg-cyan-400/20", text: "text-cyan-400" },
+          violet: { bg: "bg-violet-400/20", text: "text-violet-400" },
+          teal: { bg: "bg-teal-400/20", text: "text-teal-400" },
+          yellow: { bg: "bg-yellow-400/20", text: "text-yellow-400" },
+          red: { bg: "bg-red-400/20", text: "text-red-400" },
+          pink: { bg: "bg-pink-400/20", text: "text-pink-400" },
+          green: { bg: "bg-green-400/20", text: "text-green-400" },
+          amber: { bg: "bg-amber-400/20", text: "text-amber-400" },
+          blue: { bg: "bg-blue-400/20", text: "text-blue-400" },
+        };
+        const c = colorMap[tip.color] || colorMap.cyan;
+        return (
+          <div key={idx} className="bg-black/20 rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600 transition-all">
+            <div className={`w-12 h-12 rounded-2xl ${c.bg} flex items-center justify-center mb-4`}>
+              <i className={`fas ${tip.icon} ${c.text}`}></i>
+            </div>
+            <h3 className="text-white font-semibold mb-2">{tip.title}</h3>
+            <p className="text-gray-400 text-sm">{tip.description}</p>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <div className="text-center py-8">
+      <p className="text-gray-500">Click "Regenerate Tips" to get AI-powered writing advice</p>
+    </div>
+  )}
 </div>
 
         

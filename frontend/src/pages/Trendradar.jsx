@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import useTranslation from "../i18n/useTranslation";
 import {
   LineChart,
   Line,
@@ -36,6 +37,7 @@ const MiniLineChart = ({ data, color }) => {
 };
 
 export default function TrendRadar() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const { voiceProfile } = useSettings();
   const [trends, setTrends] = useState([]);
@@ -579,10 +581,10 @@ Return ONLY the JSON array, no additional text.`;
               <div className="w-12 h-12 mr-4 rounded-2xl gradient-accent flex items-center justify-center trend-glow">
                 <i className="fa-solid fa-radar text-white"></i>
               </div>
-              Trend Radar — What's Hot Now
+              {t("trends.title")}
             </h1>
             <p className="text-gray-400">
-              Discover trending topics and hashtags to inspire your next viral post
+              {t("trends.subtitle")}
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -622,7 +624,7 @@ Return ONLY the JSON array, no additional text.`;
                   onChange={(e) => handlePlatformChange(e.target.value)}
                   className="bg-black/30 border border-gray-600 rounded-2xl px-4 py-2 text-white pr-8 focus:border-cyan-400 focus:outline-none cursor-pointer hover:border-cyan-400/50 transition-colors"
                 >
-                  <option value="all">All Platforms</option>
+                  <option value="all">{t("trends.allPlatforms")}</option>
                   <option value="twitter">Twitter (X)</option>
                   <option value="linkedin">LinkedIn</option>
                   <option value="medium">Medium</option>
@@ -640,7 +642,7 @@ Return ONLY the JSON array, no additional text.`;
                   onChange={(e) => handleCategoryChange(e.target.value)}
                   className="bg-black/30 border border-gray-600 rounded-2xl px-4 py-2 text-white pr-8 focus:border-cyan-400 focus:outline-none cursor-pointer hover:border-cyan-400/50 transition-colors"
                 >
-                  <option value="all">All Categories</option>
+                  <option value="all">{t("trends.allCategories")}</option>
                   <option value="ai">AI & Technology</option>
                   <option value="business">Business</option>
                   <option value="marketing">Marketing</option>

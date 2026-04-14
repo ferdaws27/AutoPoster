@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import * as Toast from "@radix-ui/react-toast";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function QuoteTemplate() {
   const { connectedPlatforms, voiceProfile } = useSettings();
+  const t = useTranslation();
   const [quote, setQuote] = useState("");
   const [charCount, setCharCount] = useState(0);
   const defaultPlatforms = Object.entries(connectedPlatforms)
@@ -25,6 +28,12 @@ export default function QuoteTemplate() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("info");
   const [history, setHistory] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [stylePreset, setStylePreset] = useState("");
 
   const maxLength = 500;
   const API_BASE = "http://localhost:5000";
@@ -56,11 +65,11 @@ export default function QuoteTemplate() {
 
   const generateVariations = async () => {
     if (!quote.trim()) {
-      showToast("Please enter a quote first", "warning");
+      showToast(t("quotes.enterQuoteFirst"), "warning");
       return;
     }
     if (quote.length < 10) {
-      showToast("Quote too short. Minimum 10 characters.", "warning");
+      showToast(t("quotes.quoteTooShort"), "warning");
       return;
     }
 
@@ -78,6 +87,7 @@ export default function QuoteTemplate() {
           selectedPlatforms,
           brandEnabled,
           voiceProfile: voiceProfile || null,
+          stylePreset: stylePreset || null,
         }),
       });
 
@@ -156,6 +166,90 @@ export default function QuoteTemplate() {
     showCallout("History loaded");
   };
 
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/history?limit=20`);
+      const data = await res.json();
+      if (data.success) setHistory(data.history || []);
+    } catch (err) {
+      console.error("History error:", err);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/templates`);
+      const data = await res.json();
+      if (data.success) setTemplates(data.templates || []);
+    } catch (err) {
+      console.error("Templates error:", err);
+    }
+  };
+
+  const saveTemplate = async (variation) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/templates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quote, variation }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(t("quotes.templateSaved"), "success");
+        fetchTemplates();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      showToast("Failed to save template", "warning");
+    }
+  };
+
+  const deleteTemplate = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/templates/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setTemplates((prev) => prev.filter((tmpl) => tmpl.id !== id));
+        showToast(t("quotes.templateDeleted"), "info");
+      }
+    } catch (err) {
+      showToast("Failed to delete", "warning");
+    }
+  };
+
+  const deleteHistoryItem = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/history/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setHistory((prev) => prev.filter((h) => h.id !== id));
+        showToast("History item deleted", "info");
+      }
+    } catch (err) {
+      showToast("Failed to delete", "warning");
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/quote-generator/analytics`);
+      const data = await res.json();
+      if (data.success) setAnalytics(data);
+    } catch (err) {
+      console.error("Analytics error:", err);
+    }
+  };
+
+  const stylePresets = [
+    { key: "", label: t("quotes.default"), icon: "fa-wand-magic-sparkles" },
+    { key: "motivational", label: t("quotes.motivational"), icon: "fa-fire" },
+    { key: "professional", label: t("quotes.professional"), icon: "fa-briefcase" },
+    { key: "humorous", label: t("quotes.humorous"), icon: "fa-face-laugh" },
+    { key: "poetic", label: t("quotes.poetic"), icon: "fa-feather" },
+    { key: "provocative", label: t("quotes.provocative"), icon: "fa-bolt" },
+  ];
+
   return (
     <>
       <div className="min-h-screen bg-[#0b1020] p-8 space-y-16">
@@ -165,13 +259,13 @@ export default function QuoteTemplate() {
             <i className="fa-solid fa-quote-right text-3xl text-white"></i>
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">
-            Quote Template Generator — Turn Words Into Impact
+            {t("quotes.title")}
           </h1>
           <p className="text-xl text-gray-300 mb-2">
-            Transform any quote into AI-generated ready-to-share content
+            {t("quotes.subtitle")}
           </p>
           <p className="text-gray-400">
-            Optimized for Twitter, LinkedIn, and Medium
+            {t("quotes.description")}
           </p>
         </div>
 
@@ -185,7 +279,7 @@ export default function QuoteTemplate() {
                 onChange={(e) => setQuote(e.target.value)}
                 maxLength={maxLength}
                 className="w-full h-40 bg-transparent text-white text-lg placeholder-gray-400 rounded-2xl p-6 font-medium leading-relaxed border border-white/10 outline-none focus:border-cyan-400 resize-none"
-                placeholder="Enter your quote or thought…"
+                placeholder={t("quotes.inputPlaceholder")}
               />
               <div className="absolute bottom-4 right-6 text-gray-400">
                 {charCount}/{maxLength}
@@ -227,7 +321,7 @@ export default function QuoteTemplate() {
                 className="px-8 py-4 rounded-2xl text-white font-bold text-lg flex items-center space-x-3 bg-gradient-to-r from-cyan-500 via-violet-500 to-teal-500 disabled:opacity-60"
               >
                 <i className="fa-solid fa-wand-magic-sparkles"></i>
-                <span>{loading ? "Generating..." : "Generate Variations"}</span>
+                <span>{loading ? t("common.generating") : t("quotes.generateVariations")}</span>
                 <i className="fa-solid fa-pen-fancy"></i>
               </button>
 
@@ -236,7 +330,7 @@ export default function QuoteTemplate() {
                 onClick={clearAll}
                 className="px-6 py-4 rounded-2xl text-gray-300 border border-gray-600 hover:border-gray-400 hover:text-white transition-all font-medium"
               >
-                Clear
+                {t("common.clear")}
               </button>
             </div>
           </div>
@@ -250,10 +344,10 @@ export default function QuoteTemplate() {
                 <i className="fa-solid fa-brain text-cyan-400 text-2xl animate-pulse"></i>
               </div>
               <h3 className="text-2xl font-bold text-white mb-4">
-                AI is crafting your variations...
+                {t("quotes.craftingVariations")}
               </h3>
               <p className="text-gray-400 mb-6">
-                Analyzing tone, audience, and platform requirements
+                {t("quotes.analyzingTone")}
               </p>
               <div className="flex justify-center space-x-2">
                 <div className="w-3 h-3 bg-cyan-400 rounded-full animate-bounce"></div>
@@ -275,10 +369,10 @@ export default function QuoteTemplate() {
           <div id="variations-section" className="max-w-7xl mx-auto mb-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-white mb-2">
-                Your Quote Variations
+                {t("quotes.yourVariations")}
               </h3>
               <p className="text-gray-400">
-                AI-generated versions optimized for each platform
+                {t("quotes.variationsDesc")}
               </p>
             </div>
 
@@ -310,19 +404,26 @@ export default function QuoteTemplate() {
                       onClick={() => copyToClipboard(variation.text)}
                       className="flex-1 min-w-[120px] px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30"
                     >
-                      Copy
+                      {t("common.copy")}
                     </button>
                     <button
                       onClick={() => postToPlatform(variation.text, variation.platform)}
                       className="flex-1 min-w-[150px] px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30"
                     >
-                      {`Post to ${variation.platform}`}
+                      {`${t("quotes.postTo")} ${variation.platform}`}
                     </button>
                     <button
                       onClick={() => openVisual(variation.text)}
                       className="px-4 py-2 bg-violet-400/20 text-violet-400 rounded-xl hover:bg-violet-400/30"
                     >
-                      Visual
+                      {t("quotes.visual")}
+                    </button>
+                    <button
+                      onClick={() => saveTemplate(variation)}
+                      className="px-4 py-2 bg-amber-400/20 text-amber-400 rounded-xl hover:bg-amber-400/30"
+                      title="Save as template"
+                    >
+                      <i className="fa-solid fa-bookmark"></i>
                     </button>
                   </div>
                 </div>
@@ -348,17 +449,17 @@ export default function QuoteTemplate() {
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">
-                    Auto-include brand signature
+                    {t("quotes.brandSignature")}
                   </h4>
                   <p className="text-gray-400 text-sm">
-                    Add "@EtkanAI" to all generated variations
+                    {t("quotes.brandDesc")}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center space-x-3">
                 <span className="text-gray-400 text-sm">
-                  {brandEnabled ? "Enabled" : "Disabled"}
+                  {brandEnabled ? t("common.enabled") : t("common.disabled")}
                 </span>
                 <div className="w-12 h-6 bg-gray-600 rounded-full relative transition-all">
                   <div
@@ -376,75 +477,191 @@ export default function QuoteTemplate() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mt-12">
           {[
             {
-              title: "Recent Quotes",
-              desc: "View your quote history",
+              title: t("quotes.recentQuotes"),
+              desc: `${history.length || 0} ${t("quotes.quotesGenerated")}`,
               icon: "fa-history",
-              action: () => showCallout("Scroll down to history"),
+              color: "cyan",
+              action: () => { fetchHistory(); setShowHistory(!showHistory); setShowTemplates(false); setShowAnalytics(false); },
+              active: showHistory,
             },
             {
-              title: "Save Templates",
-              desc: "Store your best outputs",
+              title: t("quotes.savedTemplates"),
+              desc: `${templates.length || 0} ${t("quotes.templatesSaved")}`,
               icon: "fa-bookmark",
-              action: () => showCallout("Connect MongoDB history"),
+              color: "violet",
+              action: () => { fetchTemplates(); setShowTemplates(!showTemplates); setShowHistory(false); setShowAnalytics(false); },
+              active: showTemplates,
             },
             {
-              title: "Style Presets",
-              desc: "Customize quote formats",
+              title: t("quotes.stylePresets"),
+              desc: stylePreset ? stylePresets.find(s => s.key === stylePreset)?.label : t("quotes.defaultStyle"),
               icon: "fa-palette",
-              action: () => showCallout("Add prompt presets in backend"),
+              color: "teal",
+              action: () => {
+                const currentIdx = stylePresets.findIndex(s => s.key === stylePreset);
+                const next = stylePresets[(currentIdx + 1) % stylePresets.length];
+                setStylePreset(next.key);
+                showCallout(`Style: ${next.label}`);
+              },
+              active: !!stylePreset,
             },
             {
-              title: "Quote Analytics",
-              desc: "Track quote performance",
+              title: t("quotes.quoteAnalytics"),
+              desc: analytics ? `${analytics.total_generations} total` : t("quotes.viewStats"),
               icon: "fa-chart-simple",
-              action: () => showCallout("Analytics module coming soon"),
+              color: "amber",
+              action: () => { fetchAnalytics(); setShowAnalytics(!showAnalytics); setShowHistory(false); setShowTemplates(false); },
+              active: showAnalytics,
             },
-          ].map((item, i) => (
-            <div
-              key={i}
-              onClick={item.action}
-              className="rounded-2xl p-6 text-center hover:bg-white/5 transition-colors cursor-pointer border border-cyan-400/20 bg-white/5"
-            >
-              <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
-                <i className={`fa-solid ${item.icon} text-cyan-400`}></i>
+          ].map((item, i) => {
+            const colorMap = {
+              cyan: { bg: "bg-cyan-400/20", text: "text-cyan-400", border: "border-cyan-400" },
+              violet: { bg: "bg-violet-400/20", text: "text-violet-400", border: "border-violet-400" },
+              teal: { bg: "bg-teal-400/20", text: "text-teal-400", border: "border-teal-400" },
+              amber: { bg: "bg-amber-400/20", text: "text-amber-400", border: "border-amber-400" },
+            };
+            const c = colorMap[item.color] || colorMap.cyan;
+            return (
+              <div
+                key={i}
+                onClick={item.action}
+                className={`rounded-2xl p-6 text-center hover:bg-white/5 transition-all cursor-pointer border bg-white/5 ${
+                  item.active ? `${c.border} ${c.bg}` : "border-cyan-400/20"
+                }`}
+              >
+                <div className={`w-12 h-12 mx-auto mb-4 rounded-2xl ${c.bg} flex items-center justify-center`}>
+                  <i className={`fa-solid ${item.icon} ${c.text}`}></i>
+                </div>
+                <h4 className="text-white font-medium mb-2">{item.title}</h4>
+                <p className="text-gray-400 text-sm">{item.desc}</p>
               </div>
-              <h4 className="text-white font-medium mb-2">{item.title}</h4>
-              <p className="text-gray-400 text-sm">{item.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* HISTORY */}
-        {history.length > 0 && (
-          <div className="max-w-5xl mx-auto mt-16">
-            <h3 className="text-2xl font-bold text-white mb-6 text-center">
-              Recent History
+        {/* HISTORY PANEL */}
+        {showHistory && (
+          <div className="max-w-5xl mx-auto mt-8">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+              <i className="fa-solid fa-history text-cyan-400 mr-3"></i>
+              {t("quotes.recentHistory")}
             </h3>
-
-            <div className="space-y-4">
-              {history.map((item, index) => (
-                <div
-                  key={index}
-                  className="rounded-2xl p-5 bg-white/5 border border-white/10 flex items-center justify-between gap-4"
-                >
-                  <div className="flex-1">
-                    <p className="text-white font-medium line-clamp-2 mb-1">
-                      {item.quote}
-                    </p>
-                    <p className="text-gray-400 text-sm">
-                      {new Date(item.createdAt).toLocaleString()}
-                    </p>
+            {history.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">{t("quotes.noHistory")}</div>
+            ) : (
+              <div className="space-y-4">
+                {history.map((item) => (
+                  <div key={item.id} className="rounded-2xl p-5 bg-white/5 border border-white/10 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate mb-1">"{item.quote}"</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-400 text-sm">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}</span>
+                        <span className="text-gray-500 text-xs">{(item.variations || []).length} variations</span>
+                        <div className="flex gap-1">
+                          {(item.selectedPlatforms || []).map(p => (
+                            <i key={p} className={`fa-brands ${p === "twitter" ? "fa-x-twitter text-white" : p === "linkedin" ? "fa-linkedin-in text-blue-400" : "fa-medium text-green-400"} text-xs`}></i>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => loadHistoryItem(item)} className="px-4 py-2 rounded-xl bg-cyan-400/20 text-cyan-400 hover:bg-cyan-400/30 text-sm">{t("common.load")}</button>
+                      <button onClick={() => deleteHistoryItem(item.id)} className="px-3 py-2 rounded-xl bg-red-400/10 text-red-400 hover:bg-red-400/20 text-sm"><i className="fa-solid fa-trash"></i></button>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-                  <button
-                    onClick={() => loadHistoryItem(item)}
-                    className="px-4 py-2 rounded-xl bg-cyan-400/20 text-cyan-400 hover:bg-cyan-400/30"
-                  >
-                    Load
-                  </button>
-                </div>
-              ))}
+        {/* TEMPLATES PANEL */}
+        {showTemplates && (
+          <div className="max-w-5xl mx-auto mt-8">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+              <i className="fa-solid fa-bookmark text-violet-400 mr-3"></i>
+              {t("quotes.savedTemplates")}
+            </h3>
+            {templates.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {t("quotes.noTemplates")}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {templates.map((tpl) => (
+                  <div key={tpl.id} className="rounded-2xl p-6 bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm px-3 py-1 rounded-full bg-violet-400/20 text-violet-300">{tpl.variation?.platform || "—"}</span>
+                      <span className="text-gray-500 text-xs">{tpl.createdAt ? new Date(tpl.createdAt).toLocaleDateString() : ""}</span>
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2 italic">"{tpl.quote?.slice(0, 80)}..."</p>
+                    <div className="bg-black/30 rounded-xl p-4 mb-4">
+                      <p className="text-white whitespace-pre-line text-sm">{tpl.variation?.text}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => copyToClipboard(tpl.variation?.text || "")} className="flex-1 px-3 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl text-sm hover:bg-cyan-400/30">{t("common.copy")}</button>
+                      <button onClick={() => { setQuote(tpl.quote || ""); showCallout("Quote loaded"); }} className="flex-1 px-3 py-2 bg-violet-400/20 text-violet-400 rounded-xl text-sm hover:bg-violet-400/30">{t("quotes.useQuote")}</button>
+                      <button onClick={() => deleteTemplate(tpl.id)} className="px-3 py-2 bg-red-400/10 text-red-400 rounded-xl text-sm hover:bg-red-400/20"><i className="fa-solid fa-trash"></i></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ANALYTICS PANEL */}
+        {showAnalytics && analytics && (
+          <div className="max-w-5xl mx-auto mt-8">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+              <i className="fa-solid fa-chart-simple text-amber-400 mr-3"></i>
+              {t("quotes.quoteAnalytics")}
+            </h3>
+            <div className="grid md:grid-cols-4 gap-6 mb-8">
+              {[
+                { label: t("quotes.totalGenerations"), value: analytics.total_generations, icon: "fa-quote-right", color: "cyan" },
+                { label: t("quotes.savedTemplates"), value: analytics.saved_templates, icon: "fa-bookmark", color: "violet" },
+                { label: t("quotes.thisWeek"), value: analytics.this_week, icon: "fa-calendar-week", color: "teal" },
+                { label: t("quotes.avgVariations"), value: analytics.avg_variations, icon: "fa-layer-group", color: "amber" },
+              ].map((stat, i) => {
+                const cm = {
+                  cyan: { bg: "bg-cyan-400/20", text: "text-cyan-400" },
+                  violet: { bg: "bg-violet-400/20", text: "text-violet-400" },
+                  teal: { bg: "bg-teal-400/20", text: "text-teal-400" },
+                  amber: { bg: "bg-amber-400/20", text: "text-amber-400" },
+                };
+                const sc = cm[stat.color] || cm.cyan;
+                return (
+                  <div key={i} className="rounded-2xl p-6 bg-white/5 border border-white/10 text-center">
+                    <div className={`w-12 h-12 mx-auto mb-3 rounded-2xl ${sc.bg} flex items-center justify-center`}>
+                      <i className={`fa-solid ${stat.icon} ${sc.text}`}></i>
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
+                    <p className="text-gray-400 text-sm">{stat.label}</p>
+                  </div>
+                );
+              })}
             </div>
+            {analytics.platforms && Object.keys(analytics.platforms).length > 0 && (
+              <div className="rounded-2xl p-6 bg-white/5 border border-white/10">
+                <h4 className="text-white font-semibold mb-4">{t("quotes.platformUsage")}</h4>
+                <div className="space-y-3">
+                  {Object.entries(analytics.platforms).map(([platform, count]) => {
+                    const total = Object.values(analytics.platforms).reduce((a, b) => a + b, 0);
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    return (
+                      <div key={platform} className="flex items-center gap-4">
+                        <span className="text-gray-300 w-20 capitalize">{platform}</span>
+                        <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+                        </div>
+                        <span className="text-gray-400 text-sm w-16 text-right">{count} ({pct}%)</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -453,7 +670,7 @@ export default function QuoteTemplate() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
           <div className="rounded-3xl p-8 max-w-2xl w-full bg-[#121829] border border-white/10 shadow-2xl">
-            <h3 className="text-2xl text-white mb-4">Create Visual Quote</h3>
+            <h3 className="text-2xl text-white mb-4">{t("quotes.createVisual")}</h3>
             <div className="bg-black/30 rounded-2xl p-6 mb-6 text-center">
               <p className="text-white text-lg whitespace-pre-line">{modalText}</p>
             </div>
@@ -462,7 +679,7 @@ export default function QuoteTemplate() {
                 onClick={() => setModalOpen(false)}
                 className="flex-1 p-3 border border-gray-600 rounded-2xl text-gray-300"
               >
-                Close
+                {t("common.close")}
               </button>
               <button
                 onClick={() => {
@@ -471,7 +688,7 @@ export default function QuoteTemplate() {
                 }}
                 className="flex-1 p-3 bg-gradient-to-r from-cyan-500 via-violet-500 to-teal-500 rounded-2xl text-white"
               >
-                Generate Image
+                {t("quotes.generateImage")}
               </button>
             </div>
           </div>

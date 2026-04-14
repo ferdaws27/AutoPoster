@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
+import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   LineChart,
@@ -55,8 +57,10 @@ const COLORS = {
 
 /* ================= AI REPUTATION PAGE ================= */
 export default function AIReputationPage() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const { posts, stats, loading } = usePosts();
+  const { voiceProfile } = useSettings();
   const [reputationScore, setReputationScore] = useState(0);
   const [subScores, setSubScores] = useState({
     consistency: 0,
@@ -237,6 +241,7 @@ export default function AIReputationPage() {
           score: reputationScore,
           tier: currentTier.name,
           best_post_type: bestType,
+          voiceProfile: voiceProfile || null,
         }),
       });
 
@@ -297,8 +302,8 @@ export default function AIReputationPage() {
             <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center pulse-glow">
               <FontAwesomeIcon icon={faStar} className="text-3xl text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-white mb-4">AI Reputation Score â How Strong Is Your Online Presence?</h1>
-            <p className="text-xl text-gray-300 mb-2">Your consistency, engagement, and clarity converted into one simple score.</p>
+            <h1 className="text-4xl font-bold text-white mb-4">{t("reputation.title")}</h1>
+            <p className="text-xl text-gray-300 mb-2">{t("reputation.subtitle")}</p>
             <p className="text-gray-400">Based on {posts.length} post{posts.length !== 1 ? 's' : ''} &middot; {totalInteractions.toLocaleString()} interactions &middot; Updated in real-time</p>
           </div>
         </div>
@@ -397,24 +402,24 @@ export default function AIReputationPage() {
                 </h4>
                 <div className="space-y-3">
                   {[
-                    { name: "Bronze", range: "0-40", color: "amber", icon: faMedal },
-                    { name: "Silver", range: "41-70", color: "gray", icon: faMedal },
-                    { name: "Gold",   range: "71-90", color: "yellow", icon: faMedal },
-                    { name: "Platinum", range: "91-100", color: "violet", icon: faCrown },
-                  ].map((t) => {
-                    const isCurrent = currentTier.name === t.name;
-                    const isAbove = ["Bronze","Silver","Gold","Platinum"].indexOf(currentTier.name) >= ["Bronze","Silver","Gold","Platinum"].indexOf(t.name);
+                    { name: t("reputation.bronze"), range: "0-40", color: "amber", icon: faMedal },
+                    { name: t("reputation.silver"), range: "41-70", color: "gray", icon: faMedal },
+                    { name: t("reputation.gold"),   range: "71-90", color: "yellow", icon: faMedal },
+                    { name: t("reputation.platinum"), range: "91-100", color: "violet", icon: faCrown },
+                  ].map((tier) => {
+                    const isCurrent = currentTier.name === tier.name;
+                    const isAbove = ["Bronze","Silver","Gold","Platinum"].indexOf(currentTier.name) >= ["Bronze","Silver","Gold","Platinum"].indexOf(tier.name);
                     return (
-                      <div key={t.name} className={`badge-tier ${isCurrent ? 'active' : ''} flex items-center justify-between p-3 rounded-2xl bg-${t.color}-400/10 border border-${t.color}-400/30 ${!isAbove ? 'opacity-60' : ''}`}>
+                      <div key={tier.name} className={`badge-tier ${isCurrent ? 'active' : ''} flex items-center justify-between p-3 rounded-2xl bg-${tier.color}-400/10 border border-${tier.color}-400/30 ${!isAbove ? 'opacity-60' : ''}`}>
                         <div className="flex items-center space-x-3">
-                          <FontAwesomeIcon icon={t.icon} className={`text-${t.color}-400 text-xl`} />
+                          <FontAwesomeIcon icon={tier.icon} className={`text-${tier.color}-400 text-xl`} />
                           <div>
-                            <div className={`text-${t.color}-400 font-medium`}>{t.name}</div>
-                            <div className="text-gray-400 text-xs">{t.range} points</div>
+                            <div className={`text-${tier.color}-400 font-medium`}>{tier.name}</div>
+                            <div className="text-gray-400 text-xs">{tier.range} points</div>
                           </div>
                         </div>
                         {isCurrent && <div className="text-cyan-400 text-sm font-medium">Current</div>}
-                        {!isAbove && <div className="text-gray-500 text-xs">{Math.max(0, parseInt(t.range) - reputationScore)} pts to go</div>}
+                        {!isAbove && <div className="text-gray-500 text-xs">{Math.max(0, parseInt(tier.range) - reputationScore)} pts to go</div>}
                       </div>
                     );
                   })}
@@ -435,7 +440,7 @@ export default function AIReputationPage() {
                   <FontAwesomeIcon icon={faCalendarCheck} className="text-cyan-400 text-xl" />
                 </div>
                 <div>
-                  <div className="text-white font-semibold">Consistency</div>
+                  <div className="text-white font-semibold">{t("reputation.consistency")}</div>
                   <div className="text-gray-400 text-sm">ð Posting frequency</div>
                 </div>
               </div>
@@ -459,7 +464,7 @@ export default function AIReputationPage() {
                   <FontAwesomeIcon icon={faHeart} className="text-violet-400 text-xl" />
                 </div>
                 <div>
-                  <div className="text-white font-semibold">Engagement</div>
+                  <div className="text-white font-semibold">{t("reputation.engagement")}</div>
                   <div className="text-gray-400 text-sm">ð Interaction rate</div>
                 </div>
               </div>
@@ -483,7 +488,7 @@ export default function AIReputationPage() {
                   <FontAwesomeIcon icon={faBrain} className="text-teal-400 text-xl" />
                 </div>
                 <div>
-                  <div className="text-white font-semibold">Tone Clarity</div>
+                  <div className="text-white font-semibold">{t("reputation.clarity")}</div>
                   <div className="text-gray-400 text-sm">ð Message coherence</div>
                 </div>
               </div>
@@ -507,7 +512,7 @@ export default function AIReputationPage() {
                   <FontAwesomeIcon icon={faRocket} className="text-green-400 text-xl" />
                 </div>
                 <div>
-                  <div className="text-white font-semibold">Growth Momentum</div>
+                  <div className="text-white font-semibold">{t("reputation.growth")}</div>
                   <div className="text-gray-400 text-sm">ð Follower increase</div>
                 </div>
               </div>
@@ -585,9 +590,9 @@ export default function AIReputationPage() {
             <div>
               <h3 className="text-2xl font-bold text-white flex items-center mb-2">
                 <FontAwesomeIcon icon={faLightbulb} className="text-cyan-400 mr-3" />
-                AI-Generated Insights
+                {t("reputation.insights")}
               </h3>
-              <p className="text-gray-400">Personalized recommendations to boost your reputation score</p>
+              <p className="text-gray-400">{t("reputation.subtitle")}</p>
             </div>
             <div className={`flex items-center space-x-2 rounded-2xl px-4 py-2 ${insightsLoading ? 'bg-black/30' : 'bg-green-400/10'}`}>
               <div className={`w-2 h-2 rounded-full ${insightsLoading ? 'bg-cyan-400 ai-typing' : 'bg-green-400'}`}></div>
@@ -769,25 +774,25 @@ export default function AIReputationPage() {
                 { name: "Silver", min: 41, color: "gray", icon: faMedal },
                 { name: "Gold", min: 71, color: "yellow", icon: faMedal },
                 { name: "Platinum", min: 91, color: "violet", icon: faCrown },
-              ].map((t) => {
-                const ptsNeeded = Math.max(0, t.min - reputationScore);
-                const reached = reputationScore >= t.min;
-                const isSelected = goalTier === t.name;
+              ].map((tier) => {
+                const ptsNeeded = Math.max(0, tier.min - reputationScore);
+                const reached = reputationScore >= tier.min;
+                const isSelected = goalTier === tier.name;
                 return (
                   <button
-                    key={t.name}
-                    onClick={() => setGoalTier(t.name)}
+                    key={tier.name}
+                    onClick={() => setGoalTier(tier.name)}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
                       isSelected
-                        ? `bg-${t.color}-400/20 border-${t.color}-400/60`
+                        ? `bg-${tier.color}-400/20 border-${tier.color}-400/60`
                         : 'bg-black/20 border-gray-700 hover:border-gray-500'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <FontAwesomeIcon icon={t.icon} className={`text-${t.color}-400 text-xl`} />
+                      <FontAwesomeIcon icon={tier.icon} className={`text-${tier.color}-400 text-xl`} />
                       <div className="text-left">
-                        <div className={`text-${t.color}-400 font-medium`}>{t.name}</div>
-                        <div className="text-gray-400 text-xs">{t.min}+ points required</div>
+                        <div className={`text-${tier.color}-400 font-medium`}>{tier.name}</div>
+                        <div className="text-gray-400 text-xs">{tier.min}+ points required</div>
                       </div>
                     </div>
                     <div className="text-right">

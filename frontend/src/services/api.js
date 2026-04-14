@@ -26,6 +26,12 @@ export async function apiFetch(path, options = {}) {
   if (!res.ok) {
     const msg =
       (data && (data.message || data.error)) || (typeof data === "string" ? data : "Erreur API");
+    
+    // Handle credit exhaustion with user-friendly message
+    if (res.status === 402 || (typeof msg === "string" && msg.toLowerCase().includes("credit"))) {
+      throw new Error("⚠️ AI credits exhausted. Please recharge your OpenRouter account at openrouter.ai/settings/credits");
+    }
+    
     throw new Error(msg);
   }
 

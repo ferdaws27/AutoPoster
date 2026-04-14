@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import Generate from "../components/generat";
+import useTranslation from "../i18n/useTranslation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function App() {
+  const t = useTranslation();
   const [text, setText] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [selectedType, setSelectedType] = useState("");
@@ -27,10 +29,10 @@ export default function App() {
             <i className="fa-solid fa-photo-film text-3xl text-white" />
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">
-            Media Companion — Turn Posts Into Visual Stories
+            {t("media.title")}
           </h1>
           <p className="text-xl text-gray-300">
-            Transform your text posts into engaging video scripts or carousels
+            {t("media.subtitle")}
           </p>
         </section>
 
@@ -44,7 +46,7 @@ export default function App() {
       1
     </div>
     <h2 className="text-2xl font-bold text-white">
-      Input Your Post Content
+      {t("media.inputLabel")}
     </h2>
   </div>
 
@@ -83,13 +85,13 @@ What's your experience with AI-powered content tools?`}
       <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
         <h3 className="text-white font-semibold mb-4 flex items-center">
           <i className="fa-solid fa-lightbulb text-yellow-400 mr-2"></i>
-          Quick Tips
+          {t("media.quickTips")}
         </h3>
         <div className="space-y-3 text-sm text-gray-400">
           {[
-            "Include key points and insights for better script generation",
-            "Add emotional hooks or compelling statistics",
-            "Mention your target audience for better adaptation",
+            t("media.tip1"),
+            t("media.tip2"),
+            t("media.tip3"),
           ].map((tip) => (
             <div key={tip} className="flex items-start space-x-2">
               <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full mt-2" />
@@ -103,20 +105,20 @@ What's your experience with AI-powered content tools?`}
       <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50">
         <h3 className="text-white font-semibold mb-4 flex items-center">
           <i className="fa-solid fa-chart-line text-cyan-400 mr-2"></i>
-          Content Analysis
+          {t("media.contentAnalysis")}
         </h3>
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-400">Readability</span>
-            <span className="text-green-400">Good</span>
+            <span className="text-gray-400">{t("media.readability")}</span>
+            <span className="text-green-400">{t("media.good")}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Engagement Potential</span>
-            <span className="text-cyan-400">High</span>
+            <span className="text-gray-400">{t("media.engagementPotential")}</span>
+            <span className="text-cyan-400">{t("media.high")}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Key Topics</span>
-            <span className="text-violet-400">3 detected</span>
+            <span className="text-gray-400">{t("media.keyTopics")}</span>
+            <span className="text-violet-400">3 {t("media.detected")}</span>
           </div>
         </div>
       </div>
@@ -134,7 +136,7 @@ What's your experience with AI-powered content tools?`}
       2
     </div>
     <h2 className="text-2xl font-bold text-white">
-      Choose Your Output Type
+      {t("media.chooseOutput")}
     </h2>
   </div>
 

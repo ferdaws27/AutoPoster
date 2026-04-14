@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import useTranslation from "../i18n/useTranslation";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line
 } from "recharts";
@@ -43,6 +44,7 @@ const iconMap = {
 
 /* ------------------- COMPONENT ------------------- */
 export default function PerformanceOptimizer() {
+  const t = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState("7D");
   const [applied, setApplied] = useState(false);
   const [perfData, setPerfData] = useState(null);
@@ -65,10 +67,10 @@ export default function PerformanceOptimizer() {
   const bestDay = perfData?.best_day ?? "";
 
   const quickActions = [
-    { icon: faDownload, title: "Export Report", description: "Download detailed analytics", color: "cyan-400" },
-    { icon: faCalendarPlus, title: "Schedule Optimal Posts", description: "Auto-schedule at best times", color: "violet-400" },
-    { icon: faLightbulb, title: "Content Ideas", description: "Get AI-powered suggestions", color: "teal-400" },
-    { icon: faShareNodes, title: "Share Insights", description: "Send report to team", color: "yellow-400" }
+    { icon: faDownload, title: t("performance.exportReport"), description: t("performance.exportDesc"), color: "cyan-400" },
+    { icon: faCalendarPlus, title: t("performance.scheduleOptimal"), description: t("performance.scheduleDesc"), color: "violet-400" },
+    { icon: faLightbulb, title: t("performance.contentIdeas"), description: t("performance.contentDesc"), color: "teal-400" },
+    { icon: faShareNodes, title: t("performance.shareInsights"), description: t("performance.shareDesc"), color: "yellow-400" }
   ];
 
   /* ------------------- EXPORT CSV ------------------- */
@@ -100,8 +102,8 @@ export default function PerformanceOptimizer() {
         <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center">
           <FontAwesomeIcon icon={faRocket} size="2x" />
         </div>
-        <h1 className="text-4xl font-bold mb-2">Performance Optimizer — Learn From Your Data</h1>
-        <p className="text-gray-400">AI-powered insights to boost engagement</p>
+        <h1 className="text-4xl font-bold mb-2">{t("performance.title")}</h1>
+        <p className="text-gray-400">{t("performance.subtitle")}</p>
         <p className="text-gray-400">
           {loading ? "Loading..." : `Analyze ${totalPosts} posts across ${Object.keys(perfData?.platforms || {}).length} platforms • Last updated just now`}
         </p>
@@ -118,22 +120,22 @@ export default function PerformanceOptimizer() {
             <div className="metric-card glass-effect rounded-3xl p-6 text-center">
               <FontAwesomeIcon icon={faLightbulb} className="text-cyan-400 text-2xl mb-2" />
               <div className="text-2xl font-bold metric-value">{avgEngagementPct}</div>
-              <div className="text-gray-400">Avg Engagement Rate</div>
+              <div className="text-gray-400">{t("performance.avgEngagement")}</div>
               <div className="text-gray-500 text-xs mt-2">
                 {["LinkedIn", "Twitter", "Medium"].map((p, i) => (
                   <span key={p}>{i > 0 && " • "}{p}: {platformEngPct[p] ?? "—"}</span>
                 ))}
               </div>
             </div>
-            <Metric title="Best Time" value={`${bestDay} ${bestTime}`} icon={faClock} />
-            <Metric title="Top Platform" value={topPlatform} icon={faTrophy} />
+            <Metric title={t("performance.bestTime")} value={`${bestDay} ${bestTime}`} icon={faClock} />
+            <Metric title={t("performance.topPlatform")} value={topPlatform} icon={faTrophy} />
           </div>
 
           {/* CHARTS */}
           <div className="grid lg:grid-cols-2 gap-8 mb-12">
             <div className="chart-container rounded-3xl p-6 glass-effect">
               <h3 className="text-xl mb-4 flex items-center gap-2">
-                <FontAwesomeIcon icon={faChartColumn} /> Engagement per type
+                <FontAwesomeIcon icon={faChartColumn} /> {t("performance.engagementByType")}
               </h3>
               {barData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={340}>

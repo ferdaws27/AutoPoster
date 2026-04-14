@@ -9,8 +9,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { usePosts } from '../hooks/usePosts';
 import useSettings from '../hooks/useSettings';
+import useTranslation from '../i18n/useTranslation';
 
 export default function SchedulingPage() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling, openRouterKey, modelId } = useSettings();
   const [viewMode, setViewMode] = useState('week');
@@ -711,8 +713,8 @@ export default function SchedulingPage() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-white mb-2">Content Scheduler</h1>
-            <p className="text-gray-400">Plan and schedule your content across all platforms</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{t("scheduling.title")}</h1>
+            <p className="text-gray-400">{t("scheduling.subtitle")}</p>
           </div>
           
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -724,7 +726,7 @@ export default function SchedulingPage() {
                   viewMode === 'week' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Week
+                {t("scheduling.weekView")}
               </button>
               <button 
                 onClick={() => setViewMode('day')}
@@ -732,7 +734,7 @@ export default function SchedulingPage() {
                   viewMode === 'day' ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Day
+                {t("scheduling.dayView")}
               </button>
             </div>
             
@@ -751,7 +753,7 @@ export default function SchedulingPage() {
               className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
             >
               <FontAwesomeIcon icon={faPlus} />
-              <span>Add Schedule</span>
+              <span>{t("scheduling.schedulePost")}</span>
             </button>
           </div>
         </div>
@@ -797,7 +799,7 @@ export default function SchedulingPage() {
                 {loading && (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="w-8 h-8 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin mb-3"></div>
-                    <p className="text-gray-400 text-sm">Loading your posts...</p>
+                    <p className="text-gray-400 text-sm">{t("common.loading")}</p>
                   </div>
                 )}
                 
@@ -807,7 +809,7 @@ export default function SchedulingPage() {
                       <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-600 text-xl" />
                     </div>
                     <p className="text-gray-400 text-sm font-medium mb-1">
-                      {posts.length === 0 ? 'No posts yet' : 'No posts match this filter'}
+                      {posts.length === 0 ? t("scheduling.noPostsScheduled") : 'No posts match this filter'}
                     </p>
                     <p className="text-gray-500 text-xs">
                       {posts.length === 0 ? 'Create one to get started' : 'Try a different filter'}

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import useTranslation from "../i18n/useTranslation";
 import { usePosts } from "../hooks/usePosts";
 import {
   faRocket, faChartColumn, faFire, faBrain, faMagicWandSparkles,
@@ -25,6 +26,7 @@ const PLATFORM_ICON_COLORS = {
 };
 
 export default function AnalyticsPage() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const { fetchAnalyticsData, fetchBestTimes, fetchContentPerformance, fetchAiInsights } = usePosts();
   const [analyticsData, setAnalyticsData] = useState([]);
@@ -651,8 +653,8 @@ export default function AnalyticsPage() {
     <div id="main-content" className="p-8">
       <div id="header-section" className="flex items-center justify-between mb-8 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
-          <p className="text-gray-400">Track your content performance across all platforms</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{t("analytics.title")}</h1>
+          <p className="text-gray-400">{t("analytics.subtitle")}</p>
         </div>
         <div className="flex items-center space-x-4"></div>
       </div>
@@ -671,7 +673,7 @@ export default function AnalyticsPage() {
             <button onClick={() => setShowExportModal(true)}
               className="flex items-center space-x-2 px-6 py-3 glass-effect rounded-2xl text-white border border-gray-600 hover:border-cyan-400/50 transition-all hover:shadow-lg hover:shadow-cyan-400/20">
               <FontAwesomeIcon icon={faDownload} />
-              <span>Export Report</span>
+              <span>{t("analytics.exportReport")}</span>
             </button>
           </div>
         </div>
@@ -689,7 +691,7 @@ export default function AnalyticsPage() {
             </div>
             <div>
               <div className="text-3xl font-bold text-white mb-1">{analytics.totalEngagement.toLocaleString()}</div>
-              <div className="text-gray-400 text-sm">Total Engagement</div>
+              <div className="text-gray-400 text-sm">{t("analytics.totalEngagement")}</div>
               <div className="text-xs text-gray-500 mt-1">vs last {activeRange}</div>
             </div>
           </div>
@@ -708,7 +710,7 @@ export default function AnalyticsPage() {
               <div className="text-3xl font-bold text-white mb-1">
                 {analytics.totalComments > 0 ? `+${analytics.totalComments.toLocaleString()}` : '0'}
               </div>
-              <div className="text-gray-400 text-sm">Engagement Growth</div>
+              <div className="text-gray-400 text-sm">{t("analytics.followerGrowth")}</div>
               <div className="text-xs text-gray-500 mt-1">comments & interactions</div>
             </div>
           </div>
@@ -725,7 +727,7 @@ export default function AnalyticsPage() {
             </div>
             <div>
               <div className="text-3xl font-bold text-white mb-1">{analytics.estimatedReach.toLocaleString()}</div>
-              <div className="text-gray-400 text-sm">Estimated Reach</div>
+              <div className="text-gray-400 text-sm">{t("analytics.estimatedReach")}</div>
               <div className="text-xs text-gray-500 mt-1">based on engagement</div>
             </div>
           </div>
@@ -742,7 +744,7 @@ export default function AnalyticsPage() {
             </div>
             <div>
               <div className="text-3xl font-bold text-white mb-1">{analytics.postsPerDay}</div>
-              <div className="text-gray-400 text-sm">Posts per Day</div>
+              <div className="text-gray-400 text-sm">{t("analytics.postsPerDay")}</div>
               <div className="text-xs text-gray-500 mt-1">consistency score</div>
             </div>
           </div>
@@ -757,9 +759,9 @@ export default function AnalyticsPage() {
               <p className="text-gray-400 text-sm">Track your content performance trends</p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-cyan-400 rounded-full glow-point" /><span className="text-gray-300">Likes</span></div>
-              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-violet-400 rounded-full glow-point" /><span className="text-gray-300">Comments</span></div>
-              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-teal-400 rounded-full glow-point" /><span className="text-gray-300">Shares</span></div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-cyan-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.likes")}</span></div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-violet-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.comments")}</span></div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-teal-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.shares")}</span></div>
             </div>
           </div>
           <div id="engagement-chart" className="h-80 w-full bg-black/20 rounded-xl flex items-center justify-center">
@@ -769,8 +771,8 @@ export default function AnalyticsPage() {
 
         <div id="platform-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.4s" }}>
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-white mb-1">Platform Contribution</h2>
-            <p className="text-gray-400 text-sm">Engagement breakdown by platform</p>
+            <h2 className="text-xl font-semibold text-white mb-1">{t("analytics.platformContribution")}</h2>
+            <p className="text-gray-400 text-sm">{t("analytics.engagementBreakdown")}</p>
           </div>
           <div id="platform-chart" className="h-64"></div>
           <div className="mt-8 space-y-4">
@@ -791,8 +793,8 @@ export default function AnalyticsPage() {
                       style={{ width: `${analytics.platformPercentages[platform]}%` }} />
                   </div>
                   <div className="text-xs text-gray-500 flex justify-between">
-                    <span>{analytics.platformPostCount?.[platform] || 0} posts</span>
-                    <span>{(analytics.platformEngagement[platform] || 0).toLocaleString()} engagement</span>
+                    <span>{t("analytics.posts")}</span>
+                    <span>{(analytics.platformEngagement[platform] || 0).toLocaleString()} {t("analytics.engagement")}</span>
                   </div>
                 </div>
               );
@@ -805,7 +807,7 @@ export default function AnalyticsPage() {
         <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faHeart} className="text-cyan-400 text-xl" /></div>
-            <div><div className="text-white text-sm font-medium">Likes</div><div className="text-gray-400 text-xs">{analytics.likesPercent}% of engagement</div></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.likes")}</div><div className="text-gray-400 text-xs">{analytics.likesPercent}% {t("analytics.ofEngagement")}</div></div>
           </div>
           <div className="text-2xl font-bold text-cyan-400 mb-2">{analytics.totalLikes.toLocaleString()}</div>
           <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-cyan-400 rounded-full" style={{ width: `${analytics.likesPercent}%` }} /></div>
@@ -814,7 +816,7 @@ export default function AnalyticsPage() {
         <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faChartColumn} className="text-violet-400 text-xl" /></div>
-            <div><div className="text-white text-sm font-medium">Comments</div><div className="text-gray-400 text-xs">{analytics.commentsPercent}% of engagement</div></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.comments")}</div><div className="text-gray-400 text-xs">{analytics.commentsPercent}% {t("analytics.ofEngagement")}</div></div>
           </div>
           <div className="text-2xl font-bold text-violet-400 mb-2">{analytics.totalComments.toLocaleString()}</div>
           <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-violet-400 rounded-full" style={{ width: `${analytics.commentsPercent}%` }} /></div>
@@ -823,7 +825,7 @@ export default function AnalyticsPage() {
         <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-teal-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faRocket} className="text-teal-400 text-xl" /></div>
-            <div><div className="text-white text-sm font-medium">Shares</div><div className="text-gray-400 text-xs">{analytics.sharesPercent}% of engagement</div></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.shares")}</div><div className="text-gray-400 text-xs">{analytics.sharesPercent}% {t("analytics.ofEngagement")}</div></div>
           </div>
           <div className="text-2xl font-bold text-teal-400 mb-2">{analytics.totalShares.toLocaleString()}</div>
           <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-teal-400 rounded-full" style={{ width: `${analytics.sharesPercent}%` }} /></div>
@@ -833,8 +835,8 @@ export default function AnalyticsPage() {
       <div id="insights-section" className="grid grid-cols-2 gap-8 mb-8 animate-slide-up" style={{ animationDelay: "0.6s" }}>
         <div className="glass-effect rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Best Performing Times</h3>
-            {bestTimesLoading && <div className="text-xs text-gray-500 animate-pulse">Analyzing...</div>}
+            <h3 className="text-lg font-semibold text-white">{t("analytics.bestTimes")}</h3>
+            {bestTimesLoading && <div className="text-xs text-gray-500 animate-pulse">{t("analytics.analyzing")}</div>}
           </div>
           <div className="space-y-4">
             {bestTimes.length > 0 ? bestTimes.map((time, idx) => (
@@ -843,17 +845,17 @@ export default function AnalyticsPage() {
                   <div className="text-white font-medium">{time.day}</div>
                   <div className="text-gray-400 text-sm">{time.desc}</div>
                 </div>
-                <div className={`${time.color} font-bold`}>{time.value} above avg</div>
+                <div className={`${time.color} font-bold`}>{time.value} {t("analytics.aboveAvg")}</div>
               </div>
             )) : (
-              <div className="text-gray-500 text-sm p-3">Not enough data for this range.</div>
+              <div className="text-gray-500 text-sm p-3">{t("analytics.notEnoughData")}</div>
             )}
           </div>
           {bestTimesAiInsight && (
             <div className="mt-4 p-3 bg-cyan-400/5 border border-cyan-400/20 rounded-2xl">
               <div className="flex items-center space-x-2 mb-2">
                 <FontAwesomeIcon icon={faBrain} className="text-cyan-400 text-sm" />
-                <span className="text-cyan-400 text-xs font-medium">AI Timing Insight</span>
+                <span className="text-cyan-400 text-xs font-medium">{t("analytics.aiInsight")}</span>
               </div>
               <p className="text-gray-300 text-sm">{bestTimesAiInsight.recommendation}</p>
               {bestTimesAiInsight.tip && (
@@ -865,7 +867,7 @@ export default function AnalyticsPage() {
 
         <div className="glass-effect rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Content Type Performance</h3>
+            <h3 className="text-lg font-semibold text-white">{t("analytics.contentPerformance")}</h3>
             {contentPerfLoading && <div className="text-xs text-gray-500 animate-pulse">Loading...</div>}
           </div>
           <div className="space-y-4">
@@ -1034,7 +1036,7 @@ export default function AnalyticsPage() {
       {showExportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="glass-effect rounded-3xl p-8 border border-gray-700/50 max-w-md w-full mx-4 animate-scale-in">
-            <h2 className="text-2xl font-bold text-white mb-2">Export Analytics Report</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{t("analytics.exportReport")}</h2>
             <p className="text-gray-400 text-sm mb-6">Choose your preferred format</p>
             <div className="space-y-3 mb-6">
               <label className={`flex items-center p-4 rounded-2xl cursor-pointer border transition-all ${exportFormat === 'json' ? 'bg-cyan-400/10 border-cyan-400/50' : 'border-gray-700/50 hover:border-gray-600'}`}>
@@ -1047,7 +1049,7 @@ export default function AnalyticsPage() {
               </label>
             </div>
             <div className="flex space-x-3">
-              <button onClick={() => setShowExportModal(false)} className="flex-1 px-4 py-2 bg-black/30 text-gray-300 rounded-xl hover:bg-black/50 transition-all font-medium">Cancel</button>
+              <button onClick={() => setShowExportModal(false)} className="flex-1 px-4 py-2 bg-black/30 text-gray-300 rounded-xl hover:bg-black/50 transition-all font-medium">{t("common.cancel")}</button>
               <button onClick={() => { generateExportReport(); setShowExportModal(false); }} className="flex-1 px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30 transition-all font-medium border border-cyan-400/50">Download Report</button>
             </div>
           </div>

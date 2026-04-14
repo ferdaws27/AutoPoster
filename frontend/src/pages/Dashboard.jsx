@@ -218,20 +218,7 @@ export default function Dashboard() {
     setAiSuggestion(`Idée appliquée : ${idea.title}`);
   };
 
-  const handleAIOptimize = () => {
-    if (!content.trim()) {
-      setAiSuggestion("Please enter content first to optimize.");
-      return;
-    }
 
-    const optimized = content
-      .trim()
-      .replace(/\s+/g, " ")
-      .slice(0, 280);
-
-    setContent(`✅ Optimized: ${optimized}`);
-    setAiSuggestion("Contenu optimisé automatiquement ! Vous pouvez modifier puis enregistrer.");
-  };
 
   return (
     <div className="gradient-bg min-h-screen text-white m-0 p-0">
@@ -380,14 +367,6 @@ export default function Dashboard() {
                 >
                   <i className="fa-solid fa-download mr-2"></i>
                   {t("dashboard.exportData")}
-                </button>
-
-                <button
-                  onClick={handleAIOptimize}
-                  className="flex items-center px-4 py-2 rounded-xl gradient-accent text-white hover:opacity-90 transition-opacity"
-                >
-                  <i className="fa-solid fa-magic-wand-sparkles mr-2"></i>
-                  {t("dashboard.aiOptimize")}
                 </button>
 
                 <input

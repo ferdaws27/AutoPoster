@@ -105,6 +105,11 @@ export default function ABTesterPage() {
       setStats(s);
     } catch (e) {
       console.error("Fetch error:", e);
+      // Stop polling on persistent errors
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
     } finally {
       setLoading(false);
     }
@@ -112,7 +117,7 @@ export default function ABTesterPage() {
 
   useEffect(() => {
     fetchAll();
-    pollRef.current = setInterval(fetchAll, 4000);
+    pollRef.current = setInterval(fetchAll, 8000);
     return () => clearInterval(pollRef.current);
   }, []);
 

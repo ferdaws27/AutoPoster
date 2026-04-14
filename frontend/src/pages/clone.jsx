@@ -2,6 +2,7 @@
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { apiFetch } from "../services/api";
 import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 import MainTrainingInterface from "../components/MainTrainingInterface";
 
 function timeAgo(dateStr) {
@@ -38,6 +39,7 @@ function ProfileImg({ src, name, className }) {
 }
 
 export default function VoiceCloner() {
+  const t = useTranslation();
   const { raw: settingsRaw, updateSettings } = useSettings();
   const [activeTab, setActiveTab] = useState("my");
   const [url, setUrl] = useState("");
@@ -212,8 +214,8 @@ export default function VoiceCloner() {
             <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-accent flex items-center justify-center shadow-lg">
               <i className="fa-solid fa-brain text-3xl text-white"></i>
             </div>
-            <h1 className="text-4xl font-bold text-white mb-4">Train or Clone Writing Voices</h1>
-            <p className="text-xl text-gray-300 mb-2">Teach AutoPoster how you or others write — for more natural, authentic AI posts</p>
+            <h1 className="text-4xl font-bold text-white mb-4">{t("clone.title")}</h1>
+            <p className="text-xl text-gray-300 mb-2">{t("clone.subtitle")}</p>
             <p className="text-gray-400">Clone successful creators' tones or perfect your own voice with AI analysis</p>
           </div>
 
@@ -227,7 +229,7 @@ export default function VoiceCloner() {
                 }`}
               >
                 <i className="fa-solid fa-user mr-2"></i>
-                My Voice
+                {t("clone.myVoice")}
               </button>
 
               <button
@@ -237,7 +239,7 @@ export default function VoiceCloner() {
                 }`}
               >
                 <i className="fa-solid fa-copy mr-2"></i>
-                Clone Profile
+                {t("clone.cloneProfile")}
               </button>
 
               <button
@@ -247,7 +249,7 @@ export default function VoiceCloner() {
                 }`}
               >
                 <i className="fa-solid fa-file-lines mr-2"></i>
-                Train from Files
+                {t("clone.trainFromFiles")}
               </button>
             </div>
           </div>
@@ -400,7 +402,7 @@ export default function VoiceCloner() {
               <div className="neo-card rounded-3xl p-8 mb-8 slide-up">
                 <div className="text-center mb-8">
                   <h2 className="text-2xl font-bold text-white mb-2">
-                    Analyze Any Creator's Voice
+                    {t("clone.analyzeVoice")}
                   </h2>
                   <p className="text-gray-400">
                     Paste a LinkedIn, Medium, or X profile URL to clone their writing style
@@ -427,7 +429,7 @@ export default function VoiceCloner() {
                     className="w-full p-4 gradient-accent rounded-2xl text-white font-semibold hover:opacity-90 transition-all disabled:opacity-50"
                   >
                     <i className="fa-solid fa-brain mr-2"></i>
-                    Analyze Voice
+                    {t("clone.analyzeVoice")}
                   </button>
                 </div>
               </div>
@@ -644,7 +646,7 @@ export default function VoiceCloner() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-white flex items-center">
                 <i className="fa-solid fa-bookmark text-yellow-400 mr-3"></i>
-                Saved Voice Presets
+                {t("clone.savedPresets")}
               </h2>
             </div>
 
@@ -656,7 +658,7 @@ export default function VoiceCloner() {
             ) : presets.length === 0 ? (
               <div className="text-center py-8">
                 <i className="fa-solid fa-bookmark text-4xl text-gray-600 mb-4"></i>
-                <p className="text-gray-400 mb-2">No saved presets yet</p>
+                <p className="text-gray-400 mb-2">{t("clone.noPresets")}</p>
                 <p className="text-gray-500 text-sm">Clone a creator's voice to save it as a preset</p>
               </div>
             ) : (
