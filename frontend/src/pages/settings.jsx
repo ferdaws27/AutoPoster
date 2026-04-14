@@ -14,47 +14,33 @@ export default function SettingsPage() {
   const { user } = useOutletContext();
   const { updateSettings } = useSettings();
 
+  // Load settings synchronously to avoid initialData being null on first render
+  const [initialSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("userSettings");
+      if (saved) return JSON.parse(saved);
+    } catch (error) {
+      console.error("Error loading settings:", error);
+    }
+    return {};
+  });
+
   // Child states
-  const [integrationData, setIntegrationData] = useState(null);
-  const [aiData, setAiData] = useState(null);
-  const [postingData, setPostingData] = useState(null);
-  const [apiData, setApiData] = useState(null);
-  const [dangerData, setDangerData] = useState(null);
+  const [integrationData, setIntegrationData] = useState(initialSettings.integrations || null);
+  const [aiData, setAiData] = useState(initialSettings.ai || null);
+  const [postingData, setPostingData] = useState(initialSettings.posting || null);
+  const [apiData, setApiData] = useState(initialSettings.api || null);
+  const [dangerData, setDangerData] = useState(initialSettings.danger || null);
 
   // Global state
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
-
 
   const integrationsRef = useRef(null);
   const aiRef = useRef(null);
   const postingRef = useRef(null);
   const apiRef = useRef(null);
   const dangerRef = useRef(null);
-
-  // Load settings on mount
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = () => {
-    try {
-      // Load from localStorage or backend
-      const saved = localStorage.getItem("userSettings");
-      if (saved) {
-        const settings = JSON.parse(saved);
-        setIntegrationData(settings.integrations || null);
-        setAiData(settings.ai || null);
-        setPostingData(settings.posting || null);
-        setApiData(settings.api || null);
-        setDangerData(settings.danger || null);
-      }
-    } catch (error) {
-      console.error("Error loading settings:", error);
-      showToast("Failed to load settings", "error");
-    }
-  };
 
   const handleCategoryClick = (key, ref) => {
     setActiveCategory(key);
@@ -83,6 +69,20 @@ export default function SettingsPage() {
         break;
     }
   };
+
+  // Auto-save to localStorage whenever any setting changes
+  useEffect(() => {
+    if (!hasChanges) return;
+    const payload = {
+      integrations: integrationData,
+      ai: aiData,
+      posting: postingData,
+      api: apiData,
+      danger: dangerData,
+      lastUpdated: new Date().toISOString(),
+    };
+    updateSettings(payload);
+  }, [integrationData, aiData, postingData, apiData, dangerData]);
 
   const handleSaveSettings = async () => {
     if (!hasChanges) {
@@ -130,13 +130,17 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       const response = await apiFetch("/api/user/settings");
-      if (response) {
-        const settings = response;
+      if (response && response.data) {
+        const settings = response.data;
         setIntegrationData(settings.integrations || null);
         setAiData(settings.ai || null);
         setPostingData(settings.posting || null);
         setApiData(settings.api || null);
         setDangerData(settings.danger || null);
+
+        // Also save to localStorage
+        updateSettings(settings);
+
         setHasChanges(false);
         showToast("Settings synced from server", "success");
       }

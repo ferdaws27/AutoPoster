@@ -25,15 +25,10 @@ import {
   faTimes,
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
-import {
-  faTwitter,
-  faLinkedin,
-  faMedium,
-} from "@fortawesome/free-brands-svg-icons";
 
 export default function CreatePostPage() {
   const { createPost, posts, stats: hookStats } = usePosts();
-  const { modelId, toneLabel, temperature, connectedPlatforms, voiceProfile } = useSettings();
+  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity } = useSettings();
   const navigate = useNavigate();
   const ideaRef = useRef(null);
 
@@ -303,45 +298,187 @@ export default function CreatePostPage() {
 `
       : "";
 
+    const toneDescriptions = {
+      professional: "formal language, structured sentences, business vocabulary, no slang, no emojis, data-driven insights",
+      friendly: "warm and approachable language, light emojis allowed, conversational but informative, encouraging tone",
+      casual: "relaxed everyday language, emojis encouraged, short punchy sentences, speak like talking to a friend, use humor",
+    };
+
+    const lengthInstructions = {
+      "Short (50–100 words)": "STRICT LIMIT: 50-100 words maximum. Be concise. Cut any filler.",
+      "Medium (100–200 words)": "Target 100-200 words. Balanced detail.",
+      "Long (200+ words)": "Write 200+ words. Go in-depth with details.",
+      "Auto-adjust": "Adjust length naturally to fit the platform.",
+    };
+
+    const systemMessage = `You are an elite social media content creator who has built audiences of 100K+ followers across platforms. You write content that stops the scroll, sparks engagement, and builds authority.
+
+RULE 0 — LANGUAGE (HIGHEST PRIORITY):
+Detect the language of the user's topic/idea. Write ALL content in THAT SAME LANGUAGE.
+- If the topic is in French → write entirely in French
+- If the topic is in English → write entirely in English
+- If the topic is in Arabic → write entirely in Arabic
+- This applies to EVERYTHING: headlines, body, bullet points, hashtags, questions, CTAs
+- NEVER mix languages. NEVER default to English if the topic is in another language.
+
+RULE 1 — PLATFORM MASTERY:
+Follow the platform-specific structure from the user message EXACTLY. Each platform has unique formatting, character limits, and engagement patterns. Never write generic content — write platform-native content.
+
+RULE 2 — VOICE & TONE:
+Write in a ${toneLabel} tone throughout.
+${toneLabel} means: ${toneDescriptions[toneLabel] || ""}
+${toneLabel === "casual" ? "Be fun, direct, and human. Use conversational language, humor, and personality. NO corporate speak. But still respect the platform structure." : toneLabel === "professional" ? "Be polished, authoritative, and structured. Use industry vocabulary, cite frameworks, and demonstrate expertise." : "Be warm, relatable, and helpful. Use 'you' and 'we' language. Share insights like helping a friend."}
+
+RULE 3 — CONTENT LENGTH:
+${lengthInstructions[contentLength] || contentLength}. Count your words carefully. Hitting the target length is mandatory.
+
+RULE 4 — SCROLL-STOPPING QUALITY:
+- First line must create immediate curiosity, emotion, or value promise
+- Every sentence must earn the next sentence — no filler, no fluff
+- End with engagement: a question, bold statement, or clear CTA
+- Write like a human with opinions, not an AI summarizing information
+
+CREATIVITY LEVEL: ${creativity}
+${voiceProfile ? `
+VOICE PROFILE TO MATCH (this is the user's trained writing style — replicate it):
+- Tone: ${voiceProfile.tone} / ${voiceProfile.sentiment}
+- Style: ${voiceProfile.writingStyle}
+- Theme: ${voiceProfile.primaryTheme}
+- Signature keywords: ${(voiceProfile.keywords || []).slice(0, 5).join(", ")}` : ""}
+
+All rules carry EQUAL weight. Never sacrifice format for tone, tone for length, or quality for any constraint.`;
+    const isShort = contentLength.toLowerCase().includes("short");
+    const isLong = contentLength.toLowerCase().includes("long");
+
     try {
       for (const platform of platforms) {
-        let prompt = "";
+        let userPrompt = "";
+
+        const langReminder = `\n\nLANGUAGE OVERRIDE (MANDATORY): The topic "${idea}" is written in a specific language. Your ENTIRE output MUST be in that SAME language. If the topic is in French, write in French. If in English, write in English. If in Arabic, write in Arabic. Do NOT translate the topic. Do NOT write in English if the topic is in another language.`;
 
         if (platform === "Twitter") {
-          prompt = `Create a compelling Twitter post (max 280 characters) about: ${idea}. Requirements:
-- Start with an engaging hook
-- Include 2-3 key points with bullet points or numbers
-- Add relevant hashtags (2-3 max)
-- End with a question or call to action
-- Keep it conversational and impactful
-- This is generation attempt ${currentCount}, so make it unique and different from previous versions`;
+          userPrompt = `Write a high-impact Twitter post (STRICT max 280 characters) about: ${idea}.
+
+STRUCTURE:
+- Open with a scroll-stopping hook (first 5 words are everything)
+- ${isShort ? "1-2" : "2-3"} sharp key points using rhythm and punch
+- 2-3 relevant hashtags (only if they add discovery value)
+- End with a provocative question OR bold CTA
+- Use line breaks for visual rhythm when impactful
+
+TWITTER-NATIVE RULES:
+- Every word must earn its place — 280 chars means zero waste
+- Use specificity over vagueness ("3 tactics" not "some tips")
+- Pattern: Short sentence. Even shorter. Punch line.
+- NO generic filler, NO "In this thread", NO corporate speak
+
+Generation attempt ${currentCount} — write something COMPLETELY DIFFERENT from typical AI output.`;
         } else if (platform === "LinkedIn") {
-          prompt = `Write a professional LinkedIn post about: ${idea}. Requirements:
-- Start with a strong, attention-grabbing headline
-- Include 3-4 key insights with bullet points
-- Add professional context and business implications
-- Include relevant hashtags (3-4 max)
-- End with an engaging question to encourage discussion
-- Keep tone professional but conversational
-- This is generation attempt ${currentCount}, provide a fresh perspective`;
+          userPrompt = isShort
+            ? `Write a SHORT LinkedIn post (50-100 words STRICT) about: ${idea}.
+
+STRUCTURE:
+- Bold, standalone headline that works as the "see more" preview
+- 2-3 concise bullet points with real value
+- 2-3 hashtags
+- End with a short, genuine question (not "Agree?")
+
+LINKEDIN-NATIVE RULES:
+- First line IS the headline — make it impossible to not click "see more"
+- No filler, no padding, no "In today's world..."
+- Every line must deliver value or insight
+- Professional but human — write like a respected peer, not a textbook
+
+Generation attempt ${currentCount}, make it unique and fresh.`
+            : isLong
+            ? `Write a detailed LinkedIn post (200+ words) about: ${idea}.
+
+STRUCTURE:
+- Strong opening line that works as the "see more" preview (bold, specific, curiosity-driven)
+- Personal context or "why this matters" bridge (1-2 sentences)
+- 4-5 key insights with bullet points — each point must be specific and actionable
+- Deep business context: implications, trends, or lessons learned
+- 3-4 relevant industry hashtags
+- Close with a thought-provoking discussion question that invites genuine responses
+
+LINKEDIN-NATIVE RULES:
+- Use strategic line breaks every 1-2 sentences for readability
+- Write like a thought leader sharing hard-won wisdom, not a motivational poster
+- Include specific examples, numbers, or frameworks when possible
+- Tone: authoritative yet approachable — the reader should feel like they learned something
+
+Generation attempt ${currentCount}, provide a completely fresh perspective.`
+            : `Write a LinkedIn post (100-200 words) about: ${idea}.
+
+STRUCTURE:
+- Attention-grabbing headline that works as the "see more" preview
+- 3-4 key insights with bullet points — specific and actionable
+- Business context and real-world implications
+- 3-4 relevant industry hashtags
+- End with a discussion question that sparks genuine engagement
+
+LINKEDIN-NATIVE RULES:
+- Use line breaks for readability — no wall of text
+- Balance insight with personality — professional but not boring
+- Include at least one specific example, number, or framework
+- Write like sharing a valuable lesson with your professional network
+
+Generation attempt ${currentCount}, provide a fresh perspective.`;
         } else if (platform === "Medium") {
-          prompt = `Create a Medium article preview about: ${idea}. Requirements:
-- Start with an intriguing, SEO-friendly title
-- Write a compelling introduction (2-3 paragraphs)
-- Include 2-3 section headings with key insights
-- Add bullet points for key takeaways
-- End with a teaser to encourage reading the full article
-- Make it thoughtful and in-depth
-- This is generation attempt ${currentCount}, offer a unique angle`;
+          userPrompt = isShort
+            ? `Create a compelling Medium article teaser (50-100 words) about: ${idea}.
+
+STRUCTURE:
+- Catchy, SEO-friendly title that promises specific value
+- 1 punchy opening paragraph that hooks the reader
+- 2-3 key takeaways as sharp bullet points
+- Close with a curiosity hook that makes them want the full article
+
+MEDIUM-NATIVE RULES:
+- Write like a published journalist, not a social media poster
+- Title should work both for SEO and for shareability
+- Every sentence must make the reader want the next one
+
+Generation attempt ${currentCount}, offer a completely unique angle.`
+            : `Create a Medium article preview about: ${idea}.
+
+STRUCTURE:
+- SEO-friendly title that promises specific, tangible value
+- ${isLong ? "3-4" : "2-3"} compelling introduction paragraphs that set up the problem and promise a solution
+- 2-3 section headings with meaty insights under each
+- Key takeaways as clear, actionable bullet points
+- Close with a teaser that creates urgency to read the full article
+
+MEDIUM-NATIVE RULES:
+- Write in an editorial, essay-like voice — think published columnist
+- Open with a scene, statistic, or provocative question
+- Each section heading should be a standalone insight
+- Use transitions that pull the reader forward
+- Balance depth with accessibility — smart but not academic
+
+Generation attempt ${currentCount}, offer a completely unique angle.`;
         }
 
-        prompt += voiceInstruction;
+        userPrompt += langReminder;
 
         try {
-          const content = await aiGenerate({
-            prompt,
-            model: modelId,
-            max_tokens: platform === "Twitter" ? 100 : 300,
+          const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+              "HTTP-Referer": "http://localhost:5173",
+              "X-Title": "AutoPoster App",
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [
+                { role: "system", content: systemMessage },
+                { role: "user", content: userPrompt },
+              ],
+              max_tokens: platform === "Twitter" ? 100 : 300,
+              temperature,
+            }),
           });
           newVariations[platform] = content;
         } catch (fetchError) {
@@ -363,7 +500,7 @@ export default function CreatePostPage() {
   const generateAIidea = async () => {
     try {
       const prompt =
-        "Generate an interesting and engaging social media content idea. Return just the idea as a short phrase (1-6 words).";
+        "Generate one unique, specific, and trending social media content idea that would stop someone from scrolling. The idea should be timely, opinionated, or surprising — not generic. Detect the user's browser language and write the idea in that language. Return ONLY the idea as a short phrase (3-8 words), no explanation.";
 
       return await aiGenerate({
         prompt,
@@ -379,11 +516,11 @@ export default function CreatePostPage() {
   const generateMockContent = async (platform, idea, count) => {
     let prompt = "";
     if (platform === "Twitter") {
-      prompt = `Create a compelling Twitter post (max 280 characters) about: ${idea}. Generation ${count}.`;
+      prompt = `Write a scroll-stopping Twitter post (STRICT max 280 characters) about: ${idea}. Hook first, value second, CTA last. Use line breaks for rhythm. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — be completely unique.`;
     } else if (platform === "LinkedIn") {
-      prompt = `Write a professional LinkedIn post about: ${idea}. Generation ${count}.`;
+      prompt = `Write a professional LinkedIn post about: ${idea}. Start with a bold headline, add 3 key insights with bullet points, end with a discussion question. Use line breaks for readability. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — fresh perspective.`;
     } else {
-      prompt = `Create a Medium article preview about: ${idea}. Generation ${count}.`;
+      prompt = `Write a Medium article preview about: ${idea}. SEO-friendly title, compelling intro, 2 section headings with insights, end with a teaser for the full article. IMPORTANT: Write in the SAME LANGUAGE as the topic. Generation ${count} — unique angle.`;
     }
 
     try {
@@ -406,88 +543,105 @@ export default function CreatePostPage() {
     if (platforms.length === 0) return alert("Select at least one platform");
 
     setLoading(true);
+    const apiKey = openRouterKey;
+    const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+    const backendUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
     try {
-      const keywordsText = await aiGenerate({
-        prompt: `Based on this post idea: "${idea}"
-Generate 3 search keywords for relevant stock images.
-Return valid JSON array only like:
-["keyword1", "keyword2", "keyword3"]`,
-        model: modelId,
-        max_tokens: 150,
-      });
+      // Step 1: Use AI to generate smart search keywords per platform
+      let keywords = [idea.split(" ").slice(0, 3).join(" ")];
 
-      const keywords = JSON.parse(keywordsText);
-      const mainKeyword = keywords[0] || idea.split(" ")[0];
+      if (apiKey) {
+        try {
+          const promptRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+              "HTTP-Referer": "http://localhost:5173",
+              "X-Title": "AutoPoster App",
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{
+                role: "user",
+                content: `Based on this post idea: "${idea}"
+Generate 3 short image search queries (2-4 words each) to find relevant, high-quality photos.
+Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
+              }],
+              max_tokens: 100,
+            }),
+          });
 
+          if (promptRes.ok) {
+            const promptData = await promptRes.json();
+            const raw = promptData.choices[0].message.content.trim();
+            const match = raw.match(/\[[\s\S]*?\]/);
+            if (match) {
+              keywords = JSON.parse(match[0]);
+            }
+          }
+        } catch (err) {
+          console.warn("AI keyword generation failed, using idea directly:", err);
+        }
+      }
+
+      // Step 2: Fetch images from SerpAPI via backend proxy for each platform
       const imagePromises = platforms.map(async (platform) => {
         try {
-          let searchQuery = mainKeyword;
-          let imageDimensions = "400x300";
-
-          if (platform === "Twitter") {
-            searchQuery = `${mainKeyword}`;
-            imageDimensions = "400x200";
-          } else if (platform === "LinkedIn") {
-            searchQuery = `${mainKeyword} professional`;
-            imageDimensions = "400x300";
+          let searchQuery = keywords[0] || idea;
+          if (platform === "LinkedIn") {
+            searchQuery = (keywords[1] || keywords[0]) + " professional";
           } else if (platform === "Medium") {
-            searchQuery = `${mainKeyword} article`;
-            imageDimensions = "400x400";
+            searchQuery = keywords[2] || keywords[1] || keywords[0];
           }
 
-          const pexelsResponse = await fetch(
-            `https://api.pexels.com/v1/search?query=${encodeURIComponent(
-              searchQuery
-            )}&per_page=3`,
-            {
-              headers: {
-                Authorization: "YOUR_PEXELS_API_KEY",
-              },
-            }
+          const res = await fetch(
+            `${backendUrl}/api/images/search?q=${encodeURIComponent(searchQuery)}&num=6`,
+            { headers: { Authorization: `Bearer ${token}` } }
           );
 
-          let images = [];
-
-          if (pexelsResponse.ok) {
-            const pexelsData = await pexelsResponse.json();
-            images = pexelsData.photos.slice(0, 3).map((photo, idx) => ({
-              url: photo.src.medium,
-              description: `"${photo.alt}" - ${searchQuery}`,
-              selected: idx === 0,
-              keyword: searchQuery,
-              photographer: photo.photographer,
-            }));
-          } else {
-            const [width, height] = imageDimensions.split("x");
-            images = keywords.map((keyword, idx) => ({
-              url: `https://source.unsplash.com/${width}x${height}/?${encodeURIComponent(
-                keyword
-              )}`,
-              description: `${keyword} - optimized for ${platform}`,
-              selected: idx === 0,
-              keyword,
-            }));
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            console.error(`Image search error for ${platform}:`, errData);
+            return { platform, images: [] };
           }
+
+          const data = await res.json();
+          const images = (data.images || []).map((item, idx) => ({
+            url: item.original || item.url,
+            thumbnail: item.thumbnail || item.url,
+            description: item.title || searchQuery,
+            width: item.width,
+            height: item.height,
+            selected: idx === 0,
+            keyword: searchQuery,
+            source: item.source,
+          }));
 
           return { platform, images };
         } catch (err) {
-          console.error(`Error generating images for ${platform}:`, err);
+          console.error(`Error fetching images for ${platform}:`, err);
           return { platform, images: [] };
         }
       });
 
       const results = await Promise.all(imagePromises);
       const newImages = {};
+      let totalImages = 0;
       results.forEach(({ platform, images }) => {
         newImages[platform] = images;
+        totalImages += images.length;
       });
 
       setSelectedImages(newImages);
-      alert(`Generated ${platforms.length} image sets based on "${mainKeyword}".`);
+
+      if (totalImages === 0) {
+        alert("No images found. Try a different idea.");
+      }
     } catch (err) {
-      console.error(err);
-      alert("Error planning images: " + err.message);
+      console.error("Plan images error:", err);
+      alert("Error searching for images: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -590,12 +744,23 @@ const saveDraft = async () => {
     for (const platform of selectedPlatforms) {
       const platformContent = variations[platform] || idea; // Utiliser le contenu généré ou l'idée originale
       
+      // Get the selected image for this platform
+      const platformImages = selectedImages[platform] || [];
+      const selectedImg = platformImages.find(img => img.selected);
+      const imageData = selectedImg ? {
+        url: selectedImg.url,
+        thumbnail: selectedImg.thumbnail || selectedImg.url,
+        source: selectedImg.source || '',
+        keyword: selectedImg.keyword || '',
+      } : null;
+
       await createPost({
         idea,
         content: platformContent,
         platforms: { [platform]: true },
         status: "draft",
-        engagement: {}
+        engagement: {},
+        selectedImages: imageData ? [imageData] : [],
       });
     }
 
@@ -628,6 +793,16 @@ const saveDraft = async () => {
       for (const platform of scheduledPlatforms) {
         const platformContent = variations[platform] || idea; // Utiliser le contenu généré ou l'idée originale
         
+        // Get the selected image for this platform
+        const platformImages = selectedImages[platform] || [];
+        const selectedImg = platformImages.find(img => img.selected);
+        const imageData = selectedImg ? {
+          url: selectedImg.url,
+          thumbnail: selectedImg.thumbnail || selectedImg.url,
+          source: selectedImg.source || '',
+          keyword: selectedImg.keyword || '',
+        } : null;
+
         await createPost({
           idea,
           content: platformContent,
@@ -636,6 +811,7 @@ const saveDraft = async () => {
           scheduleDate: scheduleDate,
           scheduleTime: scheduleTime,
           engagement: {},
+          selectedImages: imageData ? [imageData] : [],
         });
       }
 
@@ -746,22 +922,15 @@ const saveDraft = async () => {
                   ></div>
                 </div>
                 <div className="ml-3 flex items-center">
-                  <FontAwesomeIcon
-                    icon={
-                      platform === "Twitter"
-                        ? faTwitter
-                        : platform === "LinkedIn"
-                        ? faLinkedin
-                        : faMedium
-                    }
-                    className={`mr-2 ${
+                  <i
+                    className={`fa-brands ${platform === "Twitter" ? "fa-x-twitter" : platform === "LinkedIn" ? "fa-linkedin-in" : "fa-medium"} mr-2 ${
                       platform === "Twitter"
                         ? "text-white"
                         : platform === "LinkedIn"
                         ? "text-blue-400"
                         : "text-green-400"
                     }`}
-                  />
+                  ></i>
                   <span className="text-white font-medium">{platform}</span>
                 </div>
               </label>
@@ -845,22 +1014,15 @@ The AI will adapt your content for each platform's unique style and audience.`}
                 <div className="card-bg rounded-3xl p-6 border border-gray-700 h-full">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
-                      <FontAwesomeIcon
-                        icon={
-                          platform === "Twitter"
-                            ? faTwitter
-                            : platform === "LinkedIn"
-                            ? faLinkedin
-                            : faMedium
-                        }
-                        className={`mr-3 ${
+                      <i
+                        className={`fa-brands ${platform === "Twitter" ? "fa-x-twitter" : platform === "LinkedIn" ? "fa-linkedin-in" : "fa-medium"} mr-3 ${
                           platform === "Twitter"
                             ? "text-white"
                             : platform === "LinkedIn"
                             ? "text-blue-400"
                             : "text-green-400"
                         }`}
-                      />
+                      ></i>
                       <h3 className="text-lg font-semibold text-white">
                         {platform}
                       </h3>
@@ -961,16 +1123,12 @@ The AI will adapt your content for each platform's unique style and audience.`}
                         />
                         Suggested Images
                       </h4>
-                      <div
-                        className={
-                          platform === "Twitter" ? "grid grid-cols-2 gap-3" : "space-y-2"
-                        }
-                      >
+                      <div className="grid grid-cols-3 gap-2">
                         {(selectedImages[platform] || []).map((image, index) => (
                           <div
                             key={index}
-                            className={`relative group cursor-pointer ${
-                              image.selected ? "ring-2 ring-cyan-400" : ""
+                            className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              image.selected ? "border-cyan-400 ring-1 ring-cyan-400/30" : "border-transparent hover:border-gray-500"
                             }`}
                             onClick={() => {
                               const newImages = { ...selectedImages };
@@ -985,45 +1143,39 @@ The AI will adapt your content for each platform's unique style and audience.`}
                           >
                             <div className="relative">
                               <img
-                                className={`${
-                                  platform === "Twitter"
-                                    ? "w-full h-24"
-                                    : "w-full h-32"
-                                } rounded-xl object-cover`}
-                                src={image.url}
+                                className="w-full h-24 rounded-lg object-cover bg-gray-800"
+                                src={image.thumbnail || image.url}
                                 alt={image.description}
+                                loading="lazy"
+                                onError={(e) => { e.target.style.display = 'none'; }}
                               />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                                 <FontAwesomeIcon
                                   icon={faCheck}
                                   className="text-white text-lg"
                                 />
                               </div>
                               {image.selected && (
-                                <div className="absolute top-1 right-1 bg-cyan-400 text-black rounded-full p-1">
+                                <div className="absolute top-1 right-1 bg-cyan-400 text-black rounded-full w-5 h-5 flex items-center justify-center">
                                   <FontAwesomeIcon
                                     icon={faCheck}
-                                    className="text-xs"
+                                    className="text-[10px]"
                                   />
                                 </div>
                               )}
                             </div>
                             <div
-                              className="mt-2 text-xs text-gray-400 line-clamp-2"
+                              className="mt-1 text-[10px] text-gray-500 line-clamp-1"
                               title={image.description}
                             >
-                              {image.keyword || image.description}
+                              {image.source || image.keyword}
                             </div>
                           </div>
                         ))}
                         {(!selectedImages[platform] ||
                           selectedImages[platform].length === 0) && (
-                          <div
-                            className={`text-gray-500 text-sm ${
-                              platform === "Twitter" ? "col-span-2" : ""
-                            }`}
-                          >
-                            Click "Plan Images" to generate AI-suggested images
+                          <div className="col-span-3 text-gray-500 text-sm text-center py-4">
+                            Click "Plan Images" to search Google for relevant images
                           </div>
                         )}
                       </div>

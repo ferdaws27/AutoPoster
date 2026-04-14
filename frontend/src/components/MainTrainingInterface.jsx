@@ -543,10 +543,10 @@ export default function MainTrainingInterface() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <i className="fa-brands fa-x-twitter text-blue-400"></i>
-                      <span className="text-gray-300">Twitter</span>
+                      <i className="fa-brands fa-x-twitter text-white"></i>
+                      <span className="text-gray-300">Twitter/X</span>
                     </div>
-                    <span className="text-blue-400 font-medium">
+                    <span className="text-white font-medium">
                       {analysisResults.length > 0 && analysisResults[0].nltk ? 
                         (analysisResults[0].nltk.avg_sentence_length < 15 ? "Concise & Punchy" : "Detailed & Informative") :
                         "Concise & Punchy"
@@ -556,7 +556,7 @@ export default function MainTrainingInterface() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <i className="fa-brands fa-linkedin text-violet-400"></i>
+                      <i className="fa-brands fa-linkedin-in text-blue-400"></i>
                       <span className="text-gray-300">LinkedIn</span>
                     </div>
                     <span className="text-violet-400 font-medium">
@@ -569,10 +569,10 @@ export default function MainTrainingInterface() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <i className="fa-brands fa-medium text-teal-400"></i>
+                      <i className="fa-brands fa-medium text-green-400"></i>
                       <span className="text-gray-300">Medium</span>
                     </div>
-                    <span className="text-teal-400 font-medium">
+                    <span className="text-green-400 font-medium">
                       {analysisResults.length > 0 && analysisResults[0].nltk && analysisResults[0].spacy ? 
                         (analysisResults[0].nltk.engagement_score > 30 ? "Story-Driven & Personal" : "Analytical & In-depth") :
                         "Narrative & In-depth"

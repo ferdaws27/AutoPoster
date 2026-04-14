@@ -233,7 +233,7 @@ export default function PostsLibrary() {
       platforms: post.platforms || { Twitter: false, LinkedIn: false, Medium: false },
       date: formattedDate,
       time: post.scheduleTime || '',
-      selectedImage: post.selectedImages || 0
+      selectedImages: post.selectedImages || []
     });
     setShowEditModal(true);
   };
@@ -270,7 +270,7 @@ export default function PostsLibrary() {
         idea: editingPost.content,
         content: editingPost.content,
         platforms: editingPost.platforms,
-        selectedImages: editingPost.selectedImage,
+        selectedImages: editingPost.selectedImages || [],
         scheduleDate: editingPost.date,
         scheduleTime: editingPost.time
       });
@@ -352,35 +352,40 @@ export default function PostsLibrary() {
     <div className="gradient-bg min-h-screen text-white">
       <main className="ml-0 p-8">
         {/* HEADER */}
-        <div className="flex justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Posts Library</h1>
-            <p className="text-gray-400">Manage all your content</p>
+        <div className="flex justify-between items-start mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-400/10 ring-1 ring-cyan-400/20 flex items-center justify-center">
+              <i className="fa-solid fa-layer-group text-cyan-400 text-xl"></i>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white">Posts Library</h1>
+              <p className="text-base text-gray-400">{filteredPosts.length} posts total</p>
+            </div>
           </div>
 
-          <div className="flex space-x-4">
-            <div className="flex bg-black/30 rounded-2xl p-1">
+          <div className="flex items-center gap-3">
+            <div className="flex bg-gray-800/40 rounded-xl p-1 ring-1 ring-gray-700/40">
               <button
                 onClick={() => setView("grid")}
-                className={`px-4 py-2 rounded-xl ${
-                  view === "grid" ? "bg-cyan-400/20 text-cyan-400" : "text-gray-400"
+                className={`px-3.5 py-2 rounded-lg text-sm transition-all ${
+                  view === "grid" ? "bg-cyan-400/15 text-cyan-400" : "text-gray-500 hover:text-gray-300"
                 }`}
               >
-                <i className="fa-solid fa-th-large mr-2"></i>Grid
+                <i className="fa-solid fa-th-large"></i>
               </button>
 
               <button
                 onClick={() => setView("list")}
-                className={`px-4 py-2 rounded-xl ${
-                  view === "list" ? "bg-cyan-400/20 text-cyan-400" : "text-gray-400"
+                className={`px-3.5 py-2 rounded-lg text-sm transition-all ${
+                  view === "list" ? "bg-cyan-400/15 text-cyan-400" : "text-gray-500 hover:text-gray-300"
                 }`}
               >
-                <i className="fa-solid fa-list mr-2"></i>List
+                <i className="fa-solid fa-list"></i>
               </button>
             </div>
 
             <button
-              className="px-6 py-3 gradient-accent rounded-2xl"
+              className="px-6 py-3 gradient-accent rounded-xl text-base font-medium"
               onClick={() => navigate("/dashboard/CreatePostPage")}
             >
               <i className="fa-solid fa-plus mr-2"></i>
@@ -390,16 +395,16 @@ export default function PostsLibrary() {
         </div>
 
         {/* SEARCH + FILTERS */}
-        <div id="filters-section" className="glass-effect rounded-3xl p-6 mb-8">
-          <div className="flex items-center justify-between">
+        <div id="filters-section" className="rounded-2xl p-5 mb-6 bg-[rgba(12,16,24,0.7)] border border-gray-700/30">
+          <div className="flex items-center gap-4">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <i className="fa-solid fa-search text-gray-400"></i>
+            <div className="relative flex-1 max-w-sm">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <i className="fa-solid fa-search text-gray-500 text-sm"></i>
               </div>
               <input
                 type="text"
-                className="w-full bg-black/30 rounded-2xl pl-12 pr-4 py-3 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors"
+                className="w-full bg-gray-800/40 rounded-xl pl-10 pr-4 py-3 text-base text-white placeholder-gray-500 border border-gray-700/40 focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/20 transition-all"
                 placeholder="Search posts..."
                 value={search}
                 onChange={(e) => {
@@ -413,11 +418,11 @@ export default function PostsLibrary() {
               
               {/* Search suggestions dropdown */}
               {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-black/90 rounded-2xl border border-gray-600 max-h-48 overflow-y-auto z-50">
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-[rgba(15,20,30,0.98)] rounded-xl border border-gray-700/50 max-h-48 overflow-y-auto z-50">
                   {searchSuggestions.map((suggestion, index) => (
                     <div
                       key={index}
-                      className="px-4 py-2 hover:bg-cyan-400/20 cursor-pointer text-white text-sm"
+                      className="px-3.5 py-2 hover:bg-cyan-400/10 cursor-pointer text-gray-300 text-sm transition-colors"
                       onClick={() => {
                         setSearch(suggestion);
                         setShowSuggestions(false);
@@ -440,21 +445,35 @@ export default function PostsLibrary() {
         </div>
 
         {/* TABS */}
-        <div className="flex space-x-8 border-b border-gray-700 mb-8">
+        <div className="flex items-center gap-2 mb-8">
           {[
-            { label: "All Posts", key: "all" },
-            { label: "Drafts", key: "drafts" },
-            { label: "Scheduled", key: "scheduled" },
-            { label: "Published", key: "published" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`pb-4 ${activeTab === tab.key ? "tab-active" : "text-gray-400"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { label: "All", key: "all", icon: "fa-layer-group" },
+            { label: "Drafts", key: "drafts", icon: "fa-file-pen" },
+            { label: "Scheduled", key: "scheduled", icon: "fa-clock" },
+            { label: "Published", key: "published", icon: "fa-circle-check" },
+          ].map((tab) => {
+            const count = tab.key === 'all' ? posts.length
+              : tab.key === 'drafts' ? posts.filter(p => p.status === 'draft').length
+              : tab.key === 'scheduled' ? posts.filter(p => p.status === 'scheduled').length
+              : posts.filter(p => p.status === 'posted').length;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-5 py-2.5 rounded-xl text-base font-medium transition-all flex items-center gap-2 ${
+                  activeTab === tab.key
+                    ? "bg-cyan-400/10 text-cyan-400 ring-1 ring-cyan-400/25"
+                    : "text-gray-400 hover:text-gray-300 hover:bg-gray-800/40"
+                }`}
+              >
+                <i className={`fa-solid ${tab.icon} text-sm`}></i>
+                {tab.label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-md ${
+                  activeTab === tab.key ? 'bg-cyan-400/20' : 'bg-gray-800/60'
+                }`}>{count}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* POSTS */}
@@ -475,10 +494,18 @@ export default function PostsLibrary() {
               />
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
-              <i className="fa-solid fa-inbox text-4xl text-gray-600 mb-4"></i>
-              <p className="text-gray-400 text-lg">No posts found matching your criteria.</p>
-              <p className="text-gray-500 text-sm">Try adjusting your filters or create a new post.</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-20">
+              <div className="w-16 h-16 rounded-2xl bg-gray-800/50 ring-1 ring-gray-700/50 flex items-center justify-center mb-4">
+                <i className="fa-solid fa-inbox text-2xl text-gray-600"></i>
+              </div>
+              <p className="text-gray-300 text-base font-medium mb-1">No posts found</p>
+              <p className="text-gray-500 text-sm mb-5">Try adjusting your filters or create a new post</p>
+              <button
+                onClick={() => navigate("/dashboard/CreatePostPage")}
+                className="px-5 py-2.5 rounded-xl bg-cyan-400/10 text-cyan-400 text-sm font-medium ring-1 ring-cyan-400/20 hover:bg-cyan-400/15 transition-all"
+              >
+                <i className="fa-solid fa-plus mr-2"></i>Create Post
+              </button>
             </div>
           )}
         </div>
@@ -546,8 +573,8 @@ export default function PostsLibrary() {
                   </label>
                   <div className="grid grid-cols-3 gap-4">
                     {[
-                      { name: 'Twitter', icon: 'fa-twitter', color: 'text-white' },
-                      { name: 'LinkedIn', icon: 'fa-linkedin', color: 'text-blue-400' },
+                      { name: 'Twitter', icon: 'fa-x-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin-in', color: 'text-blue-400' },
                       { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
                     ].map(platform => (
                       <label
@@ -723,113 +750,184 @@ export default function PostsLibrary() {
 // ------------------- COMPONENTS -------------------
 
 function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelete }) {
-  const statusColor =
-    post.status === "draft"
-      ? "status-draft"
-      : post.status === "scheduled"
-      ? "status-scheduled"
-      : "status-published";
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const statusLabel =
-    post.status === "draft"
-      ? "Draft"
-      : post.status === "scheduled"
-      ? "Scheduled"
-      : "Published";
+  const platformConfig = {
+    Twitter: { icon: 'fa-x-twitter', color: 'text-white', bg: 'bg-white/10', ring: 'ring-white/30' },
+    LinkedIn: { icon: 'fa-linkedin-in', color: 'text-blue-400', bg: 'bg-blue-400/10', ring: 'ring-blue-400/30' },
+    Medium: { icon: 'fa-medium', color: 'text-green-400', bg: 'bg-green-400/10', ring: 'ring-green-400/30' },
+  };
 
-  // Get active platforms
+  const statusConfig = {
+    draft: { label: 'Draft', icon: 'fa-file-pen', bg: 'bg-amber-400/10', text: 'text-amber-400', dot: 'bg-amber-400' },
+    scheduled: { label: 'Scheduled', icon: 'fa-clock', bg: 'bg-blue-400/10', text: 'text-blue-400', dot: 'bg-blue-400' },
+    posted: { label: 'Published', icon: 'fa-circle-check', bg: 'bg-emerald-400/10', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+  };
+
+  const status = statusConfig[post.status] || statusConfig.draft;
   const activePlatforms = post.platforms ? Object.keys(post.platforms).filter(p => post.platforms[p]) : [];
-
-  // Calculate engagement
   const engagement = (post.engagement?.likes || 0) + (post.engagement?.shares || 0) + (post.engagement?.comments || 0);
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "No date";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Handle delete with modal
-  const handleDelete = (e) => {
-    e.stopPropagation();
-    onDelete();
+  const getScheduleLabel = () => {
+    if (post.scheduleDate) {
+      const d = new Date(post.scheduleDate);
+      const now = new Date();
+      const diff = d - now;
+      if (diff > 0 && diff < 86400000) return { label: 'Today', urgent: true };
+      if (diff > 0 && diff < 172800000) return { label: 'Tomorrow', urgent: false };
+      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), urgent: false };
+    }
+    return null;
   };
+
+  const scheduleInfo = getScheduleLabel();
 
   return (
     <div
-      className={`post-card glass-effect rounded-3xl p-6 border border-gray-700/50 hover:border-cyan-400/30 animate-fade-in cursor-pointer ${
-        isSelected ? "border-cyan-400 ring-2 ring-cyan-400/20" : ""
-      }`}
-      onClick={toggleSelect}
+      className="group relative rounded-2xl border transition-all duration-300 overflow-hidden border-gray-700/40 hover:border-gray-600/60 bg-[rgba(12,16,24,0.9)] hover:bg-[rgba(15,20,30,0.95)]"
+      style={{ backdropFilter: 'blur(16px)' }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <span className={`${statusColor} px-3 py-1 rounded-xl text-sm font-medium`}>{statusLabel}</span>
-          <div className="flex items-center space-x-1">
-            {activePlatforms.map(platform => (
-              <i key={platform} className={`fa-brands ${
-                platform === 'Twitter' ? 'fa-twitter' :
-                platform === 'LinkedIn' ? 'fa-linkedin' :
-                'fa-medium'
-              } text-sm text-gray-400`}></i>
-            ))}
+      {/* Thumbnail area */}
+      <div className="relative h-36 bg-gradient-to-br from-gray-800/60 to-gray-900/60 overflow-hidden">
+        {post.selectedImages && post.selectedImages.length > 0 ? (
+          <img
+            src={post.selectedImages[0].thumbnail || post.selectedImages[0].url}
+            alt=""
+            className="w-full h-full object-cover opacity-60 group-hover:opacity-75 transition-opacity duration-300"
+            onError={(e) => { e.target.src = `https://picsum.photos/400/200?random=${post.id || 1}`; }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <i className="fa-solid fa-image text-3xl text-gray-700"></i>
           </div>
+        )}
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,16,24,0.95)] via-transparent to-transparent" />
+
+        {/* Status badge - top left */}
+        <div className={`absolute top-3 left-3 ${status.bg} ${status.text} px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm font-semibold`}
+          style={{ backdropFilter: 'blur(8px)' }}
+        >
+          <i className={`fa-solid ${status.icon} text-xs`}></i>
+          {status.label}
         </div>
-        <div className="flex items-center space-x-2">
+
+        {/* Platform badges - bottom of image */}
+        {activePlatforms.length > 0 && (
+          <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+            {activePlatforms.map(platform => {
+              const cfg = platformConfig[platform];
+              if (!cfg) return null;
+              return (
+                <div key={platform} className={`w-8 h-8 rounded-lg ${cfg.bg} ring-1 ${cfg.ring} flex items-center justify-center`}
+                  style={{ backdropFilter: 'blur(8px)' }}
+                >
+                  <i className={`fa-brands ${cfg.icon} ${cfg.color} text-sm`}></i>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Hover action buttons - bottom right of image */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-cyan-400 transition-colors"
+            onClick={() => onEdit()}
+            className="w-8 h-8 rounded-lg bg-black/50 ring-1 ring-white/10 flex items-center justify-center text-gray-300 hover:text-cyan-400 hover:bg-cyan-400/10 transition-all"
+            title="Edit"
           >
-            <i className="fa-solid fa-edit text-xs"></i>
+            <i className="fa-solid fa-pen text-xs"></i>
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
-            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-violet-400 transition-colors"
+            onClick={() => onDuplicate()}
+            className="w-8 h-8 rounded-lg bg-black/50 ring-1 ring-white/10 flex items-center justify-center text-gray-300 hover:text-violet-400 hover:bg-violet-400/10 transition-all"
+            title="Duplicate"
           >
             <i className="fa-solid fa-copy text-xs"></i>
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); handleDelete(e); }}
-            className="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
+            onClick={() => onDelete()}
+            className="w-8 h-8 rounded-lg bg-black/50 ring-1 ring-white/10 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-400/10 transition-all"
+            title="Delete"
           >
             <i className="fa-solid fa-trash text-xs"></i>
           </button>
         </div>
+
       </div>
 
-      <div className="mb-4">
-        <div className="w-full h-32 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-violet-400/20 flex items-center justify-center mb-3">
-          <i className="fa-solid fa-image text-2xl text-gray-400"></i>
-        </div>
-        <h3 className="text-white font-semibold text-lg mb-2 line-clamp-2">
-          {post.idea || post.content || "Untitled Post"}
+      {/* Content area */}
+      <div className="p-5 pt-4">
+        {/* Title */}
+        <h3 className={`text-base font-semibold text-white leading-snug mb-2 ${!isExpanded ? 'line-clamp-2' : ''}`}
+          onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+        >
+          {post.idea || "Untitled Post"}
         </h3>
-        <p className="text-gray-400 text-sm line-clamp-3">
-          {post.content ? post.content.substring(0, 120) + "..." : "No content preview available"}
-        </p>
-      </div>
 
-      <div className="flex items-center justify-between text-gray-400 text-sm">
-        <div className="flex items-center space-x-2">
-          <i className="fa-solid fa-calendar mr-1"></i>
-          {post.scheduleDate && post.scheduleTime
-            ? `Scheduled: ${formatDate(post.scheduleDate)} ${post.scheduleTime}`
-            : `Created: ${formatDate(post.createdAt)}`
-          }
-        </div>
-        {post.status === 'posted' && (
-          <div className="flex items-center space-x-4 text-sm">
-            <span className="flex items-center">
-              <i className="fa-solid fa-eye mr-1"></i>
-              {post.engagement?.views || 0}
-            </span>
-            <span className="flex items-center">
-              <i className="fa-solid fa-heart mr-1"></i>
-              {engagement}
-            </span>
-          </div>
+        {/* Content preview - only show if different from title */}
+        {post.content && post.content !== post.idea && (
+          <p className={`text-sm text-gray-400 leading-relaxed mb-4 ${!isExpanded ? 'line-clamp-2' : ''}`}
+            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+          >
+            {post.content}
+          </p>
         )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-700/40">
+          {/* Date info */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+            {post.status === 'scheduled' && scheduleInfo ? (
+              <>
+                <i className="fa-solid fa-clock text-xs"></i>
+                <span className={scheduleInfo.urgent ? 'text-amber-400 font-medium' : ''}>
+                  {scheduleInfo.label}
+                </span>
+                {post.scheduleTime && (
+                  <span className="text-gray-600">at {post.scheduleTime}</span>
+                )}
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-calendar text-xs"></i>
+                <span>{formatDate(post.createdAt)}</span>
+              </>
+            )}
+          </div>
+
+          {/* Engagement stats */}
+          {post.status === 'posted' && (
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-sm text-gray-500">
+                <i className="fa-solid fa-eye text-xs"></i>
+                {(post.engagement?.views || 0).toLocaleString()}
+              </span>
+              <span className="flex items-center gap-1 text-sm text-gray-500">
+                <i className="fa-solid fa-heart text-xs text-rose-400/60"></i>
+                {engagement.toLocaleString()}
+              </span>
+              {(post.engagement?.comments || 0) > 0 && (
+                <span className="flex items-center gap-1 text-sm text-gray-500">
+                  <i className="fa-solid fa-comment text-xs"></i>
+                  {post.engagement.comments}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -867,7 +965,7 @@ function FilterSelect({ type, handleFilterChange }) {
   return (
     <div className="relative">
       <select
-        className="bg-black/30 rounded-2xl px-4 py-3 text-white border border-gray-600 appearance-none pr-10"
+        className="bg-gray-800/40 rounded-xl px-4 py-3 text-base text-white border border-gray-700/40 appearance-none pr-9 focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/20 transition-all cursor-pointer"
         onChange={(e) => handleFilterChange(type, e.target.value)}
         defaultValue={type === "sort" ? "newest" : ""}
       >
@@ -891,7 +989,7 @@ function Pagination({ total, current, postsPerPage, onPageChange }) {
 
   return (
     <div id="pagination-section" className="flex items-center justify-between mt-12">
-      <div className="text-gray-400 text-sm">
+      <div className="text-gray-400 text-base">
         Showing {startItem}-{endItem} of {total} posts
       </div>
       <div className="flex items-center space-x-2">

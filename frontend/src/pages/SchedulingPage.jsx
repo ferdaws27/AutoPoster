@@ -4,15 +4,15 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faChevronLeft, faChevronRight, faEdit, faTrash, faTimes, 
   faExclamationTriangle, faCheck, faDownload, faSync, faClock, faCalendarAlt,
-  faFileLines, faShareNodes, faCalendar, faCheckCircle, faInfoCircle, faSpinner, faSave
+  faFileLines, faShareNodes, faCalendar, faCheckCircle, faInfoCircle, faSpinner, faSave, faImage,
+  faPaperPlane, faBookmark, faPen, faGlobe
 } from '@fortawesome/free-solid-svg-icons';
-import { faTwitter, faLinkedin, faMedium, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import { usePosts } from '../hooks/usePosts';
 import useSettings from '../hooks/useSettings';
 
 export default function SchedulingPage() {
   const navigate = useNavigate();
-  const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling } = useSettings();
+  const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling, openRouterKey, modelId } = useSettings();
   const [viewMode, setViewMode] = useState('week');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -23,6 +23,7 @@ export default function SchedulingPage() {
   const [errorMessage, setErrorMessage] = useState({ title: '', description: '' });
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [expandedPostId, setExpandedPostId] = useState(null);
   const [filterTab, setFilterTab] = useState('all');
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -32,15 +33,17 @@ export default function SchedulingPage() {
     platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
     date: '',
     time: '',
-    selectedImage: 0
   });
   const [editingPost, setEditingPost] = useState({
     content: '',
     platforms: { Twitter: false, LinkedIn: false, Medium: false },
     date: '',
     time: '',
-    selectedImage: 0
   });
+  const [suggestedImages, setSuggestedImages] = useState([]);
+  const [editSuggestedImages, setEditSuggestedImages] = useState([]);
+  const [isSearchingImages, setIsSearchingImages] = useState(false);
+  const [imageSearchPage, setImageSearchPage] = useState(0);
 
   // Use the centralized posts hook
   const { 
@@ -191,6 +194,98 @@ export default function SchedulingPage() {
     return 'No date set';
   };
 
+  // Search for images using SerpAPI via backend
+  const searchImages = async (content, target = 'add') => {
+    if (!content.trim()) return;
+    setIsSearchingImages(true);
+    const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+    const backendUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
+    // Increment page for regeneration
+    const currentPage = target === 'add' ? imageSearchPage : imageSearchPage;
+    const isRegenerate = (target === 'add' && suggestedImages.length > 0) || (target === 'edit' && editSuggestedImages.length > 0);
+    const nextPage = isRegenerate ? currentPage + 1 : 0;
+    setImageSearchPage(nextPage);
+
+    try {
+      // Step 1: Generate search keywords using AI
+      let keywords = [content.split(" ").slice(0, 3).join(" ")];
+      if (openRouterKey) {
+        try {
+          const promptRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openRouterKey}`,
+              "HTTP-Referer": "http://localhost:5173",
+              "X-Title": "AutoPoster App",
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: "user", content: `Based on this post idea: "${content}"\nGenerate 3 different and varied image search queries (2-4 words each) to find relevant, high-quality photos. Make each query unique.\nReturn ONLY a valid JSON array like: ["query1", "query2", "query3"]` }],
+              max_tokens: 100,
+            }),
+          });
+          if (promptRes.ok) {
+            const promptData = await promptRes.json();
+            const raw = promptData.choices[0].message.content.trim();
+            const match = raw.match(/\[[\s\S]*?\]/);
+            if (match) keywords = JSON.parse(match[0]);
+          }
+        } catch (err) {
+          console.warn("AI keyword generation failed:", err);
+        }
+      }
+
+      // Step 2: Pick keyword based on page to get variety
+      const keywordIndex = nextPage % keywords.length;
+      const searchQuery = keywords[keywordIndex] || content;
+      const res = await fetch(
+        `${backendUrl}/api/images/search?q=${encodeURIComponent(searchQuery)}&num=6&page=${nextPage}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!res.ok) {
+        console.error("Image search failed:", await res.text());
+        return;
+      }
+
+      const data = await res.json();
+      const images = (data.images || []).map((item, idx) => ({
+        url: item.original || item.url,
+        thumbnail: item.thumbnail || item.url,
+        description: item.title || searchQuery,
+        width: item.width,
+        height: item.height,
+        selected: idx === 0,
+        keyword: searchQuery,
+        source: item.source,
+      }));
+
+      if (target === 'edit') {
+        setEditSuggestedImages(images);
+      } else {
+        setSuggestedImages(images);
+      }
+    } catch (err) {
+      console.error("Image search error:", err);
+    } finally {
+      setIsSearchingImages(false);
+    }
+  };
+
+  // Get selected image data from suggested images
+  const getSelectedImageData = (images) => {
+    const selected = images.find(img => img.selected);
+    if (!selected) return null;
+    return {
+      url: selected.url,
+      thumbnail: selected.thumbnail || selected.url,
+      source: selected.source || '',
+      keyword: selected.keyword || '',
+    };
+  };
+
   // Handle schedule post
   const handleSchedulePost = async () => {
     // Validate form
@@ -231,6 +326,7 @@ export default function SchedulingPage() {
 
     try {
       setIsSaving(true);
+      const imageData = getSelectedImageData(suggestedImages);
       // Create scheduled posts for each selected platform using the hook
       const scheduledPosts = await Promise.all(
         selectedPlatformsList.map(platform => 
@@ -238,7 +334,7 @@ export default function SchedulingPage() {
             idea: newPost.content,
             content: newPost.content,
             platforms: { [platform]: true },
-            selectedImages: newPost.selectedImage,
+            selectedImages: imageData ? [imageData] : [],
             scheduleDate: newPost.date,
             scheduleTime: newPost.time,
             status: 'scheduled'
@@ -250,6 +346,7 @@ export default function SchedulingPage() {
 
       // Update UI
       setShowAddModal(false);
+      setSuggestedImages([]);
       setSuccessMessage({ title: 'Post scheduled successfully', description: 'Your content will be published as planned' });
       setShowSuccessToast(true);
       
@@ -259,7 +356,6 @@ export default function SchedulingPage() {
         platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
         date: '',
         time: '',
-        selectedImage: 0
       });
 
       setTimeout(() => setShowSuccessToast(false), 3000);
@@ -303,6 +399,7 @@ export default function SchedulingPage() {
 
     try {
       setIsSaving(true);
+      const imageData = getSelectedImageData(suggestedImages);
       // Create draft posts for each selected platform using the hook
       const draftPosts = await Promise.all(
         selectedPlatformsList.map(platform => 
@@ -311,7 +408,7 @@ export default function SchedulingPage() {
             idea: newPost.content,
             content: newPost.content,
             variations: {},
-            selectedImages: {},
+            selectedImages: imageData ? [imageData] : [],
             publishTo: { [platform]: true },
             platforms: { [platform]: true },
             status: 'draft'
@@ -321,6 +418,7 @@ export default function SchedulingPage() {
 
       // Update UI
       setShowAddModal(false);
+      setSuggestedImages([]);
       setSuccessMessage({ title: 'Draft saved successfully', description: 'Your draft has been saved for later' });
       setShowSuccessToast(true);
       
@@ -330,7 +428,6 @@ export default function SchedulingPage() {
         platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
         date: '',
         time: '',
-        selectedImage: 0
       });
 
       setTimeout(() => setShowSuccessToast(false), 3000);
@@ -357,8 +454,9 @@ export default function SchedulingPage() {
       platforms: post.platforms || { Twitter: false, LinkedIn: false, Medium: false },
       date: post.scheduleDate || '',
       time: post.scheduleTime || '',
-      selectedImage: post.selectedImages || 0
+      selectedImages: post.selectedImages || []
     });
+    setEditSuggestedImages(post.selectedImages || []);
     setShowEditModal(true);
   };
 
@@ -386,11 +484,12 @@ export default function SchedulingPage() {
       });
 
       // Update post using the hook
+      const imageData = getSelectedImageData(editSuggestedImages);
       await updatePost(selectedPost.id, {
         idea: editingPost.content,
         content: editingPost.content,
         platforms: editingPost.platforms,
-        selectedImages: editingPost.selectedImage,
+        selectedImages: imageData ? [imageData] : (editingPost.selectedImages || []),
         scheduleDate: editingPost.date,
         scheduleTime: editingPost.time
       });
@@ -398,12 +497,12 @@ export default function SchedulingPage() {
       // Update UI
       setShowEditModal(false);
       setSelectedPost(null);
+      setEditSuggestedImages([]);
       setEditingPost({
         content: '',
         platforms: { Twitter: false, LinkedIn: false, Medium: false },
         date: '',
         time: '',
-        selectedImage: 0
       });
       setSuccessMessage({ title: 'Post updated successfully', description: 'Your changes have been saved' });
       setShowSuccessToast(true);
@@ -594,15 +693,15 @@ export default function SchedulingPage() {
   }
 };
   const platformColors = {
-    Twitter: 'bg-blue-400',
-    LinkedIn: 'bg-violet-400', 
-    Medium: 'bg-teal-400'
+    Twitter: 'bg-white',
+    LinkedIn: 'bg-blue-400', 
+    Medium: 'bg-green-400'
   };
 
   const platformTextColors = {
-    Twitter: 'text-blue-400', 
-    LinkedIn: 'text-violet-400',
-    Medium: 'text-teal-400'
+    Twitter: 'text-white', 
+    LinkedIn: 'text-blue-400',
+    Medium: 'text-green-400'
   };
 
   return (
@@ -640,7 +739,13 @@ export default function SchedulingPage() {
             {/* Add Schedule Button */}
             <button 
               onClick={() => {
-                console.log('Add Schedule clicked, showing modal');
+                setNewPost({
+                  content: '',
+                  platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
+                  date: '',
+                  time: '',
+                });
+                setSuggestedImages([]);
                 setShowAddModal(true);
               }}
               className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
@@ -656,19 +761,30 @@ export default function SchedulingPage() {
           
           {/* Upcoming Posts Panel */}
           <div className="col-span-1 order-2 lg:order-1">
-            <div className="glass-effect rounded-3xl p-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
-              <h2 className="text-xl font-semibold text-white mb-6">Upcoming Posts</h2>
+            <div className="glass-effect rounded-3xl overflow-hidden max-h-[calc(100vh-12rem)] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
+                    <i className="fa-solid fa-calendar-days text-cyan-400 text-sm"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Upcoming Posts</h2>
+                    <p className="text-xs text-gray-400">{filteredPosts.length} post{filteredPosts.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              </div>
               
               {/* Filter Tabs */}
-              <div className="flex space-x-2 mb-6">
+              <div className="flex px-6 pb-4 gap-1.5">
                 {['all', 'today', 'week'].map(tab => (
                   <button
                     key={tab}
                     onClick={() => setFilterTab(tab)}
-                    className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                    className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 ${
                       filterTab === tab 
-                        ? 'bg-cyan-400/20 text-cyan-400' 
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-cyan-400/15 text-cyan-400 border border-cyan-400/20' 
+                        : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
                     }`}
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -677,144 +793,178 @@ export default function SchedulingPage() {
               </div>
 
               {/* Posts List */}
-              <div className="space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
                 {loading && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="w-8 h-8 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin mb-3"></div>
                     <p className="text-gray-400 text-sm">Loading your posts...</p>
                   </div>
                 )}
                 
                 {!loading && filteredPosts.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-600 text-3xl mb-3" />
-                    <p className="text-gray-400 text-sm">
-                      {posts.length === 0 ? 'No posts yet. Create one to get started!' : 'No posts match this filter'}
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-800/60 flex items-center justify-center mb-4">
+                      <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-600 text-xl" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium mb-1">
+                      {posts.length === 0 ? 'No posts yet' : 'No posts match this filter'}
+                    </p>
+                    <p className="text-gray-500 text-xs">
+                      {posts.length === 0 ? 'Create one to get started' : 'Try a different filter'}
                     </p>
                   </div>
                 )}
                 
-                {filteredPosts.map((post, index) => (
-                  <div 
-                    key={post.id}
-                    data-post-id={post.id}
-                    className="post-item bg-black/30 rounded-2xl p-4 border border-gray-700/50 hover:border-cyan-400/30 transition-all cursor-pointer"
-                    onClick={() => setSelectedPost(post)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <img 
-                        className="w-12 h-12 rounded-xl object-cover flex-shrink-0" 
-                        src={`https://picsum.photos/100/100?random=${post.id}`}
-                        alt="Post preview" 
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                            post.status === 'scheduled' ? 'status-scheduled' :
-                            post.status === 'draft' ? 'status-draft' :
-                            'status-posted'
-                          }`}>
-                            {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                          </span>
-                          <span className="text-gray-400 text-xs">
-                            {formatPostDateTime(post)}
-                          </span>
-                        </div>
-                        <p className="text-white text-sm font-medium mb-2 line-clamp-2">
-                          {post.idea || post.content || 'No content'}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1">
-                            {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
-                              <FontAwesomeIcon 
-                                key={platform}
-                                icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
-                                className={`${platformTextColors[platform]} text-xs`}
-                              />
-                            ))}
-                          </div>
-                          {post.status === 'posted' ? (
-                            <span className="text-green-400 text-xs">
-                              {formatEngagement(calculateEngagement(post))}
-                            </span>
-                          ) : (
-                            <div className="flex items-center space-x-2">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditPost(post);
-                                }}
-                                disabled={isSaving || post.status === 'posted'}
-                                title={post.status === 'posted' ? 'Cannot edit posted content' : 'Edit post'}
-                                className={`transition-all duration-200 ${
-                                  post.status === 'posted' 
-                                    ? 'text-gray-600 cursor-not-allowed' 
-                                    : 'text-gray-400 hover:text-cyan-400 hover:scale-110 active:scale-95'
-                                }`}
-                              >
-                                <FontAwesomeIcon icon={faEdit} className="text-xs" />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedPost(post);
-                                  setShowDeleteModal(true);
-                                }}
-                                disabled={isDeleting || post.status === 'posted'}
-                                title={post.status === 'posted' ? 'Cannot delete posted content' : 'Delete post'}
-                                className={`transition-all duration-200 ${
-                                  post.status === 'posted' 
-                                    ? 'text-gray-600 cursor-not-allowed' 
-                                    : 'text-gray-400 hover:text-red-400 hover:scale-110 active:scale-95'
-                                }`}
-                              >
-                                <FontAwesomeIcon icon={faTrash} className="text-xs" />
-                              </button>
+                {filteredPosts.map((post, index) => {
+                  const statusStyle = post.status === 'scheduled'
+                    ? { bg: 'bg-emerald-400/10', text: 'text-emerald-400', border: 'border-emerald-400/20', icon: 'fa-clock' }
+                    : post.status === 'draft'
+                    ? { bg: 'bg-amber-400/10', text: 'text-amber-400', border: 'border-amber-400/20', icon: 'fa-pen' }
+                    : post.status === 'posted'
+                    ? { bg: 'bg-blue-400/10', text: 'text-blue-400', border: 'border-blue-400/20', icon: 'fa-check' }
+                    : { bg: 'bg-cyan-400/10', text: 'text-cyan-400', border: 'border-cyan-400/20', icon: 'fa-circle' };
+
+                  return (
+                    <div 
+                      key={post.id}
+                      data-post-id={post.id}
+                      className="group post-item rounded-2xl p-4 hover:bg-white/[0.03] border border-transparent hover:border-gray-700/50 transition-all duration-200 cursor-pointer"
+                      onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Post thumbnail */}
+                        <img 
+                          className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
+                          src={post.selectedImages && post.selectedImages.length > 0 ? (post.selectedImages[0].thumbnail || post.selectedImages[0].url) : `https://picsum.photos/100/100?random=${post.id}`}
+                          alt="" 
+                          onError={(e) => { e.target.src = `https://picsum.photos/100/100?random=${post.id}`; }}
+                        />
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className={`text-sm font-semibold text-gray-100 leading-snug ${expandedPostId === post.id ? '' : 'line-clamp-2'}`}>
+                              {post.idea || post.content || 'No content'}
+                            </p>
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border}`}>
+                              <i className={`fa-solid ${statusStyle.icon} text-[8px]`}></i>
+                              {post.status ? post.status.charAt(0).toUpperCase() + post.status.slice(1) : 'Draft'}
                             </div>
+                          </div>
+                          <span className="text-xs text-gray-400">{formatPostDateTime(post)}</span>
+
+                          {/* Expanded content */}
+                          {expandedPostId === post.id && post.content && post.idea && post.content !== post.idea && (
+                            <p className="text-xs text-gray-300 mt-2 leading-relaxed bg-white/[0.03] rounded-lg p-3 border border-white/[0.05]">
+                              {post.content}
+                            </p>
                           )}
+
+                          {/* Platforms + Actions */}
+                          <div className="flex items-center justify-between mt-2.5">
+                            <div className="flex items-center gap-1.5">
+                              {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
+                                <div
+                                  key={platform}
+                                  className={`w-5 h-5 rounded-md flex items-center justify-center ring-1 ring-white/10 ${
+                                    platform === 'Twitter' ? 'bg-black' : platform === 'LinkedIn' ? 'bg-blue-600' : 'bg-green-700'
+                                  }`}
+                                  title={platform}
+                                >
+                                  <i className={`fa-brands ${platform === 'Twitter' ? 'fa-x-twitter' : platform === 'LinkedIn' ? 'fa-linkedin-in' : 'fa-medium'} text-white text-[10px]`}></i>
+                                </div>
+                              ))}
+                            </div>
+
+                            {post.status === 'posted' ? (
+                              <span className="text-emerald-400 text-xs font-medium">
+                                {formatEngagement(calculateEngagement(post))}
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditPost(post);
+                                  }}
+                                  disabled={isSaving || post.status === 'posted'}
+                                  title={post.status === 'posted' ? 'Cannot edit posted content' : 'Edit post'}
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                                    post.status === 'posted' 
+                                      ? 'text-gray-600 cursor-not-allowed' 
+                                      : 'text-gray-400 hover:text-cyan-400 hover:bg-cyan-400/10'
+                                  }`}
+                                >
+                                  <FontAwesomeIcon icon={faEdit} className="text-xs" />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedPost(post);
+                                    setShowDeleteModal(true);
+                                  }}
+                                  disabled={isDeleting || post.status === 'posted'}
+                                  title={post.status === 'posted' ? 'Cannot delete posted content' : 'Delete post'}
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                                    post.status === 'posted' 
+                                      ? 'text-gray-600 cursor-not-allowed' 
+                                      : 'text-gray-400 hover:text-red-400 hover:bg-red-400/10'
+                                  }`}
+                                >
+                                  <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
           {/* Calendar Section */}
           <div className="col-span-1 lg:col-span-3 order-1 lg:order-2">
-            <div className="glass-effect rounded-3xl p-6 max-h-[calc(100vh-12rem)] flex flex-col">
+            <div className="glass-effect rounded-3xl overflow-hidden max-h-[calc(100vh-12rem)] flex flex-col">
               {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                <div className="flex items-center space-x-4">
+              <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
+                <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleNavigateWeek('prev')}
-                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                    className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
                   >
-                    <FontAwesomeIcon icon={faChevronLeft} />
+                    <FontAwesomeIcon icon={faChevronLeft} className="text-sm" />
                   </button>
-                  <h2 className="text-2xl font-bold text-white">{formatDate(currentWeek)}</h2>
+                  <h2 className="text-xl font-semibold text-white tracking-tight">{formatDate(currentWeek)}</h2>
                   <button 
                     onClick={() => handleNavigateWeek('next')}
-                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                    className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
                   >
-                    <FontAwesomeIcon icon={faChevronRight} />
+                    <FontAwesomeIcon icon={faChevronRight} className="text-sm" />
                   </button>
                 </div>
-                <div className="flex items-center flex-wrap gap-3">
+                <div className="flex items-center gap-3">
                   {/* Platform Legend */}
-                  <div className="flex items-center gap-3 text-sm">
-                    {Object.keys(platformColors).map(platform => (
-                      <div key={platform} className="flex items-center space-x-2">
-                        <div className={`w-3 h-3 ${platformColors[platform]} rounded`}></div>
-                        <span className="text-gray-300">{platform}</span>
-                      </div>
-                    ))}
+                  <div className="hidden md:flex items-center gap-4 mr-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 bg-white rounded-sm"></div>
+                      <span className="text-gray-400 text-xs">X</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-sm"></div>
+                      <span className="text-gray-400 text-xs">LinkedIn</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 bg-green-400 rounded-sm"></div>
+                      <span className="text-gray-400 text-xs">Medium</span>
+                    </div>
                   </div>
                   
                   <button 
                     onClick={() => setCurrentWeek(new Date())}
-                    className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white text-sm transition-colors"
+                    className="px-3.5 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-xl text-gray-300 hover:text-white hover:bg-white/[0.08] text-xs font-medium transition-all"
                   >
                     Today
                   </button>
@@ -822,75 +972,81 @@ export default function SchedulingPage() {
               </div>
 
               {/* Calendar Grid */}
-              <div className="bg-gray-700/20 rounded-2xl overflow-y-auto flex-1 flex flex-col">
+              <div className="mx-4 mb-4 rounded-2xl overflow-hidden border border-white/[0.04] flex-1 flex flex-col">
                 
                 {/* Day Headers */}
-                <div className={`grid gap-px flex-shrink-0 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'}`}>
+                <div className={`grid gap-px bg-white/[0.03] flex-shrink-0 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'}`}>
                   {viewDays.map((day, index) => {
                     const isToday = day.toDateString() === today.toDateString();
                     return (
-                      <div key={index} className={`bg-black/20 p-3 text-center ${isToday ? 'border-b-2 border-cyan-400/30' : ''}`}>
-                        <div className={`text-xs font-medium mb-0.5 ${isToday ? 'text-cyan-400' : 'text-gray-400'}`}>
+                      <div key={index} className={`bg-black/40 px-3 py-3 text-center ${isToday ? 'border-b-2 border-cyan-400' : 'border-b border-white/[0.04]'}`}>
+                        <div className={`text-[10px] font-semibold tracking-wider mb-1 ${isToday ? 'text-cyan-400' : 'text-gray-500'}`}>
                           {viewMode === 'week' 
                             ? day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
                             : day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()
                           }
-                          {isToday && <span className="ml-1">TODAY</span>}
                         </div>
-                        <div className={`text-base font-semibold ${isToday ? 'text-cyan-400' : 'text-white'}`}>
+                        <div className={`text-lg font-bold ${isToday ? 'text-cyan-400' : 'text-gray-200'}`}>
                           {day.getDate()}
                         </div>
+                        {isToday && <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full mx-auto mt-1"></div>}
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Calendar Cells */}
-                <div className={`grid gap-px flex-1 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'}`}>
+                <div className={`grid gap-px bg-white/[0.02] flex-1 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-1'} overflow-y-auto`}>
                 {viewDays.map((day, index) => {
                   const dayPosts = getPostsForDay(day);
                   const isToday = day.toDateString() === today.toDateString();
                   
                   return (
-                    <div key={index} className={`bg-black/10 p-3 relative ${viewMode === 'week' ? 'min-h-[140px]' : 'min-h-[300px]'} ${isToday ? 'border-x-2 border-b-2 border-cyan-400/20' : ''}`}>
-                      {/* Events for this day */}
-                      <div className="space-y-2">
-                        {dayPosts.map((post, postIndex) => (
-                          <div 
-                            key={post.id}
-                            onClick={() => navigateToPost(post)}
-                            className={`event-bar cursor-pointer hover:scale-105 transition-transform ${post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]) ? `${Object.keys(post.platforms).find(p => post.platforms[p])?.toLowerCase()}-event` : 'twitter-event'} animate-slide-in`}
-                            style={{ animationDelay: `${postIndex * 0.1}s` }}
-                            title={post.idea || post.content || 'No content'}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-white text-xs font-medium truncate">
-                                {post.idea || post.content || 'No content'}
-                              </span>
-                              <div className="flex space-x-1">
-                                {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
-                                  <FontAwesomeIcon 
-                                    key={platform}
-                                    icon={platform === 'Twitter' ? faTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
-                                    className={`${platformTextColors[platform]} text-xs`}
-                                  />
-                                ))}
+                    <div key={index} className={`bg-black/20 p-2.5 relative ${viewMode === 'week' ? 'min-h-[140px]' : 'min-h-[300px]'} ${isToday ? 'bg-cyan-400/[0.03]' : ''}`}>
+                      {dayPosts.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-gray-700 text-xs">—</span>
+                        </div>
+                      )}
+                      <div className="space-y-1.5">
+                        {dayPosts.map((post, postIndex) => {
+                          const activePlatform = post.platforms && Object.keys(post.platforms).find(p => post.platforms[p]);
+                          const eventClass = activePlatform ? `${activePlatform.toLowerCase()}-event` : 'twitter-event';
+                          
+                          return (
+                            <div 
+                              key={post.id}
+                              onClick={() => navigateToPost(post)}
+                              className={`event-bar cursor-pointer ${eventClass} animate-slide-in`}
+                              style={{ animationDelay: `${postIndex * 0.05}s` }}
+                              title={post.idea || post.content || 'No content'}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-white text-sm font-semibold truncate">
+                                  {post.idea || post.content || 'No content'}
+                                </span>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {post.platforms && Object.keys(post.platforms).filter(p => post.platforms[p]).map(platform => (
+                                    <div
+                                      key={platform}
+                                      className={`w-5 h-5 rounded flex items-center justify-center ${
+                                        platform === 'Twitter' ? 'bg-black ring-1 ring-gray-600' : platform === 'LinkedIn' ? 'bg-blue-600' : 'bg-green-700'
+                                      }`}
+                                    >
+                                      <i className={`fa-brands ${platform === 'Twitter' ? 'fa-x-twitter' : platform === 'LinkedIn' ? 'fa-linkedin-in' : 'fa-medium'} text-white text-[9px]`}></i>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
+                              {post.scheduleTime && (
+                                <div className="text-gray-300 text-xs mt-1">
+                                  <i className="fa-regular fa-clock mr-1 text-[10px]"></i>
+                                  {formatTime(post.scheduleTime)}
+                                </div>
+                              )}
                             </div>
-                            {post.scheduleTime && (
-                              <div className="text-gray-300 text-xs">{formatTime(post.scheduleTime)}</div>
-                            )}
-                            {post.status && (
-                              <div className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
-                                post.status === 'scheduled' ? 'bg-yellow-400/20 text-yellow-400' :
-                                post.status === 'draft' ? 'bg-gray-400/20 text-gray-400' :
-                                'bg-green-400/20 text-green-400'
-                              }`}>
-                                {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -899,35 +1055,35 @@ export default function SchedulingPage() {
               </div>
 
               {/* Quick Actions */}
-              <div className="flex items-center justify-between mt-6">
-                <div className="flex items-center space-x-4">
+              <div className="flex items-center justify-between px-6 pb-5 pt-1 flex-shrink-0">
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={handleExportCalendar}
-                    className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white transition-colors"
+                    className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-gray-300 hover:text-white hover:bg-white/[0.08] text-xs font-medium transition-all"
                   >
-                    <FontAwesomeIcon icon={faDownload} className="text-sm" />
-                    <span className="text-sm">Export Calendar</span>
+                    <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                    Export
                   </button>
                   <button 
                     onClick={handleSyncAll}
                     disabled={isSyncing}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm transition-colors ${
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
                       isSyncing 
-                        ? 'bg-cyan-400/20 text-cyan-400 cursor-not-allowed' 
-                        : 'bg-black/30 text-gray-300 hover:text-white'
+                        ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20 cursor-not-allowed' 
+                        : 'bg-white/[0.04] border border-white/[0.06] text-gray-300 hover:text-white hover:bg-white/[0.08]'
                     }`}
                   >
                     <FontAwesomeIcon 
                       icon={faSync} 
-                      className={`text-sm ${isSyncing ? 'animate-spin' : ''}`} 
+                      className={`text-xs ${isSyncing ? 'animate-spin' : ''}`} 
                     />
-                    <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync All'}</span>
+                    {isSyncing ? 'Syncing...' : 'Sync'}
                   </button>
                 </div>
                 
-                <div className="flex items-center space-x-2 text-sm text-gray-400">
-                  <FontAwesomeIcon icon={faClock} />
-                  <span>Last updated: {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <i className="fa-regular fa-clock text-[10px]"></i>
+                  <span>Updated {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
                 </div>
               </div>
             </div>
@@ -936,128 +1092,215 @@ export default function SchedulingPage() {
 
         {/* Add Schedule Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-            <div className="glass-effect rounded-3xl p-8 max-w-2xl w-full border border-cyan-400/30 relative overflow-hidden">
-              <div className="absolute inset-0 gradient-accent opacity-5 rounded-3xl"></div>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Schedule New Post</h2>
+                  <p className="text-gray-400 text-sm">Compose and schedule your content</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setNewPost({ content: '', platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium }, date: '', time: '' });
+                    setSuggestedImages([]);
+                  }}
+                  className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
+                >
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
+              </div>
               
-              <div className="relative z-10">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">Schedule New Post</h2>
-                  <button 
-                    onClick={() => setShowAddModal(false)}
-                    className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                  >
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                {/* Content Section */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <FontAwesomeIcon icon={faFileLines} className="mr-2" />Content
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                      placeholder="Write your post content here..."
+                      value={newPost.content}
+                      onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                    />
+                    <div className="absolute bottom-4 right-4">
+                      <span className="text-gray-500 text-sm">
+                        {newPost.content.length} characters
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Post Content */}
-                <div className="mb-6">
-                  <label className="block text-gray-300 font-medium mb-3">Post Content</label>
-                  <textarea 
-                    value={newPost.content}
-                    onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
-                    className="w-full h-32 bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors resize-none" 
-                    placeholder="What's on your mind? Write your post here..."
-                  />
-                </div>
-
-                {/* Platform Selection */}
-                <div className="mb-6">
-                  <label className="block text-gray-300 font-medium mb-3">Select Platforms</label>
+                {/* Platforms Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <FontAwesomeIcon icon={faShareNodes} className="mr-2" />Publish To
+                  </label>
                   <div className="grid grid-cols-3 gap-4">
-                    {Object.keys(newPost.platforms).map(platform => (
-                      <label key={platform} className="flex items-center space-x-3 p-4 rounded-2xl border border-gray-600 hover:border-cyan-400 cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={newPost.platforms[platform]}
+                    {[
+                      { name: 'Twitter', icon: 'fa-x-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin-in', color: 'text-blue-400' },
+                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
+                    ].map(platform => (
+                      <label
+                        key={platform.name}
+                        className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${
+                          newPost.platforms[platform.name]
+                            ? 'bg-cyan-400/10 border-cyan-400/50'
+                            : 'bg-gray-800/30 border-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newPost.platforms[platform.name] || false}
                           onChange={(e) => setNewPost(prev => ({
                             ...prev,
-                            platforms: { ...prev.platforms, [platform]: e.target.checked }
+                            platforms: {
+                              ...prev.platforms,
+                              [platform.name]: e.target.checked
+                            }
                           }))}
-                          className="w-5 h-5 rounded bg-black/30 border-gray-600 text-cyan-400 focus:ring-cyan-400 focus:ring-2" 
+                          className="sr-only"
                         />
-                        <div className="flex items-center space-x-2">
-                          <FontAwesomeIcon 
-                            icon={platform === 'Twitter' ? faXTwitter : platform === 'LinkedIn' ? faLinkedin : faMedium}
-                            className={platformTextColors[platform]}
-                          />
-                          <span className="text-white">{platform}</span>
+                        <div className="flex flex-col items-center space-y-2">
+                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
+                          <span className="text-sm font-medium text-white">{platform.name}</span>
+                          {newPost.platforms[platform.name] && (
+                            <div className="absolute top-2 right-2">
+                              <FontAwesomeIcon icon={faCheckCircle} className="text-cyan-400 text-xs" />
+                            </div>
+                          )}
                         </div>
                       </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-gray-300 font-medium mb-3">Date</label>
-                    <input 
-                      type="date" 
-                      value={newPost.date}
-                      onChange={(e) => setNewPost(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
-                    />
+                {/* Scheduling Section */}
+                <div>
+                  <label className="block text-sm font-medium text-cyan-400 mb-3">
+                    <FontAwesomeIcon icon={faClock} className="mr-2" />Schedule
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                      <input
+                        type="date"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={newPost.date}
+                        onChange={(e) => setNewPost(prev => ({ ...prev, date: e.target.value }))}
+                      />
+                      <FontAwesomeIcon icon={faCalendar} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                        value={newPost.time}
+                        onChange={(e) => setNewPost(prev => ({ ...prev, time: e.target.value }))}
+                      />
+                      <FontAwesomeIcon icon={faClock} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-300 font-medium mb-3">Time</label>
-                    <input 
-                      type="time" 
-                      value={newPost.time}
-                      onChange={(e) => setNewPost(prev => ({ ...prev, time: e.target.value }))}
-                      className="w-full bg-black/30 rounded-2xl p-4 text-white placeholder-gray-500 border border-gray-600 focus:border-cyan-400 transition-colors [color-scheme:dark]"
-                    />
-                  </div>
+                  {newPost.date && newPost.time && (
+                    <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
+                      <p className="text-green-400 text-sm">
+                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                        Scheduled for {new Date(newPost.date).toLocaleDateString()} at {newPost.time}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* AI Image Suggestions */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-gray-300 font-medium">AI Image Suggestions</label>
-                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
-                      Generate New
+                    <label className="text-gray-300 font-medium">
+                      <FontAwesomeIcon icon={faImage} className="mr-2" />
+                      AI Image Suggestions
+                    </label>
+                    <button 
+                      onClick={() => searchImages(newPost.content, 'add')}
+                      disabled={isSearchingImages || !newPost.content.trim()}
+                      className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {isSearchingImages ? (
+                        <><FontAwesomeIcon icon={faSpinner} spin className="mr-1" /> Searching...</>
+                      ) : (
+                        <>{suggestedImages.length > 0 ? 'Regenerate' : 'Find Images'}</>
+                      )}
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[0, 1, 2].map(index => (
-                      <div 
-                        key={index}
-                        onClick={() => setNewPost(prev => ({ ...prev, selectedImage: index }))}
-                        className={`relative group cursor-pointer ${
-                          newPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
-                        }`}
-                      >
-                        <img 
-                          className="w-full h-24 rounded-xl object-cover" 
-                          src={`https://picsum.photos/200/150?random=${index + 100}`}
-                          alt={`Image suggestion ${index + 1}`}
-                        />
-                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          {newPost.selectedImage === index && (
-                            <FontAwesomeIcon icon={faCheck} className="text-white text-xl" />
+                  {suggestedImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {suggestedImages.map((image, index) => (
+                        <div 
+                          key={index}
+                          onClick={() => {
+                            setSuggestedImages(prev => prev.map((img, i) => ({ ...img, selected: i === index })));
+                          }}
+                          className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                            image.selected ? 'border-cyan-400 ring-1 ring-cyan-400/30' : 'border-transparent hover:border-gray-500'
+                          }`}
+                        >
+                          <img 
+                            className="w-full h-24 rounded-xl object-cover bg-gray-800" 
+                            src={image.thumbnail || image.url}
+                            alt={image.description || `Image ${index + 1}`}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          {image.selected && (
+                            <div className="absolute top-1 right-1 bg-cyan-400 text-black rounded-full w-5 h-5 flex items-center justify-center">
+                              <FontAwesomeIcon icon={faCheck} className="text-[10px]" />
+                            </div>
                           )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                            <FontAwesomeIcon icon={faCheck} className="text-white text-lg" />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 bg-black/20 rounded-xl border border-dashed border-gray-600">
+                      <FontAwesomeIcon icon={faImage} className="text-gray-500 text-2xl mb-2" />
+                      <p className="text-gray-500 text-sm">Write your content then click "Find Images"</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex space-x-4">
-                  <button 
-                    onClick={handleSaveDraft}
-                    className="flex-1 p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all"
-                  >
-                    Save as Draft
-                  </button>
-                  <button 
-                    onClick={handleSchedulePost}
-                    className="flex-1 p-4 rounded-2xl gradient-accent text-white font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Schedule Post
-                  </button>
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
+                  <div className="text-sm text-gray-400">
+                    <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
+                    Post will be scheduled automatically
+                  </div>
+                  <div className="flex space-x-3">
+                    <button 
+                      className="px-6 py-3 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all flex items-center space-x-2"
+                      onClick={handleSaveDraft}
+                      disabled={isSaving}
+                    >
+                      <FontAwesomeIcon icon={faSave} />
+                      <span>Save Draft</span>
+                    </button>
+                    <button 
+                      className="px-6 py-3 rounded-xl gradient-accent text-white hover:shadow-lg hover:shadow-cyan-400/25 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleSchedulePost}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <FontAwesomeIcon icon={faSpinner} spin />
+                          <span>Scheduling...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FontAwesomeIcon icon={faCalendarAlt} />
+                          <span>Schedule Post</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1109,9 +1352,9 @@ export default function SchedulingPage() {
                   </label>
                   <div className="grid grid-cols-3 gap-4">
                     {[
-                      { name: 'Twitter', icon: faXTwitter, color: 'text-white' },
-                      { name: 'LinkedIn', icon: faLinkedin, color: 'text-blue-400' },
-                      { name: 'Medium', icon: faMedium, color: 'text-green-400' }
+                      { name: 'Twitter', icon: 'fa-x-twitter', color: 'text-white' },
+                      { name: 'LinkedIn', icon: 'fa-linkedin-in', color: 'text-blue-400' },
+                      { name: 'Medium', icon: 'fa-medium', color: 'text-green-400' }
                     ].map(platform => (
                       <label
                         key={platform.name}
@@ -1134,7 +1377,7 @@ export default function SchedulingPage() {
                           className="sr-only"
                         />
                         <div className="flex flex-col items-center space-y-2">
-                          <FontAwesomeIcon icon={platform.icon} className={`text-2xl ${platform.color}`} />
+                          <i className={`fa-brands ${platform.icon} text-2xl ${platform.color}`}></i>
                           <span className="text-sm font-medium text-white">{platform.name}</span>
                           {editingPost.platforms[platform.name] && (
                             <div className="absolute top-2 right-2">
@@ -1185,33 +1428,57 @@ export default function SchedulingPage() {
                 {/* AI Image Suggestions */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-gray-300 font-medium">AI Image Suggestions</label>
-                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
-                      Generate New
+                    <label className="text-gray-300 font-medium">
+                      <FontAwesomeIcon icon={faImage} className="mr-2" />
+                      AI Image Suggestions
+                    </label>
+                    <button 
+                      onClick={() => searchImages(editingPost.content, 'edit')}
+                      disabled={isSearchingImages || !editingPost.content.trim()}
+                      className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {isSearchingImages ? (
+                        <><FontAwesomeIcon icon={faSpinner} spin className="mr-1" /> Searching...</>
+                      ) : (
+                        <>{editSuggestedImages.length > 0 ? 'Regenerate' : 'Find Images'}</>
+                      )}
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[0, 1, 2].map(index => (
-                      <div 
-                        key={index}
-                        onClick={() => setEditingPost(prev => ({ ...prev, selectedImage: index }))}
-                        className={`relative group cursor-pointer ${
-                          editingPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
-                        }`}
-                      >
-                        <img 
-                          className="w-full h-24 rounded-xl object-cover" 
-                          src={`https://picsum.photos/200/150?random=${index + 200}`}
-                          alt={`Image suggestion ${index + 1}`}
-                        />
-                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          {editingPost.selectedImage === index && (
-                            <FontAwesomeIcon icon={faCheck} className="text-white text-xl" />
+                  {editSuggestedImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {editSuggestedImages.map((image, index) => (
+                        <div 
+                          key={index}
+                          onClick={() => {
+                            setEditSuggestedImages(prev => prev.map((img, i) => ({ ...img, selected: i === index })));
+                          }}
+                          className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                            image.selected ? 'border-cyan-400 ring-1 ring-cyan-400/30' : 'border-transparent hover:border-gray-500'
+                          }`}
+                        >
+                          <img 
+                            className="w-full h-24 rounded-xl object-cover bg-gray-800" 
+                            src={image.thumbnail || image.url}
+                            alt={image.description || `Image ${index + 1}`}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          {image.selected && (
+                            <div className="absolute top-1 right-1 bg-cyan-400 text-black rounded-full w-5 h-5 flex items-center justify-center">
+                              <FontAwesomeIcon icon={faCheck} className="text-[10px]" />
+                            </div>
                           )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                            <FontAwesomeIcon icon={faCheck} className="text-white text-lg" />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 bg-black/20 rounded-xl border border-dashed border-gray-600">
+                      <FontAwesomeIcon icon={faImage} className="text-gray-500 text-2xl mb-2" />
+                      <p className="text-gray-500 text-sm">Click "Find Images" to search for relevant images</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -1226,12 +1493,12 @@ export default function SchedulingPage() {
                       onClick={() => {
                         setShowEditModal(false);
                         setSelectedPost(null);
+                        setEditSuggestedImages([]);
                         setEditingPost({
                           content: '',
                           platforms: { Twitter: false, LinkedIn: false, Medium: false },
                           date: '',
                           time: '',
-                          selectedImage: 0
                         });
                       }}
                       disabled={isSaving}

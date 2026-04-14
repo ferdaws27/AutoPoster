@@ -2,23 +2,43 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 export default function Layout() {
-  const navItems = [
-    ["fa-chart-line", "Dashboard", ""],
-    ["fa-plus", "Create Post", "CreatePostPage"],
-    ["fa-calendar", "Scheduler", "scheduling"],
-    ["fa-folder", "Posts Library", "PostsLibrary"],
-    ["fa-chart-line", "Analytics", "analytics"],
-    ["fa-cog", "Settings", "settings"],
-    ["fa-bolt", "Performance Optimizer", "PerformanceOptimizer"],
-    ["fa-microphone-alt", "Voice Trainer", "voicetrainer"],
-    ["fa-magic", "Hook Generator", "HookGeneratorPage "],
-    ["fa-photo-video", "Media Companion", "MediaCompanion"],
-    ["fa-flask", "AB Tester", "ABTesterPage"],
-    ["fa-satellite-dish", "Trendradar", "Trendradar"],
-    ["fa-clone", "Clone", "Clone"],
-    ["fa-star", "AI Reputation", "AIReputationPage"],
-    ["fa-quote-left", "Quote Template Generator", "QuoteTemplateGenerator"],
-    ["fa-users", "Audience Analyzer", "audience-analyzer"],
+  const navSections = [
+    {
+      label: "Main",
+      items: [
+        ["fa-chart-line", "Dashboard", ""],
+        ["fa-plus", "Create Post", "CreatePostPage"],
+        ["fa-calendar", "Scheduler", "scheduling"],
+        ["fa-folder", "Posts Library", "PostsLibrary"],
+      ],
+    },
+    {
+      label: "AI Tools",
+      items: [
+        ["fa-magic", "Hook Generator", "HookGeneratorPage "],
+        ["fa-quote-left", "Quote Template", "QuoteTemplateGenerator"],
+        ["fa-microphone-alt", "Voice Trainer", "voicetrainer"],
+        ["fa-clone", "Clone", "Clone"],
+        ["fa-photo-video", "Media Companion", "MediaCompanion"],
+      ],
+    },
+    {
+      label: "Analytics",
+      items: [
+        ["fa-chart-line", "Analytics", "analytics"],
+        ["fa-bolt", "Performance Optimizer", "PerformanceOptimizer"],
+        ["fa-flask", "AB Tester", "ABTesterPage"],
+        ["fa-users", "Audience Analyzer", "audience-analyzer"],
+        ["fa-satellite-dish", "Trendradar", "Trendradar"],
+        ["fa-star", "AI Reputation", "AIReputationPage"],
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        ["fa-cog", "Settings", "settings"],
+      ],
+    },
   ];
 
   const [user, setUser] = useState(null);
@@ -82,23 +102,30 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-6 space-y-2">
-          {navItems.map(([icon, label, to]) => (
-            <NavLink
-              key={label}
-              to={to}
-              end={to === ""}
-              className={({ isActive }) =>
-                `w-full flex items-center space-x-3 p-3 rounded-2xl border transition-colors ${
-                  isActive
-                    ? "bg-cyan-400/10 text-cyan-400 border border-cyan-400/20 font-bold"
-                    : "text-gray-300 hover:bg-white/5 border-transparent"
-                }`
-              }
-            >
-              <i className={`fa-solid ${icon} w-5`} />
-              <span>{label}</span>
-            </NavLink>
+        <nav className="flex-1 overflow-y-auto px-6 space-y-6">
+          {navSections.map((section) => (
+            <div key={section.label}>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">{section.label}</div>
+              <div className="space-y-1">
+                {section.items.map(([icon, label, to]) => (
+                  <NavLink
+                    key={label}
+                    to={to}
+                    end={to === ""}
+                    className={({ isActive }) =>
+                      `w-full flex items-center space-x-3 p-3 rounded-2xl border transition-colors ${
+                        isActive
+                          ? "bg-cyan-400/10 text-cyan-400 border border-cyan-400/20 font-bold"
+                          : "text-gray-300 hover:bg-white/5 border-transparent"
+                      }`
+                    }
+                  >
+                    <i className={`fa-solid ${icon} w-5`} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 

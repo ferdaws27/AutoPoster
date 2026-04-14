@@ -10,13 +10,18 @@ import {
   faArrowUp, faArrowDown, faHeart, faEye, faUsers,
   faImage, faVideo, faAlignLeft, faPoll, faExternalLinkAlt, faChartLine
 } from "@fortawesome/free-solid-svg-icons";
-import { faLinkedin, faMedium, faTwitter } from "@fortawesome/free-brands-svg-icons";
 
 // Platform icons mapping
 const PLATFORM_ICONS = {
-  Twitter: faTwitter,
-  LinkedIn: faLinkedin,
-  Medium: faMedium,
+  Twitter: "fa-x-twitter",
+  LinkedIn: "fa-linkedin-in",
+  Medium: "fa-medium",
+};
+
+const PLATFORM_ICON_COLORS = {
+  Twitter: "text-white",
+  LinkedIn: "text-blue-400",
+  Medium: "text-green-400",
 };
 
 export default function AnalyticsPage() {
@@ -251,7 +256,7 @@ export default function AnalyticsPage() {
         const platformIcons = post.platforms
           ? Object.keys(post.platforms)
               .filter(p => post.platforms[p] && PLATFORM_ICONS[p])
-              .map(p => PLATFORM_ICONS[p])
+              .map(p => ({ icon: PLATFORM_ICONS[p], color: PLATFORM_ICON_COLORS[p] || 'text-gray-300' }))
           : [];
 
         const postDate = post.createdAt ? new Date(post.createdAt) : new Date();
@@ -934,8 +939,8 @@ export default function AnalyticsPage() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      {post.platforms.map((icon, idx) => (
-                        <FontAwesomeIcon key={idx} icon={icon} className="px-2 py-1 rounded-lg text-xs text-gray-300" />
+                      {post.platforms.map((p, idx) => (
+                        <i key={idx} className={`fa-brands ${p.icon} ${p.color} text-xs`}></i>
                       ))}
                     </div>
                   </td>
