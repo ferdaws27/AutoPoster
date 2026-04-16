@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import Integrations from "../components/Integrations";
 import AiPreferences from "../components/AiPreferences";
 import PostingPreferences from "../components/PostingPreferences";
@@ -30,7 +30,7 @@ export default function SettingsPage() {
   // Child states
   const [integrationData, setIntegrationData] = useState(initialSettings.integrations || null);
   const [aiData, setAiData] = useState(initialSettings.ai || null);
-  const [postingData, setPostingData] = useState(initialSettings.posting || null);
+  const [postingData, setPostingData] = useState(initialSettings.posting  || null);
   const [apiData, setApiData] = useState(initialSettings.api || null);
   const [dangerData, setDangerData] = useState(initialSettings.danger || null);
 
@@ -311,19 +311,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
-
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: "#1a1a2e",
-            color: "#fff",
-            borderRadius: "12px",
-            border: "1px solid rgba(255,255,255,0.1)",
-          },
-        }}
-      />
     </div>
   );
 }

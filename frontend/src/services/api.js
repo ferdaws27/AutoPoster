@@ -42,10 +42,10 @@ export async function apiFetch(path, options = {}) {
  * Call the backend AI generate proxy.
  * Returns the AI-generated text content string.
  */
-export async function aiGenerate({ prompt, model, temperature, max_tokens }) {
+export async function aiGenerate({ prompt, model, temperature, max_tokens, system, user_content, language }) {
   const data = await apiFetch("/api/ai/generate/", {
     method: "POST",
-    body: JSON.stringify({ prompt, model, temperature, max_tokens }),
+    body: JSON.stringify({ prompt, model, temperature, max_tokens, system, user_content, language }),
   });
   if (!data.success) throw new Error(data.error || "AI generation failed");
   return data.content;

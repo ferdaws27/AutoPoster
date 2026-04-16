@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FaPlusCircle,
   FaRocket,
@@ -30,6 +30,7 @@ import {
   saveABSettings,
 } from "../services/api";
 import { FaPause, FaChartBar, FaMagic, FaBolt, FaCompressAlt, FaFire, FaPen, FaChevronDown, FaLightbulb, FaTimes, FaStar, FaEye, FaHandPointUp, FaDownload, FaCog, FaSave, FaBell } from "react-icons/fa";
+import toast from "react-hot-toast";
 
 const VARIATION_OPTIONS = [
   { value: "tone", label: "Tone Variation (Professional vs Casual)" },
@@ -137,7 +138,7 @@ export default function ABTesterPage() {
       setName("");
       await fetchAll();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setCreating(false);
     }
@@ -151,7 +152,7 @@ export default function ABTesterPage() {
       const res = await aiAssistABTest(content, action);
       if (res.result) setContent(res.result);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setAiAssisting(false);
       setAiAction(null);
@@ -163,7 +164,7 @@ export default function ABTesterPage() {
       await runABTest(testId);
       await fetchAll();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -172,7 +173,7 @@ export default function ABTesterPage() {
       await pauseABTest(testId);
       await fetchAll();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -182,7 +183,7 @@ export default function ABTesterPage() {
       await deleteABTest(testId);
       await fetchAll();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -205,7 +206,7 @@ export default function ABTesterPage() {
           <FaVials className="text-3xl text-white" />
         </div>
         <h1 className="text-4xl font-bold text-white mb-4">
-          Post A/B Tester — Optimize Your Content Performance
+          Post A/B Tester � Optimize Your Content Performance
         </h1>
         <p className="text-xl text-gray-300 mb-2">
           Write your post, AI generates two variations, simulate engagement, and
@@ -525,7 +526,7 @@ export default function ABTesterPage() {
   );
 }
 
-/* ═══════ TEST CARD ═══════ */
+/* ------- TEST CARD ------- */
 function getRemainingTime(test) {
   if (!test.started_at || !test.total_rounds || !test.current_round) return null;
   const remainingRounds = test.total_rounds - test.current_round;
@@ -779,7 +780,7 @@ function TestCard({ test, onRun, onPause, onDelete }) {
         )}
       </div>
 
-      {/* ── View Details Panel ── */}
+      {/* -- View Details Panel -- */}
       {showDetails && (
         <div className="mt-6 pt-6 border-t border-gray-700/50">
           {loadingAnalysis ? (
@@ -854,7 +855,7 @@ function TestCard({ test, onRun, onPause, onDelete }) {
                   { label: "Type", value: test.variation_type?.charAt(0).toUpperCase() + test.variation_type?.slice(1), icon: <FaVials className="text-cyan-400" /> },
                   { label: "Duration", value: test.duration, icon: <FaClock className="text-yellow-400" /> },
                   { label: "Impressions", value: totalImpressions.toLocaleString(), icon: <FaEye className="text-violet-400" /> },
-                  { label: "Round", value: test.current_round ? `${test.current_round}/${test.total_rounds}` : "—", icon: <FaHandPointUp className="text-green-400" /> },
+                  { label: "Round", value: test.current_round ? `${test.current_round}/${test.total_rounds}` : "�", icon: <FaHandPointUp className="text-green-400" /> },
                 ].map((item, i) => (
                   <div key={i} className="rounded-lg p-3 bg-black/20 border border-gray-700/30 text-center">
                     <div className="flex justify-center mb-1">{item.icon}</div>
@@ -882,7 +883,7 @@ function TestCard({ test, onRun, onPause, onDelete }) {
   );
 }
 
-/* ═══════ SCORE BAR ═══════ */
+/* ------- SCORE BAR ------- */
 function ScoreBar({ label, score, color }) {
   const pct = Math.min(Math.max((score || 0) * 10, 0), 100);
   const barColor = color === "cyan" ? "bg-cyan-400" : "bg-violet-400";
@@ -898,7 +899,7 @@ function ScoreBar({ label, score, color }) {
   );
 }
 
-/* ═══════ VARIANT CARD ═══════ */
+/* ------- VARIANT CARD ------- */
 function VariantCard({ variant, letter, isWinner, isLoser, leading, behind, showStats, color }) {
   const borderCls = isWinner
     ? "border-green-400/30 bg-green-400/10"
@@ -955,9 +956,9 @@ function VariantCard({ variant, letter, isWinner, isLoser, leading, behind, show
         <>
           <div className="grid grid-cols-3 gap-3 mb-4">
             {[
-              { label: "Likes", value: variant.likes, icon: "♥" },
-              { label: "Comments", value: variant.comments, icon: "💬" },
-              { label: "Shares", value: variant.shares, icon: "↗" },
+              { label: "Likes", value: variant.likes, icon: "?" },
+              { label: "Comments", value: variant.comments, icon: "??" },
+              { label: "Shares", value: variant.shares, icon: "?" },
             ].map((m, i) => (
               <div key={i} className="text-center p-2 rounded-xl bg-black/20">
                 <div className={`text-lg font-bold ${textColor}`}>
@@ -979,7 +980,7 @@ function VariantCard({ variant, letter, isWinner, isLoser, leading, behind, show
   );
 }
 
-/* ═══════ INSIGHTS ═══════ */
+/* ------- INSIGHTS ------- */
 function InsightsSection({ tests }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1138,9 +1139,9 @@ function InsightsSection({ tests }) {
   );
 }
 
-/* ═══════ PERFORMANCE ANALYTICS ═══════ */
+/* ------- PERFORMANCE ANALYTICS ------- */
 function PerformanceAnalytics({ tests }) {
-  // ── Win rates per platform (from completed tests with a winner) ──
+  // -- Win rates per platform (from completed tests with a winner) --
   const platformStats = {};
   tests.forEach((t) => {
     (t.platforms || []).forEach((p) => {
@@ -1162,7 +1163,7 @@ function PerformanceAnalytics({ tests }) {
     return { key, rate, meta, total };
   });
 
-  // ── Improvement trend — per round (minute-by-minute) ──
+  // -- Improvement trend � per round (minute-by-minute) --
   // Collect round-level data: prefer rounds_history, fallback to current variant stats
   const roundPoints = [];
   tests.forEach((t) => {
@@ -1246,7 +1247,7 @@ function PerformanceAnalytics({ tests }) {
           </div>
         </div>
 
-        {/* Improvement Trends — by minute */}
+        {/* Improvement Trends � by minute */}
         <div className="bg-black/20 rounded-2xl p-6">
           <h3 className="text-white font-semibold mb-4">Average Improvement Over Time</h3>
           {recentRounds.length === 0 ? (
@@ -1286,7 +1287,7 @@ function PerformanceAnalytics({ tests }) {
   );
 }
 
-/* ═══════ TEST HISTORY ═══════ */
+/* ------- TEST HISTORY ------- */
 const PLATFORM_ICONS = {
   twitter: { icon: "fa-brands fa-twitter", color: "text-blue-400" },
   linkedin: { icon: "fa-brands fa-linkedin", color: "text-blue-600" },
@@ -1294,7 +1295,7 @@ const PLATFORM_ICONS = {
 };
 
 function timeAgo(dateStr) {
-  if (!dateStr) return "—";
+  if (!dateStr) return "�";
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
@@ -1311,7 +1312,7 @@ function TestHistory({ tests }) {
     const rows = tests.map((t) => {
       const platforms = (t.platforms || []).join("/");
       const winner = t.winner ? `Variant ${t.winner}` : "No winner";
-      const imp = t.improvement || "—";
+      const imp = t.improvement || "�";
       const date = t.completed_at || t.created_at || "";
       return `"${t.name || "Untitled"}","${platforms}","${winner}","${imp}","${date}"`;
     }).join("\n");
@@ -1329,8 +1330,8 @@ function TestHistory({ tests }) {
     const rows = [
       `"Name","${t.name || "Untitled"}"`,
       `"Platforms","${(t.platforms || []).join(", ")}"`,
-      `"Winner","Variant ${t.winner || "—"}"`,
-      `"Improvement","${t.improvement || "—"}"`,
+      `"Winner","Variant ${t.winner || "�"}"`,
+      `"Improvement","${t.improvement || "�"}"`,
       `"Variant A Likes","${t.variant_a?.likes || 0}"`,
       `"Variant A Comments","${t.variant_a?.comments || 0}"`,
       `"Variant A Shares","${t.variant_a?.shares || 0}"`,
@@ -1384,7 +1385,7 @@ function TestHistory({ tests }) {
           </thead>
           <tbody>
             {tests.map((t, idx) => {
-              const imp = t.improvement || "—";
+              const imp = t.improvement || "�";
               const isPositive = typeof imp === "string" && imp.startsWith("+");
               const impColor = isPositive ? "text-green-400" : "text-red-400";
               const impBg = isPositive ? "bg-green-400/10" : "bg-red-400/10";
@@ -1419,7 +1420,7 @@ function TestHistory({ tests }) {
                         <span>Variant {t.winner}</span>
                       </span>
                     ) : (
-                      <span className="text-gray-500 text-sm">—</span>
+                      <span className="text-gray-500 text-sm">�</span>
                     )}
                   </td>
                   <td className="py-4 px-5">
@@ -1452,7 +1453,7 @@ function TestHistory({ tests }) {
   );
 }
 
-/* ═══════ A/B TEST SETTINGS ═══════ */
+/* ------- A/B TEST SETTINGS ------- */
 const DURATION_SETTING_OPTIONS = [
   { value: "24h", label: "24 Hours" },
   { value: "48h", label: "48 Hours" },

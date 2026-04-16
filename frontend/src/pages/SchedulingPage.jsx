@@ -10,11 +10,13 @@ import {
 import { usePosts } from '../hooks/usePosts';
 import useSettings from '../hooks/useSettings';
 import useTranslation from '../i18n/useTranslation';
+import toast from "react-hot-toast";
+import { aiGenerate } from "../services/api";
 
 export default function SchedulingPage() {
   const t = useTranslation();
   const navigate = useNavigate();
-  const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling, openRouterKey, modelId } = useSettings();
+  const { connectedPlatforms, timezone, maxPostsPerDay, platformTimes, autoPublish, smartScheduling, openRouterKey, modelId, toneLabel, contentLength, creativity, temperature, voiceProfile, language } = useSettings();
   const [viewMode, setViewMode] = useState('week');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -46,6 +48,7 @@ export default function SchedulingPage() {
   const [editSuggestedImages, setEditSuggestedImages] = useState([]);
   const [isSearchingImages, setIsSearchingImages] = useState(false);
   const [imageSearchPage, setImageSearchPage] = useState(0);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Use the centralized posts hook
   const { 
@@ -446,6 +449,55 @@ export default function SchedulingPage() {
     }
   };
 
+  // Regenerate post content with AI (platform rules + tone + voice)
+  const handleRegenerateContent = async () => {
+    if (!editingPost.content.trim()) {
+      toast.error("Write some content first");
+      return;
+    }
+    setIsRegenerating(true);
+    try {
+      const platforms = Object.keys(editingPost.platforms).filter(p => editingPost.platforms[p]);
+      const platform = platforms[0] || "LinkedIn";
+
+      const toneDescriptions = {
+        professional: "formal language, structured sentences, business vocabulary, no slang, no emojis",
+        friendly: "warm and approachable, light emojis allowed, conversational but informative",
+        casual: "relaxed everyday language, emojis encouraged, short punchy sentences, humor",
+      };
+
+      const voiceBlock = voiceProfile ? `\nVOICE PROFILE TO MATCH (replicate this writing style closely):\n- Voice: "${voiceProfile.name}"\n- Tone: ${voiceProfile.tone}\n- Structure: ${voiceProfile.structure}\n- Sentence Style: ${voiceProfile.sentenceStyle}\n- Emoji Usage: ${voiceProfile.emojiUsage}\n- Hashtag Usage: ${voiceProfile.hashtagUsage}\n- Hook Style: ${voiceProfile.hookStyle}\n- CTA Style: ${voiceProfile.ctaStyle}\n- Unique Traits: ${(voiceProfile.uniqueTraits || []).join(", ")}${voiceProfile.samplePost ? `\n- Example of their writing: "${voiceProfile.samplePost}"` : ""}` : "";
+
+      const systemMessage = `You are an elite social media content creator. Scroll-stopping, high-engagement content only.\n\nTONE: ${toneLabel}. ${toneDescriptions[toneLabel] || ""}\nLENGTH: ${contentLength}\nCREATIVITY: ${creativity}${voiceBlock}\n\nWrite like a real human — opinionated, specific, never AI-sounding. Output ONLY the post text.`;
+
+      const platformPrompts = {
+        Twitter: `Rewrite this as a high-impact Twitter post (STRICT max 280 characters).\n\nTWITTER RULES:\n- Scroll-stopping hook in first 5 words\n- Every word must earn its place — 280 chars = zero waste\n- Pattern: Short sentence. Even shorter. Punch line.\n- 2-3 relevant hashtags only if they add value\n- End with a provocative question OR bold CTA\n- NO generic filler, NO corporate speak`,
+        LinkedIn: `Rewrite this as a LinkedIn post (100-200 words).\n\nLINKEDIN RULES:\n- Attention-grabbing first line (the "see more" preview)\n- 3-4 key insights with bullet points — specific and actionable\n- Use line breaks for readability — no wall of text\n- Balance insight with personality — professional but not boring\n- 3-4 relevant industry hashtags\n- End with a discussion question that sparks genuine engagement`,
+        Medium: `Rewrite this as a Medium article preview (150-300 words).\n\nMEDIUM RULES:\n- SEO-friendly title that promises tangible value\n- 2-3 compelling introduction paragraphs\n- Section headings that are standalone insights\n- Editorial, essay-like voice — think published columnist\n- Close with a teaser that creates urgency to read more`,
+      };
+
+      const platformRule = platformPrompts[platform] || platformPrompts.LinkedIn;
+
+      const result = await aiGenerate({
+        prompt: `${platformRule}\n\nKeep the same core message.\n\nOriginal post:\n"""${editingPost.content}"""\n\nReturn ONLY the improved post text, nothing else.`,
+        system: systemMessage,
+        model: modelId,
+        temperature,
+        max_tokens: platform === "Twitter" ? 200 : 800,
+        user_content: editingPost.content,
+        language,
+      });
+      if (result) {
+        setEditingPost(prev => ({ ...prev, content: result }));
+        toast.success(`Regenerated for ${platform}`);
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to regenerate");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   // Handle edit post
   const handleEditPost = (post) => {
     if (!post || post.status === 'posted') return; // Don't allow editing posted content
@@ -468,13 +520,13 @@ export default function SchedulingPage() {
     
     // Validate form
     if (!editingPost.content.trim()) {
-      alert('Please enter post content');
+      toast.error('Please enter post content');
       return;
     }
 
     const selectedPlatformsList = Object.keys(editingPost.platforms).filter(p => editingPost.platforms[p]);
     if (selectedPlatformsList.length === 0) {
-      alert('Please select at least one platform');
+      toast.error('Please select at least one platform');
       return;
     }
 
@@ -486,12 +538,11 @@ export default function SchedulingPage() {
       });
 
       // Update post using the hook
-      const imageData = getSelectedImageData(editSuggestedImages);
       await updatePost(selectedPost.id, {
         idea: editingPost.content,
         content: editingPost.content,
         platforms: editingPost.platforms,
-        selectedImages: imageData ? [imageData] : (editingPost.selectedImages || []),
+        selectedImages: editingPost.selectedImages || [],
         scheduleDate: editingPost.date,
         scheduleTime: editingPost.time
       });
@@ -513,7 +564,7 @@ export default function SchedulingPage() {
     } catch (error) {
       console.error('Failed to update post:', error);
       const errorMessage = error?.message || 'Failed to update post. Please try again.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -563,7 +614,7 @@ export default function SchedulingPage() {
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
       console.error('Failed to delete post:', error);
-      alert('Failed to delete post. Please try again.');
+      toast.error('Failed to delete post. Please try again.');
     } finally {
       setIsDeleting(false);
     }
@@ -607,7 +658,7 @@ export default function SchedulingPage() {
     const postsWithDates = posts.filter(post => post.scheduleDate);
     
     if (postsWithDates.length === 0) {
-      alert('No scheduled posts to export');
+      toast.error('No scheduled posts to export');
       return;
     }
 
@@ -689,7 +740,7 @@ export default function SchedulingPage() {
     setTimeout(() => setShowSuccessToast(false), 3000);
   } catch (error) {
     console.error('Sync failed:', error);
-    alert('Sync failed. Please try again.');
+    toast.error('Sync failed. Please try again.');
   } finally {
     setIsSyncing(false);
   }
@@ -837,7 +888,7 @@ export default function SchedulingPage() {
                         {/* Post thumbnail */}
                         <img 
                           className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
-                          src={post.selectedImages && post.selectedImages.length > 0 ? (post.selectedImages[0].thumbnail || post.selectedImages[0].url) : `https://picsum.photos/100/100?random=${post.id}`}
+                          src={post.selectedImages && post.selectedImages.length > 0 ? (typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)) : `https://picsum.photos/100/100?random=${post.id}`}
                           alt="" 
                           onError={(e) => { e.target.src = `https://picsum.photos/100/100?random=${post.id}`; }}
                         />
@@ -1204,6 +1255,50 @@ export default function SchedulingPage() {
                       <FontAwesomeIcon icon={faClock} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                     </div>
                   </div>
+                  {/* Optimal time suggestions by platform */}
+                  {(() => {
+                    const selectedPlats = Object.entries(newPost.platforms).filter(([, v]) => v);
+                    const platConfig = {
+                      Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
+                      LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
+                      Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
+                    };
+                    const groups = selectedPlats.map(([name]) => {
+                      const cfg = platConfig[name];
+                      if (!cfg) return null;
+                      const times = (platformTimes?.[cfg.key] || []).filter(t => t && t.length >= 4);
+                      if (times.length === 0) return null;
+                      return { name, ...cfg, times };
+                    }).filter(Boolean);
+                    if (groups.length === 0) return null;
+                    return (
+                      <div className="mt-3 space-y-2">
+                        <span className="text-gray-500 text-xs">Optimal times:</span>
+                        {groups.map(g => (
+                          <div key={g.key} className="flex items-center gap-2 flex-wrap">
+                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${g.bg}`}>
+                              <i className={`${g.icon} ${g.color} text-xs`} />
+                              <span className={`${g.color} text-xs font-medium`}>{g.name}</span>
+                            </div>
+                            {g.times.map(t => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setNewPost(prev => ({ ...prev, time: t }))}
+                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                  newPost.time === t
+                                    ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
+                                    : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
+                                }`}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {newPost.date && newPost.time && (
                     <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
                       <p className="text-green-400 text-sm">
@@ -1329,9 +1424,19 @@ export default function SchedulingPage() {
               <div className="flex-1 overflow-y-auto pr-2 space-y-6">
                 {/* Content Section */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <FontAwesomeIcon icon={faFileLines} className="mr-2" />Content
-                  </label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-cyan-400">
+                      <FontAwesomeIcon icon={faFileLines} className="mr-2" />Content
+                    </label>
+                    <button
+                      onClick={handleRegenerateContent}
+                      disabled={isRegenerating}
+                      className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <FontAwesomeIcon icon={faSync} className={isRegenerating ? 'animate-spin' : ''} />
+                      {isRegenerating ? 'Generating...' : 'AI Rewrite'}
+                    </button>
+                  </div>
                   <div className="relative">
                     <textarea
                       className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
@@ -1346,6 +1451,34 @@ export default function SchedulingPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Attached Images Preview */}
+                {editingPost.selectedImages?.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-cyan-400 mb-3">
+                      <FontAwesomeIcon icon={faImage} className="mr-2" />Attached Images ({editingPost.selectedImages.length})
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      {editingPost.selectedImages.map((img, i) => {
+                        const url = typeof img === 'string' ? img : (img.thumbnail || img.url);
+                        return (
+                          <div key={i} className="relative group/img">
+                            <img src={url} alt="" className="h-20 w-28 rounded-xl object-cover border border-gray-600" />
+                            <button
+                              onClick={() => setEditingPost(prev => ({
+                                ...prev,
+                                selectedImages: prev.selectedImages.filter((_, idx) => idx !== i)
+                              }))}
+                              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                            >
+                              <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Platforms Section */}
                 <div>
@@ -1453,6 +1586,16 @@ export default function SchedulingPage() {
                           key={index}
                           onClick={() => {
                             setEditSuggestedImages(prev => prev.map((img, i) => ({ ...img, selected: i === index })));
+                            // Also add to editingPost.selectedImages
+                            const imgData = { url: image.url, thumbnail: image.thumbnail || image.url, source: image.source || '', keyword: image.keyword || '' };
+                            setEditingPost(prev => {
+                              const imgs = prev.selectedImages || [];
+                              const exists = imgs.some(im => (typeof im === 'string' ? im : im.url) === imgData.url);
+                              if (exists) {
+                                return { ...prev, selectedImages: imgs.filter(im => (typeof im === 'string' ? im : im.url) !== imgData.url) };
+                              }
+                              return { ...prev, selectedImages: [...imgs, imgData] };
+                            });
                           }}
                           className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
                             image.selected ? 'border-cyan-400 ring-1 ring-cyan-400/30' : 'border-transparent hover:border-gray-500'

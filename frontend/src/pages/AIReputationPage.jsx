@@ -43,6 +43,7 @@ import {
   faArrowTrendUp
 } from "@fortawesome/free-solid-svg-icons";
 import "../styles/AIReputationPage.css";
+import toast from "react-hot-toast";
 
 /* ================= COLORS ================= */
 const COLORS = {
@@ -260,7 +261,7 @@ export default function AIReputationPage() {
       }
     } catch (err) {
       console.error("Optimize error:", err);
-      alert("Failed to generate optimized post. Please try again.");
+      toast.error("Failed to generate optimized post. Please try again.");
     } finally {
       setOptimizeLoading(false);
     }

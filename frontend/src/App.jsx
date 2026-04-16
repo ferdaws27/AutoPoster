@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -23,6 +24,28 @@ import ABTesterPage from "./pages/ABTesterPage";
 export default function App() {
   return (
     <Router>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: "#1a1a2e",
+            color: "#fff",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.1)",
+            padding: "14px 20px",
+            fontSize: "14px",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          },
+          success: {
+            iconTheme: { primary: "#22d3ee", secondary: "#1a1a2e" },
+          },
+          error: {
+            iconTheme: { primary: "#f87171", secondary: "#1a1a2e" },
+          },
+        }}
+      />
       <Routes>
         {/* OAuth callback */}
         <Route path="/oauth/callback" element={<OAuthCallback />} />

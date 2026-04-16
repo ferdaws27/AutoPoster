@@ -39,7 +39,7 @@ const MiniLineChart = ({ data, color }) => {
 export default function TrendRadar() {
   const t = useTranslation();
   const navigate = useNavigate();
-  const { voiceProfile } = useSettings();
+  const { voiceProfile, language } = useSettings();
   const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -286,6 +286,7 @@ Return ONLY the JSON array, no additional text.`;
         prompt,
         max_tokens: 500,
         temperature: 0.7,
+        language,
       });
       
       let insightsData;

@@ -42,11 +42,17 @@ const ensureAuthenticated = async () => {
   return token;
 };
 
+// In-memory cache to avoid refetching on every component mount
+let _postsCache = null;
+let _statsCache = null;
+let _lastFetchTime = 0;
+const CACHE_TTL = 10000; // 10 seconds
+
 export const usePosts = () => {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [posts, setPosts] = useState(_postsCache || []);
+  const [loading, setLoading] = useState(!_postsCache);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState(_statsCache || {
     drafts: 0,
     scheduled: 0,
     published: 0,
@@ -62,9 +68,13 @@ export const usePosts = () => {
   useEffect(() => {
     const initPosts = async () => {
       try {
-        // Try to authenticate, but don't fail if it doesn't work
+        // Skip fetch if cache is fresh
+        if (_postsCache && (Date.now() - _lastFetchTime) < CACHE_TTL) {
+          setPosts(_postsCache);
+          if (_statsCache) setStats(_statsCache);
+          return;
+        }
         await ensureAuthenticated();
-        // Fetch posts regardless (backend handles guest users now)
         syncWithBackend();
       } catch (err) {
         console.error('Init error:', err);
@@ -112,54 +122,51 @@ export const usePosts = () => {
       setLoading(true);
       setError(null);
 
-      // 🔒 Get authenticated user's posts from backend
-      // Backend filters by user_id from JWT token
-      let postsResponse;
-      try {
-        postsResponse = await apiFetch('/api/posts/getPosts');
-        if (postsResponse.success) {
-          // Transform backend data to frontend format
-          const backendPosts = postsResponse.data.posts.map(post => ({
-            id: post._id,
-            idea: post.idea || post.content,
-            content: post.content,
-            platforms: post.platforms,
-            status: post.status,
-            scheduleDate: post.schedule_date,
-            scheduleTime: post.schedule_time,
-            engagement: post.engagement,
-            selectedImages: post.selectedImages || post.selected_images || [],
-            createdAt: post.created_at,
-            updatedAt: post.updated_at
-          }));
-          setPosts(backendPosts);
-          console.log(`✅ Loaded ${backendPosts.length} posts for authenticated user`);
-        }
-      } catch (err) {
-        console.error('Error fetching posts from backend:', err);
-        // 🔐 No fallback to localStorage for authenticated users
-        // Only authenticated users' data should be displayed
+      // Fetch posts and stats in PARALLEL
+      const [postsResult, statsResult] = await Promise.allSettled([
+        apiFetch('/api/posts/getPosts'),
+        apiFetch('/api/posts/stats/summary'),
+      ]);
+
+      // Process posts
+      if (postsResult.status === 'fulfilled' && postsResult.value.success) {
+        const backendPosts = postsResult.value.data.posts.map(post => ({
+          id: post._id,
+          idea: post.idea || post.content,
+          content: post.content,
+          platforms: post.platforms,
+          status: post.status,
+          scheduleDate: post.schedule_date,
+          scheduleTime: post.schedule_time,
+          engagement: post.engagement,
+          selectedImages: post.selectedImages || post.selected_images || [],
+          publishedAt: post.published_at,
+          createdAt: post.created_at,
+          updatedAt: post.updated_at
+        }));
+        setPosts(backendPosts);
+        _postsCache = backendPosts;
+        _lastFetchTime = Date.now();
+        console.log(`✅ Loaded ${backendPosts.length} posts for authenticated user`);
+      } else {
+        const err = postsResult.status === 'rejected' ? postsResult.reason : 'Failed';
+        console.error('Error fetching posts:', err);
         setPosts([]);
-        setError(`Failed to load posts: ${err.message}`);
-        setLoading(false);
-        return;
+        setError(`Failed to load posts: ${err}`);
       }
 
-      // Get stats
-      try {
-        const statsResponse = await apiFetch('/api/posts/stats/summary');
-        if (statsResponse.success) {
-          const backendStats = statsResponse.data;
-          setStats({
-            drafts: backendStats.draft || 0,
-            scheduled: backendStats.scheduled || 0,
-            published: backendStats.published || 0,
-            engagement: calculateEngagementDisplay(backendStats)
-          });
-        }
-      } catch (err) {
-        console.warn('Could not fetch stats:', err);
-        // Stats failed but posts are loaded - calculate stats from posts
+      // Process stats
+      if (statsResult.status === 'fulfilled' && statsResult.value.success) {
+        const backendStats = statsResult.value.data;
+        const newStats = {
+          drafts: backendStats.draft || 0,
+          scheduled: backendStats.scheduled || 0,
+          published: backendStats.published || 0,
+          engagement: calculateEngagementDisplay(backendStats)
+        };
+        setStats(newStats);
+        _statsCache = newStats;
+      } else {
         updateStats();
       }
     } finally {
@@ -565,6 +572,53 @@ export const usePosts = () => {
     }
   }, []);
 
+  const publishPost = useCallback(async (postId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await apiFetch(`/api/posts/${postId}/publish`, {
+        method: 'POST',
+      });
+
+      if (response.success) {
+        setPosts(prev =>
+          prev.map(p =>
+            p.id === postId ? { ...p, status: 'posted', publishedAt: new Date().toISOString() } : p
+          )
+        );
+        return response;
+      } else {
+        throw new Error(response.error || 'Failed to publish post');
+      }
+    } catch (err) {
+      console.error('Error publishing post:', err);
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refreshEngagement = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/posts/refresh-engagement', {
+        method: 'POST',
+      });
+
+      if (response.success) {
+        // Re-sync posts to pick up updated engagement
+        await syncWithBackend();
+        return response;
+      } else {
+        throw new Error(response.error || 'Failed to refresh engagement');
+      }
+    } catch (err) {
+      console.error('Error refreshing engagement:', err);
+      throw err;
+    }
+  }, [syncWithBackend]);
+
   return {
     posts,
     loading,
@@ -574,6 +628,8 @@ export const usePosts = () => {
     updatePost,
     deletePost,
     duplicatePost,
+    publishPost,
+    refreshEngagement,
     getPostsByDateRange,
     syncWithLocalStorage,
     syncWithBackend,

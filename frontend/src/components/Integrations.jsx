@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import { API_URL } from "../services/api";
+import toast from "react-hot-toast";
 
 const PLATFORM_ICONS = {
   twitter: "fa-brands fa-x-twitter",
@@ -28,6 +29,52 @@ export default function Integrations({ onChange }) {
   });
 
   const [selectedPlatform, setSelectedPlatform] = useState(null);
+  const [linkedinProfileUrl, setLinkedinProfileUrl] = useState("");
+  const [linkedinUrlSaving, setLinkedinUrlSaving] = useState(false);
+
+  // Fetch LinkedIn profile URL and auto-post settings on mount (parallel)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // Fetch both in parallel
+    Promise.allSettled([
+      fetch(`${API_URL}/api/user/linkedin-profile-url`, { headers }).then(r => r.json()),
+      fetch(`${API_URL}/api/user/auto-post`, { headers }).then(r => r.json()),
+    ]).then(([urlResult, autoResult]) => {
+      if (urlResult.status === 'fulfilled' && urlResult.value.success && urlResult.value.linkedin_profile_url) {
+        setLinkedinProfileUrl(urlResult.value.linkedin_profile_url);
+      }
+      if (autoResult.status === 'fulfilled' && autoResult.value.success && autoResult.value.auto_post) {
+        setPlatforms((prev) => ({
+          ...prev,
+          linkedin: { ...prev.linkedin, autoPost: autoResult.value.auto_post.linkedin || false },
+          twitter: { ...prev.twitter, autoPost: autoResult.value.auto_post.twitter || false },
+          medium: { ...prev.medium, autoPost: autoResult.value.auto_post.medium || false },
+        }));
+      }
+    });
+  }, []);
+
+  const saveLinkedinProfileUrl = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setLinkedinUrlSaving(true);
+    try {
+      const r = await fetch(`${API_URL}/api/user/linkedin-profile-url`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ linkedin_profile_url: linkedinProfileUrl }),
+      });
+      const d = await r.json();
+      if (!d.success) toast.error(d.error || "Failed to save");
+    } catch (e) {
+      toast.error("Failed to save LinkedIn profile URL");
+    } finally {
+      setLinkedinUrlSaving(false);
+    }
+  };
 
   // Sync from user's oauth_provider
   useEffect(() => {
@@ -80,6 +127,24 @@ export default function Integrations({ onChange }) {
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
+
+    // Sync autoPost toggle to backend
+    if (field === "autoPost") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        // Build current state with the new value
+        const updated = { ...platforms, [key]: { ...platforms[key], autoPost: value } };
+        fetch(`${API_URL}/api/user/auto-post`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            linkedin: updated.linkedin?.autoPost || false,
+            twitter: updated.twitter?.autoPost || false,
+            medium: updated.medium?.autoPost || false,
+          }),
+        }).catch(() => {});
+      }
+    }
   };
 
   // ========== RENDER ==========
@@ -197,6 +262,30 @@ export default function Integrations({ onChange }) {
                           </div>
                         </div>
                       </div>
+
+                      {/* LinkedIn Profile URL (only for linkedin) */}
+                      {key === "linkedin" && (
+                        <div className="mb-5 pb-5 border-b border-gray-700">
+                          <h4 className="text-white text-sm font-semibold mb-3">Profile URL</h4>
+                          <p className="text-gray-500 text-xs mb-2">Required for engagement tracking (likes, comments, shares)</p>
+                          <div className="flex space-x-2">
+                            <input
+                              type="text"
+                              value={linkedinProfileUrl}
+                              onChange={(e) => setLinkedinProfileUrl(e.target.value)}
+                              placeholder="https://www.linkedin.com/in/your-profile"
+                              className="flex-1 px-3 py-2 bg-black/30 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-cyan-400/50"
+                            />
+                            <button
+                              onClick={saveLinkedinProfileUrl}
+                              disabled={linkedinUrlSaving}
+                              className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/30 text-cyan-400 rounded-xl text-sm hover:bg-cyan-500/30 transition-colors disabled:opacity-50"
+                            >
+                              {linkedinUrlSaving ? "..." : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Disconnect */}
                       <div className="mb-5">

@@ -127,7 +127,7 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
                   {/* Post thumbnail */}
                   <img 
                     className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
-                    src={post.selectedImages && post.selectedImages.length > 0 ? (post.selectedImages[0].thumbnail || post.selectedImages[0].url) : `https://picsum.photos/100/100?random=${post.id ?? index}`}
+                    src={post.selectedImages && post.selectedImages.length > 0 ? (typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)) : `https://picsum.photos/100/100?random=${post.id ?? index}`}
                     alt="" 
                     onError={(e) => { e.target.src = `https://picsum.photos/100/100?random=${post.id ?? index}`; }}
                   />

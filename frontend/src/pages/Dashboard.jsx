@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import UpcomingPosts from "../components/UpcomingPosts";
 import useDashboardStore from "../store/useDashboardStore";
 import { usePosts } from "../hooks/usePosts";
+import { apiFetch } from "../services/api";
 import useTranslation from "../i18n/useTranslation";
 
 /* ================= COLORS ================= */
@@ -46,14 +48,23 @@ export default function Dashboard() {
     stats,
     loading,
     error,
-    syncWithBackend
+    syncWithBackend,
+    fetchAnalyticsData
   } = usePosts();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState([]);
 
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  // Fetch analytics data for engagement cards
+  useEffect(() => {
+    fetchAnalyticsData().then(data => {
+      if (Array.isArray(data)) setAnalyticsData(data);
+    });
+  }, [fetchAnalyticsData]);
 
   // Auto-refresh AI Ideas every 5 minutes
   useEffect(() => {
@@ -138,49 +149,110 @@ export default function Dashboard() {
     ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleString()
     : "No scheduled post";
 
-  const totalViews = normalizedPosts.reduce(
+  const totalViews = analyticsData.reduce(
     (sum, p) => sum + (p.engagement?.views || 0),
     0
   );
 
-  const totalEngagement = normalizedPosts.reduce(
-    (sum, p) =>
-      sum +
-      (p.engagement?.likes || 0) +
-      (p.engagement?.shares || 0) +
-      (p.engagement?.comments || 0),
+  const totalEngagement = analyticsData.reduce(
+    (sum, p) => sum + (p.totalEngagement || (p.engagement?.likes || 0) + (p.engagement?.shares || 0) + (p.engagement?.comments || 0)),
     0
   );
 
-  const avgRating = normalizedPosts.length
+  const avgRating = analyticsData.length
     ? (
-        normalizedPosts.reduce((sum, p) => sum + (p.rating || 0), 0) /
-        normalizedPosts.length
+        analyticsData.reduce((sum, p) => sum + (p.rating || 0), 0) /
+        analyticsData.length
       ).toFixed(1)
-    : "4.2";
+    : "0";
+
+  // ── Week-over-week stats (from analytics data) ──
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - now.getDay());
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const getPostDate = (p) => new Date(p.created_at || p.createdAt || 0);
+
+  const thisWeekPosts = analyticsData.filter(p => getPostDate(p) >= startOfThisWeek);
+  const lastWeekPosts = analyticsData.filter(p => {
+    const d = getPostDate(p);
+    return d >= startOfLastWeek && d < startOfThisWeek;
+  });
+
+  const thisWeekCount = thisWeekPosts.length;
+  const lastWeekCount = lastWeekPosts.length;
+  const postsChange = lastWeekCount > 0
+    ? Math.round(((thisWeekCount - lastWeekCount) / lastWeekCount) * 100)
+    : thisWeekCount > 0 ? 100 : 0;
+
+  const engagementOf = (list) => list.reduce((s, p) =>
+    s + (p.totalEngagement || (p.engagement?.likes || 0) + (p.engagement?.shares || 0) + (p.engagement?.comments || 0)), 0);
+  const thisWeekEng = engagementOf(thisWeekPosts);
+  const lastWeekEng = engagementOf(lastWeekPosts);
+  const engChange = lastWeekEng > 0
+    ? parseFloat(((thisWeekEng - lastWeekEng) / lastWeekEng * 100).toFixed(1))
+    : thisWeekEng > 0 ? 100 : 0;
 
   const handleImport = () => {
     document.getElementById("import-file").click();
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target.result);
-        if (Array.isArray(json.posts)) {
-          importPosts(json.posts);
-          setAiSuggestion("Import réussi !");
+        const postsToImport = Array.isArray(json.posts) ? json.posts : Array.isArray(json) ? json : null;
+        if (!postsToImport || postsToImport.length === 0) {
+          toast.error("No posts found in file");
+          return;
+        }
+
+        let success = 0;
+        let failed = 0;
+        const toastId = toast.loading(`Importing 0/${postsToImport.length} posts...`);
+
+        for (const post of postsToImport) {
+          try {
+            await apiFetch("/api/posts/", {
+              method: "POST",
+              body: JSON.stringify({
+                content: post.content || post.idea || "",
+                platforms: post.platforms || {},
+                status: post.status || "draft",
+                schedule_date: post.scheduleDate || post.schedule_date || null,
+                schedule_time: post.scheduleTime || post.schedule_time || null,
+                selectedImages: post.selectedImages || post.selected_images || [],
+              }),
+            });
+            success++;
+            toast.loading(`Importing ${success}/${postsToImport.length} posts...`, { id: toastId });
+          } catch (err) {
+            console.error("Import post error:", err);
+            failed++;
+          }
+        }
+
+        toast.dismiss(toastId);
+        if (success > 0) {
+          toast.success(`Imported ${success} post${success > 1 ? "s" : ""}${failed > 0 ? ` (${failed} failed)` : ""}`);
+          await syncWithBackend();
+        } else {
+          toast.error("Import failed — no posts were saved");
         }
       } catch (error) {
         console.error("Import error:", error);
-        setAiSuggestion("Erreur lors de l'import. Vérifiez le format JSON.");
+        toast.error("Invalid file format. Use JSON.");
       }
     };
     reader.readAsText(file);
+    e.target.value = "";
   };
 
   const handleExport = () => {
@@ -255,8 +327,14 @@ export default function Dashboard() {
             <div>
               <h3 className="text-white font-semibold mb-1">{t("dashboard.totalPosts")}</h3>
               <div className="flex items-center text-sm">
-                <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
-                <span className="text-green-400">+18%</span>
+                {postsChange !== 0 ? (
+                  <>
+                    <i className={`fa-solid fa-arrow-${postsChange > 0 ? 'up' : 'down'} ${postsChange > 0 ? 'text-green-400' : 'text-red-400'} mr-1`}></i>
+                    <span className={postsChange > 0 ? 'text-green-400' : 'text-red-400'}>{postsChange > 0 ? '+' : ''}{postsChange}%</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
                 <span className="text-gray-400 ml-1">{t("dashboard.vsLastWeek")}</span>
               </div>
             </div>
@@ -269,15 +347,21 @@ export default function Dashboard() {
                 <i className="fa-solid fa-heart text-violet-400 text-xl"></i>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-white">{loading ? "..." : `${Math.min(100, (scheduledCount + publishedCount) * 4)}%`}</div>
+                <div className="text-2xl font-bold text-white">{loading ? "..." : totalEngagement.toLocaleString()}</div>
                 <div className="text-sm text-gray-400">{t("dashboard.avgRate")}</div>
               </div>
             </div>
             <div>
               <h3 className="text-white font-semibold mb-1">{t("dashboard.engagement")}</h3>
               <div className="flex items-center text-sm">
-                <i className="fa-solid fa-arrow-up text-green-400 mr-1"></i>
-                <span className="text-green-400">+2.1%</span>
+                {engChange !== 0 ? (
+                  <>
+                    <i className={`fa-solid fa-arrow-${engChange > 0 ? 'up' : 'down'} ${engChange > 0 ? 'text-green-400' : 'text-red-400'} mr-1`}></i>
+                    <span className={engChange > 0 ? 'text-green-400' : 'text-red-400'}>{engChange > 0 ? '+' : ''}{engChange}%</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
                 <span className="text-gray-400 ml-1">{t("dashboard.vsLastWeek")}</span>
               </div>
             </div>
@@ -334,7 +418,7 @@ export default function Dashboard() {
               totalEngagement,
               avgRating,
             }}
-            posts={normalizedPosts}
+            posts={analyticsData.length > 0 ? analyticsData : normalizedPosts}
             navigate={navigate}
             t={t}
           />

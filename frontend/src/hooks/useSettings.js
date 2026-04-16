@@ -62,7 +62,7 @@ export default function useSettings() {
   const creativity = ai.creativity || "Balanced";
   const temperature = creativityToTemp(creativity);
   const contentLength = ai.contentLength || "Medium (100–200 words)";
-  const language = ai.language || "en";
+  const language = ai.language || "auto";
 
   // --- Posting Preferences ---
   const posting = settings.posting || {};

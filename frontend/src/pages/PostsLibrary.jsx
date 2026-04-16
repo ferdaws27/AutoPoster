@@ -1,13 +1,17 @@
 import { useState , useEffect } from "react";
 import { data, useNavigate, useSearchParams } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
+import useSettings from "../hooks/useSettings";
+import { aiGenerate, apiFetch } from "../services/api";
+import toast from "react-hot-toast";
 import useTranslation from "../i18n/useTranslation";
 
 export default function PostsLibrary() {
   const t = useTranslation();
   const navigate = useNavigate();
+  const { toneLabel, contentLength, creativity, temperature, voiceProfile, modelId, language } = useSettings();
   const [searchParams] = useSearchParams();
-  const { posts, deletePost, updatePost, duplicatePost } = usePosts();
+  const { posts, deletePost, updatePost, duplicatePost, refreshEngagement } = usePosts();
   console.log('PostsLibrary posts:', posts);
 
   // Map query param filter to tab name
@@ -48,6 +52,9 @@ export default function PostsLibrary() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [suggestedImages, setSuggestedImages] = useState([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
   const [successMessage, setSuccessMessage] = useState({ title: '', description: '' });
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState({ title: '', description: '' });
@@ -302,6 +309,78 @@ export default function PostsLibrary() {
     }
   };
 
+  // Regenerate post content with AI (platform rules + tone + voice)
+  const handleRegenerateContent = async () => {
+    if (!editingPost.content.trim()) {
+      toast.error("Write some content first");
+      return;
+    }
+    setIsRegenerating(true);
+    try {
+      const platforms = Object.keys(editingPost.platforms).filter(p => editingPost.platforms[p]);
+      const platform = platforms[0] || "LinkedIn";
+
+      const toneDescriptions = {
+        professional: "formal language, structured sentences, business vocabulary, no slang, no emojis",
+        friendly: "warm and approachable, light emojis allowed, conversational but informative",
+        casual: "relaxed everyday language, emojis encouraged, short punchy sentences, humor",
+      };
+
+      const voiceBlock = voiceProfile ? `\nVOICE PROFILE TO MATCH (replicate this writing style closely):\n- Voice: "${voiceProfile.name}"\n- Tone: ${voiceProfile.tone}\n- Structure: ${voiceProfile.structure}\n- Sentence Style: ${voiceProfile.sentenceStyle}\n- Emoji Usage: ${voiceProfile.emojiUsage}\n- Hashtag Usage: ${voiceProfile.hashtagUsage}\n- Hook Style: ${voiceProfile.hookStyle}\n- CTA Style: ${voiceProfile.ctaStyle}\n- Unique Traits: ${(voiceProfile.uniqueTraits || []).join(", ")}${voiceProfile.samplePost ? `\n- Example of their writing: "${voiceProfile.samplePost}"` : ""}` : "";
+
+      const systemMessage = `You are an elite social media content creator. Scroll-stopping, high-engagement content only.\n\nTONE: ${toneLabel}. ${toneDescriptions[toneLabel] || ""}\nLENGTH: ${contentLength}\nCREATIVITY: ${creativity}${voiceBlock}\n\nWrite like a real human — opinionated, specific, never AI-sounding. Output ONLY the post text.`;
+
+      const platformPrompts = {
+        Twitter: `Rewrite this as a high-impact Twitter post (STRICT max 280 characters).\n\nTWITTER RULES:\n- Scroll-stopping hook in first 5 words\n- Every word must earn its place — 280 chars = zero waste\n- Pattern: Short sentence. Even shorter. Punch line.\n- 2-3 relevant hashtags only if they add value\n- End with a provocative question OR bold CTA\n- NO generic filler, NO corporate speak`,
+        LinkedIn: `Rewrite this as a LinkedIn post (100-200 words).\n\nLINKEDIN RULES:\n- Attention-grabbing first line (the "see more" preview)\n- 3-4 key insights with bullet points — specific and actionable\n- Use line breaks for readability — no wall of text\n- Balance insight with personality — professional but not boring\n- 3-4 relevant industry hashtags\n- End with a discussion question that sparks genuine engagement`,
+        Medium: `Rewrite this as a Medium article preview (150-300 words).\n\nMEDIUM RULES:\n- SEO-friendly title that promises tangible value\n- 2-3 compelling introduction paragraphs\n- Section headings that are standalone insights\n- Editorial, essay-like voice — think published columnist\n- Close with a teaser that creates urgency to read more`,
+      };
+
+      const platformRule = platformPrompts[platform] || platformPrompts.LinkedIn;
+
+      const result = await aiGenerate({
+        prompt: `${platformRule}\n\nKeep the same core message.\n\nOriginal post:\n"""${editingPost.content}"""\n\nReturn ONLY the improved post text, nothing else.`,
+        system: systemMessage,
+        model: modelId,
+        temperature,
+        max_tokens: platform === "Twitter" ? 200 : 800,
+        user_content: editingPost.content,
+        language,
+      });
+      if (result) {
+        setEditingPost(prev => ({ ...prev, content: result }));
+        toast.success(`Regenerated for ${platform}`);
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to regenerate");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // Generate AI image suggestions based on post content
+  const handleGenerateImages = async () => {
+    const query = editingPost.content.trim().substring(0, 80);
+    if (!query) {
+      toast.error("Write some content first");
+      return;
+    }
+    setIsLoadingImages(true);
+    try {
+      const res = await apiFetch(`/api/images/search?q=${encodeURIComponent(query)}&num=3`);
+      if (res.success && res.images?.length > 0) {
+        setSuggestedImages(res.images);
+        toast.success(`Found ${res.images.length} images`);
+      } else {
+        toast.error("No images found");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to search images");
+    } finally {
+      setIsLoadingImages(false);
+    }
+  };
+
   // Handle delete post (like SchedulingPage)
   const handleDeletePost = async () => {
     if (!selectedPost) return;
@@ -385,6 +464,22 @@ export default function PostsLibrary() {
                 <i className="fa-solid fa-list"></i>
               </button>
             </div>
+
+            <button
+              className="px-4 py-3 rounded-xl text-sm font-medium border border-gray-600 text-gray-300 hover:text-white hover:border-cyan-400/50 transition-all"
+              onClick={async () => {
+                try {
+                  showToastMessage("Scraping LinkedIn for engagement... (this takes ~90s)");
+                  await refreshEngagement();
+                  showToastMessage("Engagement updated successfully!");
+                } catch (err) {
+                  showToastMessage("Failed to refresh engagement: " + err.message);
+                }
+              }}
+            >
+              <i className="fa-solid fa-rotate mr-2"></i>
+              Refresh Stats
+            </button>
 
             <button
               className="px-6 py-3 gradient-accent rounded-xl text-base font-medium"
@@ -493,6 +588,7 @@ export default function PostsLibrary() {
                   setSelectedPost(post);
                   setShowDeleteModal(true);
                 }}
+                onRefreshEngagement={refreshEngagement}
               />
             ))
           ) : (
@@ -550,9 +646,19 @@ export default function PostsLibrary() {
               <div className="flex-1 overflow-y-auto pr-2 space-y-6">
                 {/* Content Section */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <i className="fa-solid fa-file-text mr-2"></i>Content
-                  </label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-cyan-400">
+                      <i className="fa-solid fa-file-text mr-2"></i>Content
+                    </label>
+                    <button
+                      onClick={handleRegenerateContent}
+                      disabled={isRegenerating}
+                      className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <i className={`fa-solid fa-wand-magic-sparkles ${isRegenerating ? 'animate-spin' : ''}`}></i>
+                      {isRegenerating ? 'Generating...' : 'AI Rewrite'}
+                    </button>
+                  </div>
                   <div className="relative">
                     <textarea
                       className="w-full h-40 bg-gray-800/50 border border-gray-600 rounded-2xl p-6 text-white placeholder-gray-400 resize-none focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
@@ -613,6 +719,34 @@ export default function PostsLibrary() {
                   </div>
                 </div>
 
+                {/* Selected Images Preview */}
+                {editingPost.selectedImages?.length > 0 && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-cyan-400 mb-3">
+                      <i className="fa-solid fa-images mr-2"></i>Attached Images ({editingPost.selectedImages.length})
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      {editingPost.selectedImages.map((img, i) => {
+                        const url = typeof img === 'string' ? img : (img.thumbnail || img.url);
+                        return (
+                          <div key={i} className="relative group/img">
+                            <img src={url} alt="" className="h-20 w-28 rounded-xl object-cover border border-gray-600" />
+                            <button
+                              onClick={() => setEditingPost(prev => ({
+                                ...prev,
+                                selectedImages: prev.selectedImages.filter((_, idx) => idx !== i)
+                              }))}
+                              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                            >
+                              <i className="fa-solid fa-times"></i>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Scheduling Section */}
                 <div>
                   <label className="block text-sm font-medium text-cyan-400 mb-3">
@@ -652,31 +786,58 @@ export default function PostsLibrary() {
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-gray-300 font-medium">AI Image Suggestions</label>
-                    <button className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
-                      Generate New
+                    <button
+                      onClick={handleGenerateImages}
+                      disabled={isLoadingImages}
+                      className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <i className={`fa-solid ${isLoadingImages ? 'fa-spinner animate-spin' : 'fa-wand-magic-sparkles'} mr-1`}></i>
+                      {isLoadingImages ? 'Searching...' : 'Generate New'}
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
-                    {[0, 1, 2].map(index => (
-                      <div 
-                        key={index}
-                        onClick={() => setEditingPost(prev => ({ ...prev, selectedImage: index }))}
-                        className={`relative group cursor-pointer ${
-                          editingPost.selectedImage === index ? 'ring-2 ring-cyan-400' : ''
-                        }`}
-                      >
-                        <img 
-                          className="w-full h-24 rounded-xl object-cover" 
-                          src={`https://picsum.photos/200/150?random=${index + 300}`}
-                          alt={`Image suggestion ${index + 1}`}
-                        />
-                        <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          {editingPost.selectedImage === index && (
-                            <i className="fa-solid fa-check text-white text-xl"></i>
-                          )}
+                    {(suggestedImages.length > 0 ? suggestedImages : [0, 1, 2]).map((item, index) => {
+                      const imgUrl = suggestedImages.length > 0
+                        ? (item.thumbnail || item.url)
+                        : `https://picsum.photos/200/150?random=${index + 300}`;
+                      const imgData = suggestedImages.length > 0
+                        ? { url: item.url || item.thumbnail, thumbnail: item.thumbnail || item.url, source: item.source || '', keyword: item.keyword || '' }
+                        : null;
+                      const isSelected = editingPost.selectedImages?.some(im => {
+                        const u = typeof im === 'string' ? im : (im.url || im.thumbnail);
+                        return u === (imgData ? imgData.url : imgUrl);
+                      });
+                      return (
+                        <div 
+                          key={index}
+                          onClick={() => {
+                            if (!imgData) return;
+                            setEditingPost(prev => {
+                              const imgs = prev.selectedImages || [];
+                              const exists = imgs.some(im => (typeof im === 'string' ? im : im.url) === imgData.url);
+                              if (exists) {
+                                return { ...prev, selectedImages: imgs.filter(im => (typeof im === 'string' ? im : im.url) !== imgData.url) };
+                              }
+                              return { ...prev, selectedImages: [...imgs, imgData] };
+                            });
+                          }}
+                          className={`relative group cursor-pointer ${
+                            isSelected ? 'ring-2 ring-cyan-400' : ''
+                          }`}
+                        >
+                          <img 
+                            className="w-full h-24 rounded-xl object-cover" 
+                            src={imgUrl}
+                            alt={suggestedImages.length > 0 ? (item.title || `Image ${index + 1}`) : `Placeholder ${index + 1}`}
+                          />
+                          <div className="absolute inset-0 bg-cyan-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            {isSelected && (
+                              <i className="fa-solid fa-check text-white text-xl"></i>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -751,7 +912,7 @@ export default function PostsLibrary() {
 
 // ------------------- COMPONENTS -------------------
 
-function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelete }) {
+function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelete, onRefreshEngagement }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const platformConfig = {
@@ -805,10 +966,10 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
       <div className="relative h-36 bg-gradient-to-br from-gray-800/60 to-gray-900/60 overflow-hidden">
         {post.selectedImages && post.selectedImages.length > 0 ? (
           <img
-            src={post.selectedImages[0].thumbnail || post.selectedImages[0].url}
+            src={typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)}
             alt=""
             className="w-full h-full object-cover opacity-60 group-hover:opacity-75 transition-opacity duration-300"
-            onError={(e) => { e.target.src = `https://picsum.photos/400/200?random=${post.id || 1}`; }}
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -889,7 +1050,7 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-700/40">
+        <div className="pt-3 border-t border-gray-700/40 space-y-2">
           {/* Date info */}
           <div className="flex items-center gap-1.5 text-sm text-gray-500">
             {post.status === 'scheduled' && scheduleInfo ? (
@@ -902,6 +1063,11 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
                   <span className="text-gray-600">at {post.scheduleTime}</span>
                 )}
               </>
+            ) : post.status === 'posted' && post.publishedAt ? (
+              <>
+                <i className="fa-solid fa-check-circle text-xs text-green-400"></i>
+                <span className="text-green-400">Published {formatDate(post.publishedAt)}</span>
+              </>
             ) : (
               <>
                 <i className="fa-solid fa-calendar text-xs"></i>
@@ -912,21 +1078,19 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
 
           {/* Engagement stats */}
           {post.status === 'posted' && (
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1 text-sm text-gray-500">
-                <i className="fa-solid fa-eye text-xs"></i>
-                {(post.engagement?.views || 0).toLocaleString()}
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 text-sm text-gray-400">
+                <i className="fa-solid fa-heart text-rose-400"></i>
+                {(post.engagement?.likes || 0).toLocaleString()}
               </span>
-              <span className="flex items-center gap-1 text-sm text-gray-500">
-                <i className="fa-solid fa-heart text-xs text-rose-400/60"></i>
-                {engagement.toLocaleString()}
+              <span className="flex items-center gap-1.5 text-sm text-gray-400">
+                <i className="fa-solid fa-comment text-blue-400"></i>
+                {(post.engagement?.comments || 0).toLocaleString()}
               </span>
-              {(post.engagement?.comments || 0) > 0 && (
-                <span className="flex items-center gap-1 text-sm text-gray-500">
-                  <i className="fa-solid fa-comment text-xs"></i>
-                  {post.engagement.comments}
-                </span>
-              )}
+              <span className="flex items-center gap-1.5 text-sm text-gray-400">
+                <i className="fa-solid fa-share text-green-400"></i>
+                {(post.engagement?.shares || 0).toLocaleString()}
+              </span>
             </div>
           )}
         </div>

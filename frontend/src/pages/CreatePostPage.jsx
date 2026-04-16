@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { usePosts } from "../hooks/usePosts";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
+import toast from "react-hot-toast";
 import { aiGenerate } from "../services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -25,11 +26,12 @@ import {
   faSpinner,
   faTimes,
   faCheck,
+  faPaperPlane,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function CreatePostPage() {
-  const { createPost, posts, stats: hookStats } = usePosts();
-  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity, language } = useSettings();
+  const { createPost, publishPost, posts, stats: hookStats } = usePosts();
+  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity, language, platformTimes } = useSettings();
   const t = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,7 +54,12 @@ export default function CreatePostPage() {
   const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleTime, setScheduleTime] = useState(() => {
+    // Pre-fill with first optimal posting time from settings
+    const times = platformTimes?.linkedin || platformTimes?.twitter || platformTimes?.medium || [];
+    const firstValid = times.find((t) => t && t.length >= 4);
+    return firstValid || "";
+  });
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState([
     {
@@ -232,7 +239,7 @@ export default function CreatePostPage() {
         localStorage.removeItem('selectedTrend');
       } catch (error) {
         console.error('Erreur lors de la récupération de la tendance:', error);
-        alert('❌ Error loading trend data. Please try again.');
+        toast.error('Error loading trend data. Please try again.');
       }
     } else {
       console.log('No trend data found in localStorage');
@@ -278,7 +285,7 @@ export default function CreatePostPage() {
       const generatedIdea = await generateAIidea();
       if (!generatedIdea) {
         setLoading(false);
-        alert("Failed to generate AI idea. Please try again.");
+        toast.error("Failed to generate AI idea. Please try again.");
         return;
       }
       idea = generatedIdea;
@@ -288,7 +295,7 @@ export default function CreatePostPage() {
 
     if (platforms.length === 0) {
       setLoading(false);
-      return alert("Select at least one platform");
+      return toast.error("Select at least one platform");
     }
 
     setLoading(true);
@@ -308,59 +315,22 @@ export default function CreatePostPage() {
       "Auto-adjust": "Adjust length naturally to fit the platform.",
     };
 
-    const systemMessage = `You are an elite social media content creator who has built audiences of 100K+ followers across platforms. You write content that stops the scroll, sparks engagement, and builds authority.
+    const systemMessage = `You are an elite social media content creator. You write scroll-stopping, high-engagement content.
 
-RULE 0 — LANGUAGE (HIGHEST PRIORITY):
-Detect the language of the user's topic/idea below. Write ALL content in THAT SAME LANGUAGE.
-- If the topic is in French → write entirely in French
-- If the topic is in English → write entirely in English
-- If the topic is in Arabic → write entirely in Arabic
-- This applies to EVERYTHING: headlines, body, bullet points, hashtags, questions, CTAs
-- NEVER mix languages. NEVER default to English if the topic is in another language.
-
-RULE 1 — PLATFORM MASTERY:
-Follow the platform-specific structure from the user message EXACTLY. Each platform has unique formatting, character limits, and engagement patterns. Never write generic content — write platform-native content.
-
-RULE 2 — VOICE & TONE:
-Write in a ${toneLabel} tone throughout.
-${toneLabel} means: ${toneDescriptions[toneLabel] || ""}
-${toneLabel === "casual" ? "Be fun, direct, and human. Use conversational language, humor, and personality. NO corporate speak. But still respect the platform structure." : toneLabel === "professional" ? "Be polished, authoritative, and structured. Use industry vocabulary, cite frameworks, and demonstrate expertise." : "Be warm, relatable, and helpful. Use 'you' and 'we' language. Share insights like helping a friend."}
-
-RULE 3 — CONTENT LENGTH:
-${lengthInstructions[contentLength] || contentLength}. Count your words carefully. Hitting the target length is mandatory.
-
-RULE 4 — SCROLL-STOPPING QUALITY:
-- First line must create immediate curiosity, emotion, or value promise
-- Every sentence must earn the next sentence — no filler, no fluff
-- End with engagement: a question, bold statement, or clear CTA
-- Write like a human with opinions, not an AI summarizing information
-
-CREATIVITY LEVEL: ${creativity}
+TONE: ${toneLabel}. ${toneDescriptions[toneLabel] || ""}
+LENGTH: ${lengthInstructions[contentLength] || contentLength}
+CREATIVITY: ${creativity}
 ${activeVoice ? `
-VOICE PROFILE TO MATCH (this is the user's trained writing style — replicate it closely):
-- Voice: "${activeVoice.name}"
-- Tone: ${activeVoice.tone}
-- Structure: ${activeVoice.structure}
-- Sentence Style: ${activeVoice.sentenceStyle}
-- Emoji Usage: ${activeVoice.emojiUsage}
-- Hashtag Usage: ${activeVoice.hashtagUsage}
-- Vocabulary Level: ${activeVoice.vocabularyLevel}
-- Hook Style: ${activeVoice.hookStyle}
-- CTA Style: ${activeVoice.ctaStyle}
-- Content Themes: ${(activeVoice.contentThemes || []).join(", ")}
-- Writing Patterns: ${(activeVoice.writingPatterns || []).join(", ")}
-- Unique Traits: ${(activeVoice.uniqueTraits || []).join(", ")}
-${activeVoice.samplePost ? `- Example of their writing: "${activeVoice.samplePost}"` : ""}` : ""}
+VOICE TO MATCH: "${activeVoice.name}" — Tone: ${activeVoice.tone}, Structure: ${activeVoice.structure}, Hook: ${activeVoice.hookStyle}, CTA: ${activeVoice.ctaStyle}, Emoji: ${activeVoice.emojiUsage}, Traits: ${(activeVoice.uniqueTraits || []).join(", ")}${activeVoice.samplePost ? `
+Example: "${activeVoice.samplePost}"` : ""}` : ""}
 
-All rules carry EQUAL weight. Never sacrifice format for tone, tone for length, or quality for any constraint.`;
+Write like a real human — opinionated, specific, never sound like AI. Follow the platform rules from the user message exactly. Output ONLY the post.`;
     const isShort = contentLength.toLowerCase().includes("short");
     const isLong = contentLength.toLowerCase().includes("long");
 
     try {
-      for (const platform of platforms) {
+      const platformPrompts = platforms.map(platform => {
         let userPrompt = "";
-
-        const langReminder = `\n\nLANGUAGE OVERRIDE (MANDATORY): The topic "${idea}" is written in a specific language. Your ENTIRE output MUST be in that SAME language. If the topic is in French, write in French. If in English, write in English. If in Arabic, write in Arabic. Do NOT translate the topic. Do NOT write in English if the topic is in another language.`;
 
         if (platform === "Twitter") {
           userPrompt = `Write a high-impact Twitter post (STRICT max 280 characters) about: ${idea}.
@@ -465,27 +435,39 @@ MEDIUM-NATIVE RULES:
 Generation attempt ${currentCount}, offer a completely unique angle.`;
         }
 
-        userPrompt += langReminder;
+        return { platform, userPrompt };
+      });
 
-        try {
-          const generatedContent = await aiGenerate({
-            prompt: systemMessage + "\n\n" + userPrompt,
+      // Run ALL platform generations in PARALLEL
+      const results = await Promise.allSettled(
+        platformPrompts.map(({ platform, userPrompt }) =>
+          aiGenerate({
+            prompt: userPrompt,
+            system: systemMessage,
             model: modelId,
-            max_tokens: platform === "Twitter" ? 100 : 300,
+            max_tokens: platform === "Twitter" ? 200 : 800,
             temperature,
-          });
-          newVariations[platform] = generatedContent || "";
-        } catch (fetchError) {
-          console.warn(`API failed for ${platform}, using fallback`, fetchError);
-          newVariations[platform] = generateAlternativeMockContent(platform, idea);
+            user_content: idea,
+            language,
+          }).then(content => ({ platform, content: content || "" }))
+            .catch(err => {
+              console.warn(`API failed for ${platform}, using fallback`, err);
+              return { platform, content: generateAlternativeMockContent(platform, idea) };
+            })
+        )
+      );
+
+      results.forEach(result => {
+        if (result.status === "fulfilled") {
+          newVariations[result.value.platform] = result.value.content;
         }
-      }
+      });
 
       setVariations(newVariations);
       setGenerationCount(currentCount);
     } catch (err) {
       console.error(err);
-      alert("Some API calls failed while generating text.");
+      toast.error("Some API calls failed while generating text.");
     } finally {
       setLoading(false);
     }
@@ -500,6 +482,7 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
         prompt,
         model: modelId,
         max_tokens: 50,
+        language,
       });
     } catch (err) {
       console.error("Error generating AI idea:", err);
@@ -511,8 +494,8 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
     const idea = ideaRef.current.value.trim();
     const platforms = Object.keys(publishTo).filter((p) => publishTo[p]);
 
-    if (!idea) return alert("Enter your idea first");
-    if (platforms.length === 0) return alert("Select at least one platform");
+    if (!idea) return toast.error("Enter your idea first");
+    if (platforms.length === 0) return toast.error("Select at least one platform");
 
     setLoading(true);
     const apiKey = openRouterKey;
@@ -609,11 +592,11 @@ Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
       setSelectedImages(newImages);
 
       if (totalImages === 0) {
-        alert("No images found. Try a different idea.");
+        toast.error("No images found. Try a different idea.");
       }
     } catch (err) {
       console.error("Plan images error:", err);
-      alert("Error searching for images: " + err.message);
+      toast.error("Error searching for images: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -621,7 +604,7 @@ Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
 
   const regenerateContent = async (platform) => {
     const idea = ideaRef.current.value.trim();
-    if (!idea) return alert("Enter your idea first");
+    if (!idea) return toast.error("Enter your idea first");
 
     setLoading(true);
 
@@ -650,19 +633,22 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
 
       let userPrompt = "";
       if (platform === "Twitter") {
-        userPrompt = `Create a completely different Twitter post (max 280 chars) about: ${idea}. Write something fresh and unique.`;
+        userPrompt = `Create a completely different Twitter post (STRICT max 280 characters) about: ${idea}.\n\nTWITTER RULES:\n- Scroll-stopping hook in first 5 words\n- Every word must earn its place — 280 chars = zero waste\n- 2-3 relevant hashtags only if they add value\n- End with a provocative question OR bold CTA\n- NO generic filler, NO corporate speak\n\nWrite something fresh and unique.`;
       } else if (platform === "LinkedIn") {
-        userPrompt = `Write a fresh LinkedIn post about: ${idea}. Bold headline, key insights with bullet points, end with a discussion question.`;
+        userPrompt = `Write a fresh LinkedIn post (100-200 words) about: ${idea}.\n\nLINKEDIN RULES:\n- Attention-grabbing first line (the "see more" preview)\n- 3-4 key insights with bullet points — specific and actionable\n- Line breaks for readability\n- 3-4 relevant industry hashtags\n- End with a discussion question that sparks genuine engagement`;
       } else {
-        userPrompt = `Create a unique Medium article preview about: ${idea}. SEO-friendly title, compelling intro, section headings with insights.`;
+        userPrompt = `Create a unique Medium article preview (150-300 words) about: ${idea}.\n\nMEDIUM RULES:\n- SEO-friendly title that promises tangible value\n- 2-3 compelling introduction paragraphs\n- Section headings that are standalone insights\n- Editorial, essay-like voice\n- Close with a teaser that creates urgency to read more`;
       }
 
       try {
         const newContent = await aiGenerate({
-          prompt: systemMessage + "\n\n" + userPrompt,
+          prompt: userPrompt,
+          system: systemMessage,
           model: modelId,
-          max_tokens: platform === "Twitter" ? 100 : 300,
+          max_tokens: platform === "Twitter" ? 200 : 800,
           temperature,
+          user_content: idea,
+          language,
         });
 
         setVariations((prev) => ({
@@ -681,7 +667,7 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
       }
     } catch (err) {
       console.error(err);
-      alert("Error regenerating content: " + err.message);
+      toast.error("Error regenerating content: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -702,7 +688,7 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
 
   const enhanceContent = async () => {
     const idea = ideaRef.current.value.trim();
-    if (!idea) return alert("Enter your idea first");
+    if (!idea) return toast.error("Enter your idea first");
 
     setLoading(true);
 
@@ -713,13 +699,15 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
         prompt,
         model: modelId,
         max_tokens: 150,
+        user_content: idea,
+        language,
       });
 
       ideaRef.current.value = enhancedIdea;
       setCharCount(enhancedIdea.length);
     } catch (err) {
       console.error(err);
-      alert("Error enhancing content: " + err.message);
+      toast.error("Error enhancing content: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -728,8 +716,8 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
 const saveDraft = async () => {
   const idea = ideaRef.current.value.trim();
 
-  if (!idea) return alert("Please enter an idea before saving");
-  if (!draftName.trim()) return alert("Please enter a draft name");
+  if (!idea) return toast.error("Please enter an idea before saving");
+  if (!draftName.trim()) return toast.error("Please enter a draft name");
 
   try {
     // Créer un post pour chaque plateforme sélectionnée avec son contenu généré
@@ -758,28 +746,28 @@ const saveDraft = async () => {
       });
     }
 
-    alert(`Draft saved successfully for ${selectedPlatforms.length} platform(s)!`);
+    toast.success(`Draft saved successfully for ${selectedPlatforms.length} platform(s)!`);
     setShowSaveDraftModal(false);
     setDraftName("");
   } catch (err) {
     console.error("SAVE DRAFT ERROR:", err);
-    alert(err.message);
+    toast.error(err.message);
   }
 };
 
   const schedulePosts = async () => {
     const idea = ideaRef.current.value.trim();
 
-    if (!idea) return alert("Please enter an idea first");
+    if (!idea) return toast.error("Please enter an idea first");
     if (!scheduleDate || !scheduleTime)
-      return alert("Please select both date and time");
+      return toast.error("Please select both date and time");
 
     const scheduledPlatforms = Object.keys(publishTo).filter(
       (p) => publishTo[p]
     );
 
     if (scheduledPlatforms.length === 0) {
-      return alert("Please select at least one platform to schedule");
+      return toast.error("Please select at least one platform to schedule");
     }
 
     try {
@@ -809,19 +797,75 @@ const saveDraft = async () => {
         });
       }
 
-      alert(`Post scheduled successfully for ${scheduledPlatforms.length} platform(s)!`);
+      toast.success(`Post scheduled successfully for ${scheduledPlatforms.length} platform(s)!`);
       setShowScheduleModal(false);
       setScheduleDate("");
       setScheduleTime("");
     } catch (err) {
       console.error("SCHEDULE ERROR:", err);
-      alert(err.message);
+      toast.error(err.message);
+    }
+  };
+
+  const publishNow = async () => {
+    const idea = ideaRef.current.value.trim();
+    if (!idea) return toast.error("Please enter an idea first");
+
+    const selectedPlatforms = Object.keys(publishTo).filter((p) => publishTo[p]);
+    if (selectedPlatforms.length === 0) return toast.error("Select at least one platform");
+
+    // Check that content has been generated
+    const hasContent = selectedPlatforms.some((p) => variations[p]);
+    if (!hasContent) return toast.error("Please generate content first before publishing");
+
+    setLoading(true);
+    try {
+      for (const platform of selectedPlatforms) {
+        const platformContent = variations[platform] || idea;
+
+        const platformImages = selectedImages[platform] || [];
+        const selectedImg = platformImages.find((img) => img.selected);
+        const imageData = selectedImg
+          ? {
+              url: selectedImg.url,
+              thumbnail: selectedImg.thumbnail || selectedImg.url,
+              source: selectedImg.source || "",
+              keyword: selectedImg.keyword || "",
+            }
+          : null;
+
+        // 1) Create the post as draft first
+        const newPost = await createPost({
+          idea,
+          content: platformContent,
+          platforms: { [platform]: true },
+          status: "draft",
+          engagement: {},
+          selectedImages: imageData ? [imageData] : [],
+        });
+
+        // 2) Publish it to LinkedIn
+        if (platform === "LinkedIn" && newPost?.id) {
+          try {
+            await publishPost(newPost.id);
+          } catch (pubErr) {
+            toast.error(`Failed to publish to LinkedIn: ${pubErr.message}`);
+            continue;
+          }
+        }
+      }
+      toast.success(`Published successfully to ${selectedPlatforms.join(", ")}!`);
+    } catch (err) {
+      console.error("PUBLISH ERROR:", err);
+      toast.error("Error publishing: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const getMoreTips = async () => {
     const idea = ideaRef.current.value.trim();
-    if (!idea) return alert("Enter your idea first");
+    if (!idea) return toast.error("Enter your idea first");
 
     setLoading(true);
 
@@ -832,6 +876,8 @@ const saveDraft = async () => {
         prompt,
         model: modelId,
         max_tokens: 250,
+        user_content: idea,
+        language,
       });
 
       const parsed = JSON.parse(content);
@@ -1224,6 +1270,15 @@ const saveDraft = async () => {
               <FontAwesomeIcon icon={faClock} className="mr-2" />
               {t("create.schedule")}
             </button>
+
+            <button
+              onClick={publishNow}
+              disabled={loading}
+              className="flex items-center px-6 py-3 rounded-2xl bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FontAwesomeIcon icon={faPaperPlane} className="mr-2" />
+              Publish Now
+            </button>
           </div>
         </div>
 
@@ -1390,6 +1445,49 @@ const saveDraft = async () => {
                     onChange={(e) => setScheduleTime(e.target.value)}
                     className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
                   />
+                  {/* Optimal times by platform */}
+                  {(() => {
+                    const platConfig = {
+                      Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
+                      LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
+                      Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
+                    };
+                    const groups = Object.entries(publishTo).filter(([, v]) => v).map(([name]) => {
+                      const cfg = platConfig[name];
+                      if (!cfg) return null;
+                      const times = (platformTimes?.[cfg.key] || []).filter(t => t && t.length >= 4);
+                      if (times.length === 0) return null;
+                      return { name, ...cfg, times };
+                    }).filter(Boolean);
+                    if (groups.length === 0) return null;
+                    return (
+                      <div className="mt-3 space-y-2">
+                        <span className="text-gray-500 text-xs">Optimal times:</span>
+                        {groups.map(g => (
+                          <div key={g.key} className="flex items-center gap-2 flex-wrap">
+                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${g.bg}`}>
+                              <i className={`${g.icon} ${g.color} text-xs`} />
+                              <span className={`${g.color} text-xs font-medium`}>{g.name}</span>
+                            </div>
+                            {g.times.map(t => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setScheduleTime(t)}
+                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                  scheduleTime === t
+                                    ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
+                                    : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
+                                }`}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

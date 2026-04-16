@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from "../services/api";
 
 export default function PostingPreferences({ initialData, onChange }) {
   const [timezone, setTimezone] = useState(initialData?.timezone || "PKT (GMT+5)");
@@ -12,6 +13,23 @@ export default function PostingPreferences({ initialData, onChange }) {
       medium: ["10:00", "14:00", ""],
     }
   );
+
+  // Load auto-post setting from backend on mount
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_URL}/api/user/auto-post`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.auto_post) {
+          const anyEnabled = d.auto_post.linkedin || d.auto_post.twitter || d.auto_post.medium;
+          setAutoPublish(anyEnabled);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Notify parent on change
   useEffect(() => {
@@ -128,7 +146,19 @@ export default function PostingPreferences({ initialData, onChange }) {
             title="Auto-publish"
             subtitle="Publish posts automatically"
             active={autoPublish}
-            onToggle={() => setAutoPublish(!autoPublish)}
+            onToggle={() => {
+              const newVal = !autoPublish;
+              setAutoPublish(newVal);
+              // Sync to backend — enable/disable for all platforms
+              const token = localStorage.getItem("token");
+              if (token) {
+                fetch(`${API_URL}/api/user/auto-post`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ linkedin: newVal, twitter: newVal, medium: newVal }),
+                }).catch(() => {});
+              }
+            }}
           />
           <ToggleCard
             title="Smart Scheduling"

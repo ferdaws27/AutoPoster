@@ -233,7 +233,7 @@ const useDashboardStore = create((set, get) => ({
         }
       ];
       
-      const themeIndex = (currentCount - 1) % fallbackThemes.length;
+      const themeIndex = (get().generationCount - 1) % fallbackThemes.length;
       const currentFallbackTheme = fallbackThemes[themeIndex];
       
       const fallbackIdeas = currentFallbackTheme.topics.map((topic, index) => ({

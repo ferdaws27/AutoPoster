@@ -312,6 +312,27 @@ export default function QuoteTemplate() {
               ))}
             </div>
 
+            {/* STYLE PRESETS */}
+            <div className="mb-6">
+              <p className="text-gray-400 text-sm text-center mb-3">{t("quotes.stylePresets")}</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {stylePresets.map((preset) => (
+                  <button
+                    key={preset.key}
+                    onClick={() => setStylePreset(preset.key)}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                      stylePreset === preset.key
+                        ? "bg-violet-400/15 text-violet-300 border-violet-400/50"
+                        : "text-gray-400 border-white/10 hover:text-white hover:border-white/25"
+                    }`}
+                  >
+                    <i className={`fa-solid ${preset.icon}`}></i>
+                    <span>{preset.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* ACTION BUTTONS */}
             <div className="flex flex-wrap items-center justify-center gap-4">
               <button

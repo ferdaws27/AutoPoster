@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import toast from "react-hot-toast";
 
 const sampleHooksData = [
   { text: "Here's the uncomfortable truth about AI that nobody talks about:", score: 94, type: "bold-statement" },
@@ -125,7 +126,7 @@ export default function HookGeneratorPage() {
       }
     } catch (error) {
       console.error("Error generating hooks:", error);
-      alert(`Error generating hooks: ${error.message}\n\nUsing sample hooks instead.`);
+      toast.error(`Error generating hooks: ${error.message}. Using sample hooks instead.`);
       setHooks([...sampleHooksData]);
     } finally {
       setLoading(false);
