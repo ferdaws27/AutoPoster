@@ -541,6 +541,7 @@ function TestCard({ test, onRun, onPause, onDelete }) {
   const [showDetails, setShowDetails] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [activePlatform, setActivePlatform] = useState(test.platforms?.[0] || "twitter");
 
   const isCompleted = test.status === "completed";
   const isReady = test.status === "ready";
@@ -664,35 +665,98 @@ function TestCard({ test, onRun, onPause, onDelete }) {
       {isGenerating && (
         <div className="flex items-center justify-center py-12 text-gray-400">
           <FaSpinner className="animate-spin text-2xl mr-3" />
-          <span>AI is generating two variations from your content...</span>
+          <span>AI is generating variations for {test.platforms?.length || 0} platform{test.platforms?.length > 1 ? "s" : ""}...</span>
         </div>
       )}
 
-      {/* Variant cards */}
-      {!isGenerating && test.variant_a?.content && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          <VariantCard
-            variant={test.variant_a}
-            letter="A"
-            isWinner={isCompleted && test.winner === "A"}
-            isLoser={isCompleted && test.winner === "B"}
-            leading={!isCompleted && isRunning && aLeading}
-            behind={!isCompleted && isRunning && !aLeading}
-            showStats={isRunning || isCompleted}
-            color="cyan"
-          />
-          <VariantCard
-            variant={test.variant_b}
-            letter="B"
-            isWinner={isCompleted && test.winner === "B"}
-            isLoser={isCompleted && test.winner === "A"}
-            leading={!isCompleted && isRunning && !aLeading}
-            behind={!isCompleted && isRunning && aLeading}
-            showStats={isRunning || isCompleted}
-            color="violet"
-          />
-        </div>
-      )}
+      {/* Platform tabs + Variant cards */}
+      {!isGenerating && (test.variants || test.variant_a?.content) && (() => {
+        const hasPerPlatform = test.variants && Object.keys(test.variants).length > 0 &&
+          Object.values(test.variants).some(v => v?.a?.content || v?.b?.content);
+
+        if (hasPerPlatform) {
+          const platformIcons = { twitter: "fa-x-twitter", linkedin: "fa-linkedin-in", medium: "fa-medium" };
+          const pVariants = test.variants[activePlatform] || {};
+          const va = pVariants.a || {};
+          const vb = pVariants.b || {};
+          const pAScore = (va.likes || 0) + (va.comments || 0) * 3 + (va.shares || 0) * 5;
+          const pBScore = (vb.likes || 0) + (vb.comments || 0) * 3 + (vb.shares || 0) * 5;
+          const pALeading = pAScore >= pBScore;
+
+          return (
+            <>
+              {/* Platform tabs */}
+              {test.platforms?.length > 1 && (
+                <div className="flex items-center gap-2 mb-4">
+                  {test.platforms.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setActivePlatform(p)}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                        activePlatform === p
+                          ? "bg-cyan-400/15 text-cyan-400 border-cyan-400/40"
+                          : "text-gray-400 border-white/10 hover:text-white hover:border-white/25"
+                      }`}
+                    >
+                      <i className={`fa-brands ${platformIcons[p] || ""}`}></i>
+                      <span>{p.charAt(0).toUpperCase() + p.slice(1)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* A/B cards for active platform */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <VariantCard
+                  variant={va}
+                  letter="A"
+                  isWinner={isCompleted && test.winner === "A"}
+                  isLoser={isCompleted && test.winner === "B"}
+                  leading={!isCompleted && isRunning && pALeading}
+                  behind={!isCompleted && isRunning && !pALeading}
+                  showStats={isRunning || isCompleted}
+                  color="cyan"
+                />
+                <VariantCard
+                  variant={vb}
+                  letter="B"
+                  isWinner={isCompleted && test.winner === "B"}
+                  isLoser={isCompleted && test.winner === "A"}
+                  leading={!isCompleted && isRunning && !pALeading}
+                  behind={!isCompleted && isRunning && pALeading}
+                  showStats={isRunning || isCompleted}
+                  color="violet"
+                />
+              </div>
+            </>
+          );
+        }
+
+        // Fallback: legacy variant_a/variant_b (old tests)
+        return (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <VariantCard
+              variant={test.variant_a}
+              letter="A"
+              isWinner={isCompleted && test.winner === "A"}
+              isLoser={isCompleted && test.winner === "B"}
+              leading={!isCompleted && isRunning && aLeading}
+              behind={!isCompleted && isRunning && !aLeading}
+              showStats={isRunning || isCompleted}
+              color="cyan"
+            />
+            <VariantCard
+              variant={test.variant_b}
+              letter="B"
+              isWinner={isCompleted && test.winner === "B"}
+              isLoser={isCompleted && test.winner === "A"}
+              leading={!isCompleted && isRunning && !aLeading}
+              behind={!isCompleted && isRunning && aLeading}
+              showStats={isRunning || isCompleted}
+              color="violet"
+            />
+          </div>
+        );
+      })()}
 
       {/* Footer */}
       <div className="mt-6 flex items-center justify-between">
