@@ -897,7 +897,7 @@ export default function SchedulingPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <p className={`text-sm font-semibold text-gray-100 leading-snug ${expandedPostId === post.id ? '' : 'line-clamp-2'}`}>
-                              {post.idea || post.content || 'No content'}
+                              {typeof post.idea === 'string' ? post.idea : typeof post.content === 'string' ? post.content : post.content?.title || post.idea?.title || 'No content'}
                             </p>
                             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border}`}>
                               <i className={`fa-solid ${statusStyle.icon} text-[8px]`}></i>
