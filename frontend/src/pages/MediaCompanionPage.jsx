@@ -8,12 +8,35 @@ export default function App() {
   const [text, setText] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [selectedType, setSelectedType] = useState("");
+  const [viewingCarousel, setViewingCarousel] = useState(null);
   const inputRef = useRef(null);
   
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (viewingCarousel) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [viewingCarousel]);
 
   useEffect(() => {
     setCharCount(text.length);
   }, [text]);
+
+  useEffect(() => {
+    const handleViewCarousel = (event) => {
+      setViewingCarousel(event.detail);
+    };
+
+    window.addEventListener('viewCarousel', handleViewCarousel);
+    return () => {
+      window.removeEventListener('viewCarousel', handleViewCarousel);
+    };
+  }, []);
 
   return (
     <div className="gradient-bg min-h-screen text-gray-100">
@@ -212,71 +235,195 @@ What's your experience with AI-powered content tools?`}
         {/* ================= STEP 3 : GENERATE / RESULTS ================= */}
 <Generate text={text} selectedType={selectedType} />
 
-        {/* ================= TEMPLATES GALLERY ================= */}
-<section
-  id="templates-section"
-  className="glass-effect rounded-3xl p-8 mb-8 slide-up max-w-7xl mx-auto"
->
-  <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
-    <i className="fa-solid fa-layer-group text-yellow-400 mr-3"></i>
-    Popular Templates
-  </h3>
+        {/* ================= SAVED VISUAL PLANS ================= */}
+        <section
+          id="saved-plans-section"
+          className="glass-effect rounded-3xl p-8 mb-8 slide-up max-w-7xl mx-auto"
+        >
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+            <i className="fa-solid fa-bookmark text-yellow-400 mr-3"></i>
+            Saved Visual Plans
+          </h3>
 
-  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-    {/* TEMPLATE 1 */}
-    <div className="bg-black/20 rounded-2xl p-4 border border-gray-700/50 hover:border-cyan-400/50 transition-all cursor-pointer group">
-      <div className="w-full h-32 bg-gradient-to-br from-cyan-400/20 to-violet-400/20 rounded-xl mb-4 flex items-center justify-center">
-        <i className="fa-solid fa-rocket text-2xl text-cyan-400"></i>
-      </div>
-      <h4 className="text-white font-semibold mb-1">
-        Product Launch
-      </h4>
-      <p className="text-gray-400 text-xs">
-        Perfect for announcing new features or products
-      </p>
-    </div>
+          <div id="saved-plans-container" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Saved plans will be dynamically added here */}
+            <div className="bg-black/20 rounded-2xl p-6 border border-gray-700/50 text-center text-gray-400">
+              <i className="fa-solid fa-folder-open text-4xl mb-4 text-gray-500"></i>
+              <p>No saved visual plans yet</p>
+              <p className="text-sm mt-2">Generate and save your first carousel to see it here</p>
+            </div>
+          </div>
+        </section>
 
-    {/* TEMPLATE 2 */}
-    <div className="bg-black/20 rounded-2xl p-4 border border-gray-700/50 hover:border-violet-400/50 transition-all cursor-pointer group">
-      <div className="w-full h-32 bg-gradient-to-br from-violet-400/20 to-teal-400/20 rounded-xl mb-4 flex items-center justify-center">
-        <i className="fa-solid fa-chart-line text-2xl text-violet-400"></i>
-      </div>
-      <h4 className="text-white font-semibold mb-1">
-        Growth Story
-      </h4>
-      <p className="text-gray-400 text-xs">
-        Share metrics, achievements, and milestones
-      </p>
-    </div>
+        {/* Carousel View Modal */}
+        {viewingCarousel && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-700">
+                <h3 className="text-2xl font-bold text-white">
+                  <i className="fa-solid fa-images text-violet-400 mr-3" />
+                  {viewingCarousel.title}
+                </h3>
+                <button
+                  onClick={() => setViewingCarousel(null)}
+                  className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-all"
+                >
+                  <i className="fa-solid fa-times" />
+                </button>
+              </div>
 
-    {/* TEMPLATE 3 */}
-    <div className="bg-black/20 rounded-2xl p-4 border border-gray-700/50 hover:border-teal-400/50 transition-all cursor-pointer group">
-      <div className="w-full h-32 bg-gradient-to-br from-teal-400/20 to-yellow-400/20 rounded-xl mb-4 flex items-center justify-center">
-        <i className="fa-solid fa-lightbulb text-2xl text-teal-400"></i>
-      </div>
-      <h4 className="text-white font-semibold mb-1">
-        Tips & Insights
-      </h4>
-      <p className="text-gray-400 text-xs">
-        Educational content and valuable tips
-      </p>
-    </div>
+              {/* Carousel Container */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="relative bg-black/30 rounded-2xl p-4 min-h-[300px]">
+                  {/* Navigation Arrows */}
+                  <button
+                    onClick={() => {
+                      const container = document.getElementById('modal-carousel');
+                      if (container) {
+                        container.scrollBy({ left: -container.offsetWidth, behavior: 'smooth' });
+                      }
+                    }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform shadow-lg"
+                  >
+                    <i className="fa-solid fa-chevron-left text-xs" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const container = document.getElementById('modal-carousel');
+                      if (container) {
+                        container.scrollBy({ left: container.offsetWidth, behavior: 'smooth' });
+                      }
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform shadow-lg"
+                  >
+                    <i className="fa-solid fa-chevron-right text-xs" />
+                  </button>
 
-    {/* TEMPLATE 4 */}
-    <div className="bg-black/20 rounded-2xl p-4 border border-gray-700/50 hover:border-yellow-400/50 transition-all cursor-pointer group">
-      <div className="w-full h-32 bg-gradient-to-br from-yellow-400/20 to-cyan-400/20 rounded-xl mb-4 flex items-center justify-center">
-        <i className="fa-solid fa-users text-2xl text-yellow-400"></i>
-      </div>
-      <h4 className="text-white font-semibold mb-1">
-        Behind the Scenes
-      </h4>
-      <p className="text-gray-400 text-xs">
-        Personal stories and team highlights
-      </p>
-    </div>
-  </div>
-</section>
-</div>
+                  {/* Carousel Slides */}
+                  <div
+                    id="modal-carousel"
+                    className="flex overflow-x-hidden snap-x snap-mandatory rounded-xl mb-4"
+                    style={{ scrollSnapType: 'x mandatory' }}
+                  >
+                    {viewingCarousel.data?.slides?.map((slide, i) => (
+                      <div
+                        key={i}
+                        className="flex-none w-full snap-center px-1"
+                        style={{ scrollSnapAlign: 'center' }}
+                      >
+                        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700">
+                          {/* Image Section */}
+                          <div className="aspect-video relative">
+                            {viewingCarousel.slideImages && viewingCarousel.slideImages[i] ? (
+                              <img
+                                src={viewingCarousel.slideImages[i]}
+                                alt={`Slide ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : viewingCarousel.image ? (
+                              // Extract individual slide from full carousel image for old saves
+                              <div className="w-full h-full relative overflow-hidden">
+                                <img
+                                  src={viewingCarousel.image}
+                                  alt={`Slide ${i + 1}`}
+                                  className="w-full h-full object-cover"
+                                  style={{
+                                    transform: `translateX(-${i * 100}%)`,
+                                    width: `${viewingCarousel.slides * 100}%`
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+                                <i className="fa-solid fa-image text-4xl text-violet-400" />
+                              </div>
+                            )}
+                            
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                            
+                            {/* Slide Number Badge */}
+                            <div className="absolute top-2 right-2 w-8 h-8 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold text-xs">{i + 1}</span>
+                            </div>
+                          </div>
+
+                          {/* Text Section */}
+                          <div className="p-4 text-center bg-gray-800/50">
+                            <h3 className="text-lg font-bold text-white mb-2 leading-tight">
+                              {slide.headline}
+                            </h3>
+                            <p className="text-gray-300 text-sm leading-relaxed line-clamp-3">
+                              {slide.body}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Dots Navigation */}
+                  <div className="flex justify-center space-x-2 mt-4 mb-4">
+                    {viewingCarousel.data?.slides?.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const container = document.getElementById('modal-carousel');
+                          if (container) {
+                            const slideWidth = container.offsetWidth;
+                            container.scrollTo({ left: i * slideWidth, behavior: 'smooth' });
+                          }
+                        }}
+                        className="h-1.5 rounded-full transition-all duration-300"
+                        style={{
+                          backgroundColor: i === 0 ? '#8B5CF6' : '#374151',
+                          width: i === 0 ? '24px' : '6px'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Scroll Indicator */}
+                  <div className="text-center text-gray-400 text-xs mb-4">
+                    <i className="fa-solid fa-arrows-up-down mr-2" />
+                    Scroll down to see all slides
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex justify-between items-center p-4 border-t border-gray-700 bg-gray-900">
+                <div className="text-gray-400 text-sm">
+                  <i className="fa-solid fa-images mr-2" />
+                  {viewingCarousel.slides} slides • {new Date(viewingCarousel.createdAt).toLocaleDateString()}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = viewingCarousel.image;
+                      a.download = `${viewingCarousel.title.replace(/[^a-zA-Z0-9]/g, '_')}_carousel.png`;
+                      a.click();
+                    }}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
+                  >
+                    <i className="fa-solid fa-download mr-2" />
+                    Download
+                  </button>
+                  <button
+                    onClick={() => setViewingCarousel(null)}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        </div>
       </main>
     </div>
     

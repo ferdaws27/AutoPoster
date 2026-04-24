@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import useSettings from "../hooks/useSettings";
+import JSZip from "jszip";
 
 export default function Generate({ text, selectedType }) {
   const { voiceProfile } = useSettings();
@@ -25,6 +26,7 @@ export default function Generate({ text, selectedType }) {
   const [carouselBuildStep, setCarouselBuildStep] = useState("");
   const [carouselBuildProgress, setCarouselBuildProgress] = useState(0);
   const [carouselZipUrl, setCarouselZipUrl] = useState(null);
+  const [carouselImages, setCarouselImages] = useState([]); // Store actual AI images
 
   const loadingSteps = [
     "Analyzing content structure...",
@@ -217,6 +219,7 @@ export default function Generate({ text, selectedType }) {
     setCarouselBuildState("building");
     setCarouselBuildProgress(0);
     setCarouselBuildStep("Preparing slides...");
+    setCarouselImages([]); // Reset images
 
     const steps = [
       { pct: 5, text: "Creating image prompts for each slide..." },
@@ -263,6 +266,10 @@ export default function Generate({ text, selectedType }) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setCarouselZipUrl(url);
+
+      // Extract images from ZIP for display
+      await extractImagesFromZip(blob);
+
       setCarouselBuildProgress(100);
       setCarouselBuildStep("Carousel ready!");
       setCarouselBuildState("done");
@@ -271,6 +278,491 @@ export default function Generate({ text, selectedType }) {
       console.error("Carousel build error:", err);
       setCarouselBuildStep(err.message);
       setCarouselBuildState("error");
+    }
+  };
+
+  // Extract images from ZIP for carousel display
+  const extractImagesFromZip = async (zipBlob) => {
+    try {
+      console.log('Starting ZIP extraction...');
+      const zip = await JSZip.loadAsync(zipBlob);
+      const imageUrls = [];
+
+      // Get all slide images (slide_1.jpg, slide_2.jpg, etc.)
+      const slideFiles = Object.keys(zip.files)
+        .filter(name => name.startsWith('slide_') && name.endsWith('.jpg'))
+        .sort((a, b) => {
+          const aMatch = a.match(/slide_(\d+)\.jpg/);
+          const bMatch = b.match(/slide_(\d+)\.jpg/);
+          const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+          const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+          return aNum - bNum;
+        });
+
+      console.log(`Found ${slideFiles.length} slide files:`, slideFiles);
+
+      for (const fileName of slideFiles) {
+        try {
+          const file = zip.files[fileName];
+          const base64 = await file.async('base64');
+          const imageUrl = `data:image/jpeg;base64,${base64}`;
+          imageUrls.push(imageUrl);
+          console.log(`Extracted image ${fileName}`);
+        } catch (fileErr) {
+          console.error(`Error extracting file ${fileName}:`, fileErr);
+        }
+      }
+
+      setCarouselImages(imageUrls);
+      console.log(`Successfully extracted ${imageUrls.length} carousel images`);
+    } catch (err) {
+      console.error('Error extracting images from ZIP:', err);
+      // Fallback: use placeholder images
+      setCarouselImages([]);
+    }
+  };
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Save entire carousel as displayed in interface and add to saved visual plans
+  const saveCarouselAsDisplayed = async () => {
+    // Prevent multiple saves
+    if (isSaving) {
+      console.log('Save already in progress, ignoring click');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      console.log('Starting carousel save...');
+      
+      // Get the carousel container element
+      const carouselElement = document.getElementById('modern-carousel');
+      if (!carouselElement) {
+        console.error('Carousel element not found');
+        alert('Carousel element not found. Please try again.');
+        return;
+      }
+
+      console.log('Carousel element found, capturing...');
+
+      // Import html2canvas dynamically
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Temporarily show all slides side by side for capture
+      const originalOverflow = carouselElement.style.overflow;
+      const originalScrollLeft = carouselElement.scrollLeft;
+      
+      // Make all slides visible
+      carouselElement.style.overflow = 'visible';
+      
+      // Get all slides
+      const slides = carouselElement.querySelectorAll('.flex-none');
+      const slideWidth = slides[0]?.offsetWidth || 0;
+      
+      // Set container width to show all slides
+      carouselElement.style.width = `${slideWidth * slides.length}px`;
+      
+      console.log('Capturing canvas...');
+      // Capture the entire carousel
+      const canvas = await html2canvas(carouselElement, {
+        backgroundColor: '#1a1a2e',
+        scale: 2, // Higher quality
+        logging: false,
+        width: slideWidth * slides.length,
+        height: carouselElement.offsetHeight
+      });
+
+      console.log('Canvas captured, restoring styles...');
+
+      // Restore original styles
+      carouselElement.style.overflow = originalOverflow;
+      carouselElement.style.width = '';
+      carouselElement.scrollLeft = originalScrollLeft;
+
+      console.log('Converting to blob...');
+      // Convert to blob and add to saved visual plans
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          console.log('Blob created, saving to plans...');
+          
+          // Add to saved visual plans (includes MongoDB save)
+          await addCarouselToSavedPlans(url, result);
+          
+          console.log('Saved to plans, downloading...');
+          
+          // Also download for user
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `carousel_complete_${new Date().getTime()}.png`;
+          a.click();
+          
+          console.log('Carousel saved successfully!');
+          alert('Carousel saved successfully to MongoDB and local storage!');
+        }
+      }, 'image/png');
+    } catch (err) {
+      console.error('Error saving carousel:', err);
+      alert(`Error saving carousel: ${err.message}. Please try again.`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add carousel to saved visual plans (localStorage + MongoDB)
+  const addCarouselToSavedPlans = async (imageUrl, carouselData) => {
+    try {
+      console.log('=== ADD CAROUSEL TO SAVED PLANS ===');
+      console.log('Carousel images available:', carouselImages?.length || 0);
+      console.log('Carousel images array:', carouselImages);
+      console.log('Image URL:', imageUrl?.substring(0, 50) + '...');
+      
+      // Check if carouselImages is populated
+      if (!carouselImages || carouselImages.length === 0) {
+        console.warn('WARNING: carouselImages is empty! Individual slide images will not be saved.');
+      } else {
+        console.log('First carousel image sample:', carouselImages[0]?.substring(0, 100) + '...');
+      }
+
+      // Convert blob URLs to base64
+      const convertBlobToBase64 = async (blobUrl, compress = false) => {
+        // If it's already a base64 data URL, return it as-is
+        if (blobUrl && blobUrl.startsWith('data:image')) {
+          console.log('Image is already base64, using as-is');
+          return blobUrl;
+        }
+        // If it's a blob URL, convert to base64
+        if (blobUrl && blobUrl.startsWith('blob:')) {
+          console.log('Converting blob URL to base64' + (compress ? ' with compression...' : '...'));
+          try {
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            
+            if (compress) {
+              // Compress image by drawing to canvas and exporting with lower quality
+              return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const ctx = canvas.getContext('2d');
+                  // Resize to max 1200px width
+                  const maxWidth = 1200;
+                  const scale = Math.min(1, maxWidth / img.width);
+                  canvas.width = img.width * scale;
+                  canvas.height = img.height * scale;
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  
+                  // Export at 0.7 quality
+                  const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                  console.log('Image compressed from', blob.size, 'to', compressedDataUrl.length, 'bytes');
+                  resolve(compressedDataUrl);
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(blob);
+              });
+            }
+            
+            return new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                console.log('Blob converted to base64');
+                resolve(reader.result);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          } catch (err) {
+            console.error('Error converting blob to base64:', err);
+            return null;
+          }
+        }
+        console.log('Image URL is neither base64 nor blob:', blobUrl?.substring(0, 50));
+        return null;
+      };
+
+      // Use carouselImages directly (already base64 from ZIP extraction)
+      const slideImagesBase64 = carouselImages || [];
+      console.log('Slide images to save:', slideImagesBase64.length);
+      console.log('Total slide images data size:', JSON.stringify(slideImagesBase64).length);
+
+      // First save to MongoDB (includes full data with images)
+      let mongoId = null;
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const saveData = {
+            title: carouselData?.title || 'Untitled Carousel',
+            slides: carouselData?.slides || [],
+            slideImages: slideImagesBase64
+            // Not saving main image to avoid MongoDB size limit
+          };
+          console.log('Data to send to MongoDB:', {
+            title: saveData.title,
+            slidesCount: saveData.slides.length,
+            slideImagesCount: saveData.slideImages.length
+          });
+          
+          const response = await fetch('http://127.0.0.1:5000/api/media/save-carousel', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(saveData)
+          });
+          
+          console.log('MongoDB save response status:', response.status);
+          
+          if (response.ok) {
+            const result = await response.json();
+            mongoId = result.carouselId;
+            console.log('✓ Carousel saved to MongoDB with ID:', mongoId);
+            console.log('✓ Slide images saved:', slideImagesBase64.length);
+          } else {
+            const errorText = await response.text();
+            console.error('✗ Failed to save to MongoDB:', response.status, errorText);
+          }
+        }
+      } catch (mongoErr) {
+        console.error('✗ MongoDB save error:', mongoErr);
+      }
+
+      // Only store metadata in localStorage to avoid quota issues
+      const savedPlans = JSON.parse(localStorage.getItem('savedVisualPlans') || '[]');
+      
+      // Create metadata-only plan object (no large base64 images or blob URLs)
+      const newPlan = {
+        id: Date.now(),
+        mongoId: mongoId, // Reference to MongoDB document
+        title: carouselData?.title || 'Untitled Carousel',
+        type: 'carousel',
+        slides: carouselData?.slides?.length || 0,
+        image: null, // Don't store blob URLs or base64 in localStorage
+        createdAt: new Date().toISOString(),
+        // Don't store full data or slideImages in localStorage to avoid quota issues
+      };
+      
+      // Add to saved plans
+      savedPlans.unshift(newPlan);
+      
+      // Keep only last 10 plans
+      if (savedPlans.length > 10) {
+        savedPlans.splice(10);
+      }
+      
+      // Save metadata only to localStorage
+      localStorage.setItem('savedVisualPlans', JSON.stringify(savedPlans));
+      
+      // Update UI
+      updateSavedPlansUI();
+      
+      console.log('Carousel added to saved visual plans (metadata in localStorage, full data in MongoDB)');
+    } catch (err) {
+      console.error('Error adding carousel to saved plans:', err);
+    }
+  };
+
+  // Update saved plans UI
+  const updateSavedPlansUI = () => {
+    try {
+      const savedPlans = JSON.parse(localStorage.getItem('savedVisualPlans') || '[]');
+      const container = document.getElementById('saved-plans-container');
+      
+      if (!container) return;
+      
+      if (savedPlans.length === 0) {
+        container.innerHTML = `
+          <div class="bg-black/20 rounded-2xl p-6 border border-gray-700/50 text-center text-gray-400">
+            <i class="fa-solid fa-folder-open text-4xl mb-4 text-gray-500"></i>
+            <p>No saved visual plans yet</p>
+            <p class="text-sm mt-2">Generate and save your first carousel to see it here</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = savedPlans.map(plan => `
+        <div class="bg-black/20 rounded-2xl p-4 border border-gray-700/50 hover:border-violet-400/50 transition-all cursor-pointer group">
+          <div class="w-full h-32 rounded-xl mb-3 overflow-hidden bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+            <i class="fa-solid fa-images text-4xl text-violet-400"></i>
+          </div>
+          <h4 class="text-white font-semibold mb-1 truncate">${plan.title}</h4>
+          <p class="text-gray-400 text-xs">${plan.slides} slides • ${new Date(plan.createdAt).toLocaleDateString()}</p>
+          <div class="mt-2 flex gap-2">
+            <button onclick="viewCarousel('${plan.id}')" class="px-2 py-1 bg-violet-500/20 text-violet-400 rounded text-xs hover:bg-violet-500/30 transition-all">
+              <i class="fa-solid fa-eye"></i> View
+            </button>
+            <button onclick="deleteCarousel('${plan.id}')" class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs hover:bg-red-500/30 transition-all">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+      
+      // Add global functions for buttons
+      window.viewCarousel = async (planId) => {
+        console.log('=== VIEW CAROUSEL CALLED ===');
+        const plan = savedPlans.find(p => p.id == planId);
+        console.log('Plan found:', plan);
+        
+        if (plan) {
+          // If we have mongoId, load full data from MongoDB
+          if (plan.mongoId) {
+            console.log('Loading carousel from MongoDB, mongoId:', plan.mongoId);
+            try {
+              const token = localStorage.getItem('token');
+              if (token) {
+                console.log('Fetching saved carousels from MongoDB...');
+                const response = await fetch('http://127.0.0.1:5000/api/media/saved-carousels', {
+                  headers: {
+                    'Authorization': `Bearer ${token}`
+                  }
+                });
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  console.log('Received carousels:', data.carousels?.length || 0);
+                  const fullCarousel = data.carousels.find(c => c._id === plan.mongoId);
+                  console.log('Full carousel found:', !!fullCarousel);
+                  
+                  if (fullCarousel) {
+                    console.log('Slide images count:', fullCarousel.slideImages?.length || 0);
+                    console.log('Slides count:', fullCarousel.slides?.length || 0);
+                    
+                    // Merge metadata with full data from MongoDB
+                    const fullPlan = {
+                      ...plan,
+                      data: { slides: fullCarousel.slides },
+                      slideImages: fullCarousel.slideImages || [],
+                      image: fullCarousel.image || plan.image
+                    };
+                    console.log('✓ Carousel loaded from MongoDB successfully');
+                    const event = new CustomEvent('viewCarousel', { detail: fullPlan });
+                    window.dispatchEvent(event);
+                    return;
+                  } else {
+                    console.error('Carousel not found in MongoDB data');
+                  }
+                } else {
+                  const errorText = await response.text();
+                  console.error('Failed to fetch carousels:', response.status, errorText);
+                }
+              } else {
+                console.error('No token found');
+              }
+            } catch (err) {
+              console.error('Error loading from MongoDB:', err);
+            }
+          }
+          
+          // Fallback to metadata-only view
+          console.log('Using fallback: metadata-only view');
+          const event = new CustomEvent('viewCarousel', { detail: plan });
+          window.dispatchEvent(event);
+        } else {
+          console.error('Plan not found with id:', planId);
+        }
+      };
+      
+      window.deleteCarousel = async (planId) => {
+        try {
+          const savedPlans = JSON.parse(localStorage.getItem('savedVisualPlans') || '[]');
+          const plan = savedPlans.find(p => p.id == planId);
+          
+          // Delete from MongoDB if we have mongoId
+          if (plan && plan.mongoId) {
+            try {
+              const token = localStorage.getItem('token');
+              if (token) {
+                const response = await fetch(`http://127.0.0.1:5000/api/media/saved-carousels/${plan.mongoId}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${token}`
+                  }
+                });
+                
+                if (response.ok) {
+                  console.log('Carousel deleted from MongoDB');
+                } else {
+                  console.error('Failed to delete from MongoDB');
+                }
+              }
+            } catch (mongoErr) {
+              console.error('MongoDB delete error:', mongoErr);
+            }
+          }
+          
+          // Delete from localStorage
+          const updatedPlans = savedPlans.filter(p => p.id != planId);
+          localStorage.setItem('savedVisualPlans', JSON.stringify(updatedPlans));
+          updateSavedPlansUI();
+        } catch (err) {
+          console.error('Error deleting carousel:', err);
+        }
+      };
+      
+    } catch (err) {
+      console.error('Error updating saved plans UI:', err);
+    }
+  };
+
+  // Load saved plans on component mount
+  useEffect(() => {
+    updateSavedPlansUI();
+    
+    // Sync localStorage carousels to MongoDB
+    syncLocalToMongo();
+  }, []);
+
+  // Sync localStorage carousels to MongoDB
+  const syncLocalToMongo = async () => {
+    try {
+      const savedPlans = JSON.parse(localStorage.getItem('savedVisualPlans') || '[]');
+      if (savedPlans.length === 0) return;
+      
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      // Only sync plans that don't have mongoId (old format)
+      const plansToSync = savedPlans.filter(plan => !plan.mongoId);
+      if (plansToSync.length === 0) {
+        console.log('All plans already synced to MongoDB');
+        return;
+      }
+      
+      for (const plan of plansToSync) {
+        try {
+          const response = await fetch('http://127.0.0.1:5000/api/media/save-carousel', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              title: plan.title,
+              slides: plan.data?.slides || [],
+              slideImages: plan.slideImages || [],
+              image: plan.image
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            // Update plan with mongoId
+            plan.mongoId = result.carouselId;
+            console.log(`Synced plan: ${plan.title} to MongoDB with ID: ${result.carouselId}`);
+          }
+        } catch (err) {
+          console.error(`Error syncing plan ${plan.title}:`, err);
+        }
+      }
+      
+      // Update localStorage with mongoIds
+      localStorage.setItem('savedVisualPlans', JSON.stringify(savedPlans));
+    } catch (err) {
+      console.error('Error syncing localStorage to MongoDB:', err);
     }
   };
 
@@ -645,12 +1137,11 @@ h2{color:#7B61FF;margin-top:30px}
                       className="storyboard-card bg-black/20 rounded-2xl p-4 border border-gray-700/50"
                     >
                       <div className="flex items-center space-x-4">
-                        {slideImages[i] && !failedImages[i] ? (
+                        {carouselImages[i] ? (
                           <img
-                            src={slideImages[i]}
+                            src={carouselImages[i]}
                             alt={slide.headline}
                             className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                            onError={() => setFailedImages((prev) => ({ ...prev, [i]: true }))}
                           />
                         ) : (
                           <div className="w-16 h-16 bg-gradient-to-br from-violet-400/20 to-teal-400/20 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -775,26 +1266,154 @@ h2{color:#7B61FF;margin-top:30px}
                   </div>
                 )}
 
-                {/* Done — download */}
+                {/* Done — carousel first, then ZIP */}
                 {carouselBuildState === "done" && carouselZipUrl && (
-                  <div className="max-w-md mx-auto mb-6">
-                    <div className="p-6 bg-green-400/10 border border-green-400/30 rounded-2xl mb-4">
-                      <i className="fa-solid fa-file-zipper text-green-400 text-4xl mb-3" />
-                      <p className="text-green-400 font-medium">{result.slides?.length} slide images generated</p>
-                      <p className="text-gray-400 text-sm mt-1">1080×1080px — optimized for LinkedIn & Instagram</p>
+                  <div className="space-y-6">
+                    {/* Modern Carousel Display - First */}
+                    <div className="max-w-3xl mx-auto">
+                      {/* Carousel Container */}
+                      <div className="relative bg-black/30 rounded-2xl p-4 backdrop-blur-md">
+                        {/* Navigation Arrows */}
+                        <button
+                          onClick={() => {
+                            const container = document.getElementById('modern-carousel');
+                            if (container) {
+                              container.scrollBy({ left: -container.offsetWidth, behavior: 'smooth' });
+                            }
+                          }}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform shadow-lg"
+                        >
+                          <i className="fa-solid fa-chevron-left text-sm" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const container = document.getElementById('modern-carousel');
+                            if (container) {
+                              container.scrollBy({ left: container.offsetWidth, behavior: 'smooth' });
+                            }
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform shadow-lg"
+                        >
+                          <i className="fa-solid fa-chevron-right text-sm" />
+                        </button>
+
+                        {/* Carousel Slides */}
+                        <div
+                          id="modern-carousel"
+                          className="flex overflow-x-hidden snap-x snap-mandatory rounded-xl"
+                          style={{ scrollSnapType: 'x mandatory' }}
+                        >
+                          {result.slides?.map((slide, i) => (
+                            <div
+                              key={i}
+                              className="flex-none w-full snap-center px-1"
+                              style={{ scrollSnapAlign: 'center' }}
+                            >
+                              {/* Compact Slide Card */}
+                              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700">
+                                {/* Image Section - Full Space (No Overlay) */}
+                                <div className="aspect-video relative">
+                                  {carouselImages[i] ? (
+                                    <img
+                                      src={carouselImages[i]}
+                                      alt={`Slide ${i + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        console.error(`Error loading image ${i}:`, e);
+                                        e.target.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+                                      <i className="fa-solid fa-image text-4xl text-violet-400" />
+                                    </div>
+                                  )}
+                                  
+                                  {/* Slide Number Badge */}
+                                  <div className="absolute top-2 right-2 w-8 h-8 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full flex items-center justify-center">
+                                    <span className="text-white font-bold text-xs">{i + 1}</span>
+                                  </div>
+                                </div>
+
+                                {/* Text Section - Below Image */}
+                                <div className="p-4 text-center bg-gray-800/50">
+                                  {/* Headline */}
+                                  <h3 className="text-lg font-bold text-white mb-2 leading-tight">
+                                    {slide.headline}
+                                  </h3>
+                                  
+                                  {/* Body Text */}
+                                  <p className="text-gray-300 text-sm leading-relaxed mb-3 line-clamp-3">
+                                    {slide.body}
+                                  </p>
+                                  
+                                  {/* Design Note */}
+                                  {slide.designNote && (
+                                    <div className="text-xs text-violet-400 opacity-75">
+                                      <i className="fa-solid fa-palette mr-1" />
+                                      {slide.designNote}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Compact Dots Navigation */}
+                        <div className="flex justify-center space-x-2 mt-4">
+                          {result.slides?.map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                const container = document.getElementById('modern-carousel');
+                                if (container) {
+                                  const slideWidth = container.offsetWidth;
+                                  container.scrollTo({ left: i * slideWidth, behavior: 'smooth' });
+                                }
+                              }}
+                              className="h-1.5 rounded-full transition-all duration-300"
+                              style={{
+                                backgroundColor: i === 0 ? '#8B5CF6' : '#374151',
+                                width: i === 0 ? '24px' : '6px'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Action Buttons - Second */}
                     <div className="flex justify-center gap-4">
                       <button
+                        onClick={saveCarouselAsDisplayed}
+                        disabled={isSaving}
+                        className="px-6 py-2.5 rounded-xl text-white font-semibold hover:opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                        style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}
+                      >
+                        {isSaving ? (
+                          <>
+                            <i className="fa-solid fa-spinner fa-spin mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fa-solid fa-images mr-2" />
+                            Save Full Carousel
+                          </>
+                        )}
+                      </button>
+                      <button
                         onClick={handleDownloadCarousel}
-                        className="px-8 py-3 rounded-2xl text-white font-semibold hover:opacity-90 transition-all"
+                        className="px-6 py-2.5 rounded-xl text-white font-semibold hover:opacity-90 transition-all transform hover:scale-105"
                         style={{ background: "linear-gradient(135deg, #8B5CF6, #06B6D4)" }}
                       >
                         <i className="fa-solid fa-download mr-2" />
                         Download ZIP
                       </button>
                       <button
-                        onClick={() => { setCarouselBuildState("idle"); setCarouselZipUrl(null); }}
-                        className="px-6 py-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 transition-all"
+                        onClick={() => { setCarouselBuildState("idle"); setCarouselZipUrl(null); setCarouselImages([]); }}
+                        className="px-4 py-2.5 bg-black/30 rounded-xl text-gray-300 hover:text-white border border-gray-600 transition-all hover:scale-105"
                       >
                         <i className="fa-solid fa-redo mr-2" />
                         Rebuild
@@ -991,75 +1610,14 @@ h2{color:#7B61FF;margin-top:30px}
             </div>
           )}
 
-          {/* ---- EXPORT OPTIONS ---- */}
-          <div className="glass-effect rounded-3xl p-8">
-            <h3 className="text-2xl font-bold text-white mb-6 text-center">Export Your Visual Plan</h3>
-            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              <button
-                onClick={handleExportCanva}
-                className="bg-black/20 border border-gray-700/50 rounded-2xl p-6 text-center hover:border-cyan-400/50 transition-all group"
-              >
-                <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-cyan-400/20 flex items-center justify-center group-hover:bg-cyan-400/30 transition-colors">
-                  {exportStatus === "canva" ? (
-                    <i className="fa-solid fa-check text-green-400" />
-                  ) : (
-                    <i className="fa-solid fa-upload text-cyan-400" />
-                  )}
-                </div>
-                <h4 className="text-white font-semibold mb-2">
-                  {exportStatus === "canva" ? "Copied!" : "Export to Canva 📤"}
-                </h4>
-                <p className="text-gray-400 text-sm">Copy all slide/script text to clipboard for Canva</p>
-              </button>
-
-              <button
-                onClick={handleExportCapcut}
-                className="bg-black/20 border border-gray-700/50 rounded-2xl p-6 text-center hover:border-violet-400/50 transition-all group"
-              >
-                <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-violet-400/20 flex items-center justify-center group-hover:bg-violet-400/30 transition-colors">
-                  {exportStatus === "capcut" ? (
-                    <i className="fa-solid fa-check text-green-400" />
-                  ) : (
-                    <i className="fa-solid fa-video text-violet-400" />
-                  )}
-                </div>
-                <h4 className="text-white font-semibold mb-2">
-                  {exportStatus === "capcut" ? "Downloaded!" : "Export to CapCut 🎥"}
-                </h4>
-                <p className="text-gray-400 text-sm">
-                  {selectedType === "video"
-                    ? "Download .srt subtitle file for CapCut import"
-                    : "Download formatted text with all slides"}
-                </p>
-              </button>
-
-              <button
-                onClick={handleExportPDF}
-                className="bg-black/20 border border-gray-700/50 rounded-2xl p-6 text-center hover:border-teal-400/50 transition-all group"
-              >
-                <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-teal-400/20 flex items-center justify-center group-hover:bg-teal-400/30 transition-colors">
-                  {exportStatus === "pdf" ? (
-                    <i className="fa-solid fa-check text-green-400" />
-                  ) : (
-                    <i className="fa-solid fa-file-pdf text-teal-400" />
-                  )}
-                </div>
-                <h4 className="text-white font-semibold mb-2">
-                  {exportStatus === "pdf" ? "Opening..." : "Download PDF"}
-                </h4>
-                <p className="text-gray-400 text-sm">Print or save as PDF with full visual guide</p>
-              </button>
-            </div>
-
-            <div className="text-center mt-8">
-              <button
-                onClick={handleReset}
-                className="px-8 py-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 transition-all"
-              >
-                <i className="fa-solid fa-plus mr-2" />
-                Create Another Visual Plan
-              </button>
-            </div>
+          <div className="text-center mt-8">
+            <button
+              onClick={handleReset}
+              className="px-8 py-3 bg-black/30 rounded-2xl text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 transition-all"
+            >
+              <i className="fa-solid fa-plus mr-2" />
+              Create Another Visual Plan
+            </button>
           </div>
         </div>
       )}

@@ -339,7 +339,11 @@ export default function QuoteTemplate() {
       const res = await fetch(`${API_BASE}/api/quote-generator/templates`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quote, variation }),
+        body: JSON.stringify({ 
+          quote, 
+          variation,
+          allVariations: variations // Include all generated variations
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -728,7 +732,30 @@ export default function QuoteTemplate() {
                     </div>
                     <div className="flex gap-3">
                       <button onClick={() => copyToClipboard(tpl.variation?.text || "")} className="flex-1 px-3 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl text-sm hover:bg-cyan-400/30">{t("common.copy")}</button>
-                      <button onClick={() => { setQuote(tpl.quote || ""); showCallout("Quote loaded"); }} className="flex-1 px-3 py-2 bg-violet-400/20 text-violet-400 rounded-xl text-sm hover:bg-violet-400/30">{t("quotes.useQuote")}</button>
+                      <button onClick={() => { 
+  console.log("Template data:", tpl); 
+  console.log("All variations:", tpl.allVariations); 
+  
+  setQuote(tpl.quote || ""); 
+  
+  // Handle old templates without allVariations
+  if (tpl.allVariations && tpl.allVariations.length > 0) {
+    // New template with all variations
+    setVariations(tpl.allVariations);
+    setVariationsVisible(true);
+    showCallout("Quote and variations loaded");
+  } else if (tpl.variation) {
+    // Old template with single variation - create array with this variation
+    setVariations([tpl.variation]);
+    setVariationsVisible(true);
+    showCallout("Quote and variation loaded");
+  } else {
+    // Fallback - no variations
+    setVariations([]);
+    setVariationsVisible(false);
+    showCallout("Quote loaded (no variations)");
+  }
+}} className="flex-1 px-3 py-2 bg-violet-400/20 text-violet-400 rounded-xl text-sm hover:bg-violet-400/30">{t("quotes.useQuote")}</button>
                       <button onClick={() => deleteTemplate(tpl.id)} className="px-3 py-2 bg-red-400/10 text-red-400 rounded-xl text-sm hover:bg-red-400/20"><i className="fa-solid fa-trash"></i></button>
                     </div>
                   </div>
