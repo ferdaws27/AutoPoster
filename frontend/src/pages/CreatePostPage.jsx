@@ -7,7 +7,6 @@ import toast from "react-hot-toast";
 import { aiGenerate } from "../services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHistory,
   faWandMagicSparkles,
   faRotateRight,
   faEdit,
@@ -923,10 +922,6 @@ const saveDraft = async () => {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="px-4 py-2 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all">
-                <FontAwesomeIcon icon={faHistory} className="mr-2" />
-                {t("create.history")}
-              </button>
               <button
                 onClick={() => setShowAiAssistant(true)}
                 className="px-4 py-2 rounded-2xl gradient-accent text-white hover:opacity-90 transition-opacity"

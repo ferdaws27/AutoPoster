@@ -12,7 +12,6 @@ import {
   faGlobe,
 } from "@fortawesome/free-solid-svg-icons";
 import * as Toast from "@radix-ui/react-toast";
-import { loginGuest } from "../services/auth";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
 
@@ -377,22 +376,7 @@ export default function Login() {
   const connectMedium = () => {
     window.location.href = `${API}/api/oauth/medium/start`;
   };
-  const continueWithoutConnecting = async () => {
-    setLoading(true);
-    try {
-      const data = await loginGuest();
-      if (data.user) localStorage.setItem("user", JSON.stringify({
-        ...data.user,
-        full_name: `${data.user.first_name || "Guest"} ${data.user.last_name || "User"}`.trim(),
-      }));
-      setSuccess(true);
-      setTimeout(() => navigate("/dashboard", { replace: true }), 1500);
-    } catch (e) {
-      console.error("Guest login failed:", e);
-      setLoading(false);
-    }
-  };
-
+  
   /* ================== RETURN ================== */
   return (
     <div className="min-h-screen relative text-white overflow-x-hidden">
@@ -483,18 +467,7 @@ export default function Login() {
                 <OAuthButton icon="fa-medium" label={t("login.connectMedium")} onClick={connectMedium} />
               </div>
 
-              <div className="text-center">
-                <div className="flex items-center mb-4">
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
-                  <span className="px-4 text-gray-500 text-sm">{t("login.or")}</span>
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
-                </div>
-                <button onClick={continueWithoutConnecting} disabled={loading} className="w-full p-4 rounded-2xl border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 transition-all disabled:opacity-50">
-                  <span className="font-medium">{loading ? t("login.connectingBtn") : t("login.continueWithout")}</span>
-                  <span className="block text-sm text-gray-500 mt-1">{t("login.addPlatformsLater")}</span>
-                </button>
-              </div>
-            </div>
+                          </div>
           </div>
         </div>
       </div>

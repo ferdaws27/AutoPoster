@@ -104,8 +104,11 @@ export default function SchedulingPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Filter posts based on selected tab
-  const filteredPosts = posts.filter(post => {
+  // Filter posts for calendar display (exclude drafts)
+  const calendarFilteredPosts = posts.filter(post => {
+    // Exclude drafts from calendar view
+    if (post.status === 'draft') return false;
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -140,9 +143,45 @@ export default function SchedulingPage() {
     return dateB - dateA;
   });
 
+  // Filter posts for Upcoming Posts list (include drafts)
+  const filteredPosts = posts.filter(post => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Use scheduleDate for scheduled posts, createdAt for drafts and others
+    const postDate = post.scheduleDate ? new Date(post.scheduleDate) : new Date(post.createdAt);
+    postDate.setHours(0, 0, 0, 0);
+    
+    if (filterTab === 'all') return true;
+    if (filterTab === 'today') {
+      return postDate.toDateString() === today.toDateString();
+    }
+    if (filterTab === 'week') {
+      // Start of current week (Monday)
+      const weekStart = new Date(today);
+      const day = weekStart.getDay();
+      const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+      weekStart.setDate(diff);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      // End of current week (Sunday)
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      return postDate >= weekStart && postDate <= weekEnd;
+    }
+    return true;
+  }).sort((a, b) => {
+    // Sort by date/time (most recent first)
+    const dateA = new Date(`${a.scheduleDate || a.createdAt} ${a.scheduleTime || '00:00'}`);
+    const dateB = new Date(`${b.scheduleDate || b.createdAt} ${b.scheduleTime || '00:00'}`);
+    return dateB - dateA;
+  });
+
   // Get posts for specific day
   const getPostsForDay = (date) => {
-    return filteredPosts.filter(post => {
+    return calendarFilteredPosts.filter(post => {
       // Use scheduleDate for scheduled posts, createdAt for others
       const postDate = post.scheduleDate ? new Date(post.scheduleDate) : new Date(post.createdAt);
       postDate.setHours(0, 0, 0, 0);
@@ -543,8 +582,9 @@ export default function SchedulingPage() {
         content: editingPost.content,
         platforms: editingPost.platforms,
         selectedImages: editingPost.selectedImages || [],
-        scheduleDate: editingPost.date,
-        scheduleTime: editingPost.time
+        // Only set schedule info if not a draft
+        scheduleDate: selectedPost.status === 'draft' ? null : editingPost.date,
+        scheduleTime: selectedPost.status === 'draft' ? null : editingPost.time
       });
 
       // Update UI
@@ -885,13 +925,18 @@ export default function SchedulingPage() {
                       onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
                     >
                       <div className="flex items-start gap-3">
-                        {/* Post thumbnail */}
-                        <img 
-                          className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
-                          src={post.selectedImages && post.selectedImages.length > 0 ? (typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)) : `https://picsum.photos/100/100?random=${post.id}`}
-                          alt="" 
-                          onError={(e) => { e.target.src = `https://picsum.photos/100/100?random=${post.id}`; }}
-                        />
+                        {/* Post thumbnail or placeholder */}
+                        {post.selectedImages && post.selectedImages.length > 0 ? (
+                          <img 
+                            className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
+                            src={typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)}
+                            alt="" 
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl bg-gray-800/60 flex-shrink-0 ring-1 ring-white/10 flex items-center justify-center">
+                            <i className="fa-solid fa-image text-gray-600 text-sm"></i>
+                          </div>
+                        )}
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
@@ -1523,41 +1568,6 @@ export default function SchedulingPage() {
                       </label>
                     ))}
                   </div>
-                </div>
-
-                {/* Scheduling Section */}
-                <div>
-                  <label className="block text-sm font-medium text-cyan-400 mb-3">
-                    <FontAwesomeIcon icon={faClock} className="mr-2" />Schedule (Optional)
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="relative">
-                      <input
-                        type="date"
-                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
-                        value={editingPost.date}
-                        onChange={(e) => setEditingPost(prev => ({ ...prev, date: e.target.value }))}
-                      />
-                      <FontAwesomeIcon icon={faCalendar} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="time"
-                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
-                        value={editingPost.time}
-                        onChange={(e) => setEditingPost(prev => ({ ...prev, time: e.target.value }))}
-                      />
-                      <FontAwesomeIcon icon={faClock} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  {editingPost.date && editingPost.time && (
-                    <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
-                      <p className="text-green-400 text-sm">
-                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                        Scheduled for {new Date(editingPost.date).toLocaleDateString()} at {editingPost.time}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* AI Image Suggestions */}

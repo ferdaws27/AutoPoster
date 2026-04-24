@@ -19,7 +19,6 @@ export default function QuoteTemplate() {
   const [variations, setVariations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [variationsVisible, setVariationsVisible] = useState(false);
-  const [brandEnabled, setBrandEnabled] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalText, setModalText] = useState("");
   const [calloutOpen, setCalloutOpen] = useState(false);
@@ -34,6 +33,9 @@ export default function QuoteTemplate() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [stylePreset, setStylePreset] = useState("");
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [modalPlatform, setModalPlatform] = useState(null);
 
   const maxLength = 500;
   const API_BASE = "http://localhost:5000";
@@ -41,6 +43,13 @@ export default function QuoteTemplate() {
   useEffect(() => {
     setCharCount(quote.length);
   }, [quote]);
+
+  // Auto-generate image when modal platform is set
+  useEffect(() => {
+    if (modalOpen && modalPlatform && modalText) {
+      generateImage(modalPlatform);
+    }
+  }, [modalPlatform, modalOpen]);
 
   const togglePlatform = (platform) => {
     setSelectedPlatforms((prev) =>
@@ -85,7 +94,7 @@ export default function QuoteTemplate() {
         body: JSON.stringify({
           quote,
           selectedPlatforms,
-          brandEnabled,
+          brandEnabled: false,
           voiceProfile: voiceProfile || null,
           stylePreset: stylePreset || null,
         }),
@@ -123,7 +132,6 @@ export default function QuoteTemplate() {
     setVariations([]);
     setVariationsVisible(false);
     setSelectedPlatforms(["twitter", "linkedin", "medium"]);
-    setBrandEnabled(false);
   };
 
   const copyToClipboard = async (text) => {
@@ -154,9 +162,149 @@ export default function QuoteTemplate() {
     }
   };
 
-  const openVisual = (text) => {
+  const openVisual = (text, platform = "twitter") => {
     setModalText(text);
+    setModalPlatform(platform.toLowerCase());
     setModalOpen(true);
+    setGeneratedImage(null);
+  };
+
+  const generateImage = async (platform = "twitter") => {
+    if (!modalText.trim()) {
+      showToast("No text to generate image", "warning");
+      return;
+    }
+
+    setImageLoading(true);
+    try {
+      // Modern Corporate Design
+      const platformDesign = {
+        twitter: {
+          gradient1: "#0A1929",
+          gradient2: "#1A3A52",
+          accent1: "#1DA1F2",
+          accent2: "#1A8FCC"
+        },
+        linkedin: {
+          gradient1: "#003366",
+          gradient2: "#0055AA",
+          accent1: "#0077B5",
+          accent2: "#0A66C2"
+        },
+        medium: {
+          gradient1: "#1F1F1F",
+          gradient2: "#3F3F3F",
+          accent1: "#FFFFFF",
+          accent2: "#E0E0E0"
+        }
+      };
+
+      const design = platformDesign[platform] || platformDesign.twitter;
+
+      // Create canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 630;
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      // Draw gradient background (diagonal)
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, design.gradient1);
+      gradient.addColorStop(1, design.gradient2);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Add subtle noise texture
+      ctx.fillStyle = "rgba(255, 255, 255, 0.01)";
+      for (let i = 0; i < 30; i++) {
+        ctx.fillRect(Math.random() * canvas.width, 0, 1, canvas.height);
+      }
+
+      // Main text styling
+      const fontSize = 56;
+      const fontFamily = "'Segoe UI', '-apple-system', 'Helvetica Neue', sans-serif";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = "center";
+
+      // Word wrap function
+      const wrapText = (text, maxWidth) => {
+        const words = text.split(" ");
+        const lines = [];
+        let currentLine = "";
+
+        for (let word of words) {
+          const testLine = currentLine + (currentLine ? " " : "") + word;
+          ctx.font = `600 ${fontSize}px ${fontFamily}`;
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) lines.push(currentLine);
+        return lines;
+      };
+
+      // Wrap and calculate position
+      const maxWidth = canvas.width - 200;
+      const lines = wrapText(modalText, maxWidth);
+      const lineHeight = 75;
+      const totalHeight = lines.length * lineHeight;
+      let startY = (canvas.height - totalHeight) / 2;
+
+      // Draw main text with professional styling
+      ctx.font = `600 ${fontSize}px ${fontFamily}`;
+      ctx.fillStyle = "#FFFFFF";
+      
+      lines.forEach((line, index) => {
+        const y = startY + index * lineHeight;
+        ctx.fillText(line, canvas.width / 2, y);
+      });
+
+      // Draw top accent bar
+      ctx.fillStyle = design.accent1;
+      ctx.fillRect(0, 0, canvas.width, 4);
+
+      // Draw bottom accent bar
+      ctx.fillRect(0, canvas.height - 4, canvas.width, 4);
+
+      // Platform label - Corporate style
+      ctx.font = `700 18px ${fontFamily}`;
+      ctx.fillStyle = design.accent1;
+      ctx.textAlign = "right";
+      const platformLabel = platform.toUpperCase();
+      ctx.fillText(platformLabel, canvas.width - 40, canvas.height - 30);
+
+      // Small divider before label
+      ctx.fillStyle = design.accent1;
+      ctx.fillRect(canvas.width - 150, canvas.height - 45, 100, 1);
+
+      // Convert to data URL
+      const imageData = canvas.toDataURL("image/png");
+      setGeneratedImage(imageData);
+      showToast("Image generated successfully!", "success");
+    } catch (error) {
+      console.error("Canvas error:", error);
+      showToast("Image generation failed", "warning");
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  const downloadImage = (imageData) => {
+    try {
+      const link = document.createElement("a");
+      link.href = imageData;
+      link.download = `quote-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showCallout("Image downloaded!");
+    } catch (error) {
+      showToast("Download failed", "warning");
+    }
   };
 
   const loadHistoryItem = (item) => {
@@ -434,7 +582,7 @@ export default function QuoteTemplate() {
                       {`${t("quotes.postTo")} ${variation.platform}`}
                     </button>
                     <button
-                      onClick={() => openVisual(variation.text)}
+                      onClick={() => openVisual(variation.text, variation.platform)}
                       className="px-4 py-2 bg-violet-400/20 text-violet-400 rounded-xl hover:bg-violet-400/30"
                     >
                       {t("quotes.visual")}
@@ -452,47 +600,6 @@ export default function QuoteTemplate() {
             </div>
           </div>
         )}
-
-        {/* BRAND TOGGLE */}
-        <div id="brand-section" className="max-w-4xl mx-auto mb-12">
-          <div
-            className={`rounded-2xl p-6 cursor-pointer border transition-all duration-300 ${
-              brandEnabled
-                ? "border-violet-400 bg-violet-400/5"
-                : "border-gray-700 hover:border-violet-400/40"
-            }`}
-            onClick={() => setBrandEnabled(!brandEnabled)}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center">
-                  <i className="fa-solid fa-signature text-violet-400"></i>
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold mb-1">
-                    {t("quotes.brandSignature")}
-                  </h4>
-                  <p className="text-gray-400 text-sm">
-                    {t("quotes.brandDesc")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <span className="text-gray-400 text-sm">
-                  {brandEnabled ? t("common.enabled") : t("common.disabled")}
-                </span>
-                <div className="w-12 h-6 bg-gray-600 rounded-full relative transition-all">
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all ${
-                      brandEnabled ? "left-6" : "left-0.5"
-                    }`}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* QUICK ACTIONS */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mt-12">
@@ -690,27 +797,87 @@ export default function QuoteTemplate() {
       {/* MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
-          <div className="rounded-3xl p-8 max-w-2xl w-full bg-[#121829] border border-white/10 shadow-2xl">
+          <div className="rounded-3xl p-8 max-w-4xl w-full bg-[#121829] border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl text-white mb-4">{t("quotes.createVisual")}</h3>
+            
+            {/* Original quote text */}
             <div className="bg-black/30 rounded-2xl p-6 mb-6 text-center">
               <p className="text-white text-lg whitespace-pre-line">{modalText}</p>
             </div>
-            <div className="flex space-x-4">
+
+            {/* Platform selection buttons */}
+            <div className="mb-6">
+              <p className="text-gray-400 text-sm mb-3">Change platform or regenerate:</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {["twitter", "linkedin", "medium"].map((platform) => (
+                  <button
+                    key={platform}
+                    onClick={() => generateImage(platform)}
+                    disabled={imageLoading}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-2xl font-medium transition-all border ${
+                      imageLoading
+                        ? "opacity-60 cursor-not-allowed"
+                        : "hover:bg-white/10"
+                    } ${
+                      modalPlatform === platform
+                        ? "bg-cyan-400/20 text-cyan-400 border-cyan-400/60"
+                        : "text-white border-white/20 bg-white/5"
+                    }`}
+                  >
+                    <i
+                      className={`fa-brands ${
+                        platform === "twitter"
+                          ? "fa-x-twitter"
+                          : platform === "linkedin"
+                          ? "fa-linkedin-in"
+                          : "fa-medium"
+                      }`}
+                    ></i>
+                    <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Generated image preview */}
+            {generatedImage && (
+              <div className="mb-6">
+                <p className="text-gray-400 text-sm mb-3">Generated Image Preview:</p>
+                <div className="bg-black/50 rounded-2xl p-4 flex justify-center">
+                  <img src={generatedImage} alt="Generated quote" className="max-w-full max-h-96 rounded-xl" />
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3 justify-between">
               <button
                 onClick={() => setModalOpen(false)}
-                className="flex-1 p-3 border border-gray-600 rounded-2xl text-gray-300"
+                className="px-6 py-3 border border-gray-600 rounded-2xl text-gray-300 hover:border-gray-400 hover:text-white transition-all"
               >
                 {t("common.close")}
               </button>
-              <button
-                onClick={() => {
-                  setModalOpen(false);
-                  showCallout("Connect image generation next");
-                }}
-                className="flex-1 p-3 bg-gradient-to-r from-cyan-500 via-violet-500 to-teal-500 rounded-2xl text-white"
-              >
-                {t("quotes.generateImage")}
-              </button>
+              
+              {generatedImage && (
+                <>
+                  <button
+                    onClick={() => downloadImage(generatedImage)}
+                    className="px-6 py-3 bg-cyan-400/20 text-cyan-400 rounded-2xl hover:bg-cyan-400/30 transition-all flex items-center space-x-2"
+                  >
+                    <i className="fa-solid fa-download"></i>
+                    <span>Download Image</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedImage);
+                      showCallout("Image data copied!");
+                    }}
+                    className="px-6 py-3 bg-violet-400/20 text-violet-400 rounded-2xl hover:bg-violet-400/30 transition-all"
+                  >
+                    {t("common.copy")}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

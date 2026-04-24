@@ -108,20 +108,23 @@ export default function PostsLibrary() {
         if (filters.date === "quarter" && diffDays > 90) return false;
       }
 
-      // NEW: Performance filter implementation
-      if (filters.performance) {
+      // NEW: Performance filter implementation (exclude drafts completely)
+      if (filters.performance && filters.performance !== "") {
+        // Completely exclude drafts when performance filter is active
+        if (post.status === "draft") return false;
+        
         const engagement = (post.engagement?.likes || 0) + (post.engagement?.shares || 0) + (post.engagement?.comments || 0);
         const views = post.engagement?.views || 0;
         
         switch (filters.performance) {
           case "high":
-            if (engagement < 100 || views < 1000) return false;
+            if (engagement < 50) return false;
             break;
           case "medium":
-            if (engagement < 20 || engagement >= 100 || views < 200 || views >= 1000) return false;
+            if (engagement < 10 || engagement >= 50) return false;
             break;
           case "low":
-            if (engagement >= 20 || views >= 200) return false;
+            if (engagement >= 10) return false;
             break;
         }
       }
@@ -180,18 +183,40 @@ export default function PostsLibrary() {
     setSearchSuggestions(Array.from(suggestions).slice(0, 5));
   };
 
+  // Reset current page if it exceeds total pages after filtering
+  useEffect(() => {
+    const maxPage = Math.ceil(filteredPosts.length / postsPerPage);
+    if (currentPage > maxPage && maxPage > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredPosts, currentPage, postsPerPage]);
+
   const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
   const endIndex = startIndex + postsPerPage;
   const paginatedPosts = filteredPosts.slice(startIndex, endIndex);
 
   const handlePageChange = (page) => {
+    // Validate page number
+    if (!page || page < 1 || isNaN(page)) {
+      console.error('Invalid page number:', page);
+      return;
+    }
+    
+    const maxPage = Math.ceil(filteredPosts.length / postsPerPage);
+    if (page > maxPage && maxPage > 0) {
+      console.error('Page number exceeds total pages:', page, 'max:', maxPage);
+      return;
+    }
+    
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    // Reset to page 1 when filters change to prevent empty page issues
+    setCurrentPage(1);
   };
 
   const toggleSelectPost = (postId) => {
@@ -1006,10 +1031,15 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
 
         {/* Hover action buttons - bottom right of image */}
         <div className="absolute bottom-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {/* Edit button - transparent for published posts */}
           <button
-            onClick={() => onEdit()}
-            className="w-8 h-8 rounded-lg bg-black/50 ring-1 ring-white/10 flex items-center justify-center text-gray-300 hover:text-cyan-400 hover:bg-cyan-400/10 transition-all"
-            title="Edit"
+            onClick={() => post.status !== 'posted' && onEdit()}
+            className={`w-8 h-8 rounded-lg bg-black/50 ring-1 ring-white/10 flex items-center justify-center transition-all ${
+              post.status === 'posted' 
+                ? 'text-gray-600/30 cursor-not-allowed' 
+                : 'text-gray-300 hover:text-cyan-400 hover:bg-cyan-400/10'
+            }`}
+            title={post.status === 'posted' ? "Cannot edit published posts" : "Edit"}
           >
             <i className="fa-solid fa-pen text-xs"></i>
           </button>
@@ -1037,7 +1067,7 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
         <h3 className={`text-base font-semibold text-white leading-snug mb-2 ${!isExpanded ? 'line-clamp-2' : ''}`}
           onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
         >
-          {post.idea || "Untitled Post"}
+          {typeof post.idea === 'string' ? post.idea : post.idea?.title || post.idea?.content || "Untitled Post"}
         </h3>
 
         {/* Content preview - only show if different from title */}
@@ -1045,7 +1075,7 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
           <p className={`text-sm text-gray-400 leading-relaxed mb-4 ${!isExpanded ? 'line-clamp-2' : ''}`}
             onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
           >
-            {post.content}
+            {typeof post.content === 'string' ? post.content : post.content?.title || post.content?.content || String(post.content || '')}
           </p>
         )}
 
@@ -1160,42 +1190,86 @@ function Pagination({ total, current, postsPerPage, onPageChange }) {
       </div>
       <div className="flex items-center space-x-2">
         <button 
-          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white hover:bg-black/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700/50 hover:border-gray-600"
           onClick={() => onPageChange(current - 1)}
           disabled={current === 1}
+          title={`Previous page (Page ${current - 1})`}
         >
-          <i className="fa-solid fa-chevron-left"></i>
+          <i className="fa-solid fa-chevron-left text-sm"></i>
         </button>
         
-        {/* Page numbers */}
-        {Array.from({ length: totalPages }, (_, index) => {
-          const page = index + 1;
-          const isActive = page === current;
-          const isEllipsis = page === '...';
+        {/* Page numbers with smart ellipsis */}
+        {(() => {
+          const pages = [];
+          const maxVisible = 7; // Maximum pages to show at once
           
-          if (isEllipsis) {
-            return <span key={index} className="text-gray-400">...</span>;
+          if (totalPages <= maxVisible) {
+            // Show all pages if there are few
+            for (let i = 1; i <= totalPages; i++) {
+              pages.push(i);
+            }
+          } else {
+            // Smart pagination with ellipsis
+            if (current <= 4) {
+              // Near the beginning
+              for (let i = 1; i <= 5; i++) {
+                pages.push(i);
+              }
+              pages.push('...');
+              pages.push(totalPages);
+            } else if (current >= totalPages - 3) {
+              // Near the end
+              pages.push(1);
+              pages.push('...');
+              for (let i = totalPages - 4; i <= totalPages; i++) {
+                pages.push(i);
+              }
+            } else {
+              // In the middle
+              pages.push(1);
+              pages.push('...');
+              for (let i = current - 1; i <= current + 1; i++) {
+                pages.push(i);
+              }
+              pages.push('...');
+              pages.push(totalPages);
+            }
           }
           
-          return (
-            <button
-              key={page}
-              className={`w-10 h-10 rounded-xl ${
-                isActive ? "bg-cyan-400/20 text-cyan-400" : "bg-black/30 text-gray-400 hover:text-white"
-              }`}
-              onClick={() => onPageChange(page)}
-            >
-              {page}
-            </button>
-          );
-        })}
+          return pages.map((page, index) => {
+            if (page === '...') {
+              return (
+                <span key={`ellipsis-${index}`} className="text-gray-400 px-2">
+                  ...
+                </span>
+              );
+            }
+            
+            const isActive = page === current;
+            return (
+              <button
+                key={page}
+                className={`w-10 h-10 rounded-xl font-medium text-sm transition-all border ${
+                  isActive 
+                    ? "bg-cyan-400/20 text-cyan-400 border-cyan-400/30" 
+                    : "bg-black/30 text-gray-400 hover:text-white hover:bg-black/50 border-gray-700/50 hover:border-gray-600"
+                }`}
+                onClick={() => onPageChange(page)}
+                title={`Go to page ${page}`}
+              >
+                {page}
+              </button>
+            );
+          });
+        })()}
         
         <button 
-          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          className="w-10 h-10 rounded-xl bg-black/30 flex items-center justify-center text-gray-400 hover:text-white hover:bg-black/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700/50 hover:border-gray-600"
           onClick={() => onPageChange(current + 1)}
           disabled={current === totalPages}
+          title={`Next page (Page ${current + 1})`}
         >
-          <i className="fa-solid fa-chevron-right"></i>
+          <i className="fa-solid fa-chevron-right text-sm"></i>
         </button>
       </div>
     </div>

@@ -305,10 +305,6 @@ export default function Dashboard() {
             </h2>
             <p className="text-gray-400">{t("dashboard.subtitle")}</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <Status t={t} />
-            <IconButton icon="fa-bell" />
-          </div>
         </header>
 
         {/* Quick Stats Cards */}
