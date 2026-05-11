@@ -196,18 +196,22 @@ export default function AnalyticsPage() {
     })));
 
     const postsInRange = analyticsData.filter(post => {
-      if (!post.createdAt) return false;
-      const postDate = new Date(post.createdAt);
+      // Use the relevant date based on post status
+      const relevantDate = post.scheduleDate || post.publishedAt || post.createdAt;
+      if (!relevantDate) return false;
+      const postDate = new Date(relevantDate);
       const inRange = !isNaN(postDate) && postDate >= cutoffDate;
-      console.log(`Post: ${post.content?.substring(0, 30)}... | Date: ${post.createdAt} | Valid: ${!isNaN(postDate)} | In range: ${inRange}`);
+      console.log(`Post: ${post.content?.substring(0, 30)}... | Status: ${post.status} | Date: ${relevantDate} | Valid: ${!isNaN(postDate)} | In range: ${inRange}`);
       return inRange;
     });
 
     console.log('Posts in range:', postsInRange.length);
 
     const postsInPreviousRange = analyticsData.filter(post => {
-      if (!post.createdAt) return false;
-      const postDate = new Date(post.createdAt);
+      // Use the relevant date based on post status for consistency
+      const relevantDate = post.scheduleDate || post.publishedAt || post.createdAt;
+      if (!relevantDate) return false;
+      const postDate = new Date(relevantDate);
       return !isNaN(postDate) && postDate >= previousCutoffDate && postDate < cutoffDate;
     });
 
