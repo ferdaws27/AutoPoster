@@ -299,6 +299,18 @@ export default function PostsLibrary() {
         editingPost
       });
 
+      // Determine status based on scheduling
+      let newStatus = 'draft';
+      if (editingPost.date && editingPost.time) {
+        const scheduledDateTime = new Date(`${editingPost.date} ${editingPost.time}`);
+        const now = new Date();
+        if (scheduledDateTime <= now) {
+          newStatus = 'posted';
+        } else {
+          newStatus = 'scheduled';
+        }
+      }
+
       // Update post using the hook
       await updatePost(selectedPost.id, {
         idea: editingPost.content,
@@ -306,7 +318,8 @@ export default function PostsLibrary() {
         platforms: editingPost.platforms,
         selectedImages: editingPost.selectedImages || [],
         scheduleDate: editingPost.date,
-        scheduleTime: editingPost.time
+        scheduleTime: editingPost.time,
+        status: newStatus
       });
 
       // Update UI
@@ -956,31 +969,68 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
   const activePlatforms = post.platforms ? Object.keys(post.platforms).filter(p => post.platforms[p]) : [];
   const engagement = (post.engagement?.likes || 0) + (post.engagement?.shares || 0) + (post.engagement?.comments || 0);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, isFuture = false) => {
     if (!dateString) return "No date";
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now - date;
+    const diffMs = isFuture ? date - now : now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getScheduleLabel = () => {
-    if (post.scheduleDate) {
-      const d = new Date(post.scheduleDate);
-      const now = new Date();
-      const diff = d - now;
-      if (diff > 0 && diff < 86400000) return { label: 'Today', urgent: true };
-      if (diff > 0 && diff < 172800000) return { label: 'Tomorrow', urgent: false };
-      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), urgent: false };
+    
+    if (isFuture) {
+      // For future dates (scheduled posts)
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Tomorrow';
+      if (diffDays < 7) return `In ${diffDays} days`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else {
+      // For past dates (published/draft posts)
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
-    return null;
   };
 
-  const scheduleInfo = getScheduleLabel();
+  const getDisplayDate = () => {
+    // For scheduled posts: show scheduleDate
+    if (post.status === 'scheduled' && post.scheduleDate) {
+      return {
+        date: post.scheduleDate,
+        label: formatDate(post.scheduleDate, true),
+        isFuture: true,
+        urgent: new Date(post.scheduleDate) - new Date() < 86400000 // Urgent if within 24 hours
+      };
+    }
+    // For posted posts: show scheduleDate if available (when it was scheduled), otherwise createdAt
+    if (post.status === 'posted') {
+      const publishDate = post.scheduleDate || post.publishedAt || post.createdAt;
+      return {
+        date: publishDate,
+        label: formatDate(publishDate, false),
+        isFuture: false,
+        urgent: false
+      };
+    }
+    // For draft posts: show createdAt (creation date)
+    if (post.status === 'draft' && post.createdAt) {
+      return {
+        date: post.createdAt,
+        label: formatDate(post.createdAt, false),
+        isFuture: false,
+        urgent: false
+      };
+    }
+    // Fallback to any available date
+    const fallbackDate = post.createdAt || post.scheduleDate || post.date;
+    return {
+      date: fallbackDate,
+      label: fallbackDate ? formatDate(fallbackDate, post.status === 'scheduled') : "No date",
+      isFuture: post.status === 'scheduled',
+      urgent: false
+    };
+  };
+
+  const dateInfo = getDisplayDate();
 
   return (
     <div
@@ -1083,25 +1133,25 @@ function PostCard({ post, isSelected, toggleSelect, onEdit, onDuplicate, onDelet
         <div className="pt-3 border-t border-gray-700/40 space-y-2">
           {/* Date info */}
           <div className="flex items-center gap-1.5 text-sm text-gray-500">
-            {post.status === 'scheduled' && scheduleInfo ? (
+            {post.status === 'scheduled' ? (
               <>
                 <i className="fa-solid fa-clock text-xs"></i>
-                <span className={scheduleInfo.urgent ? 'text-amber-400 font-medium' : ''}>
-                  {scheduleInfo.label}
+                <span className={dateInfo.urgent ? 'text-amber-400 font-medium' : ''}>
+                  {dateInfo.label}
                 </span>
                 {post.scheduleTime && (
                   <span className="text-gray-600">at {post.scheduleTime}</span>
                 )}
               </>
-            ) : post.status === 'posted' && post.publishedAt ? (
+            ) : post.status === 'posted' ? (
               <>
                 <i className="fa-solid fa-check-circle text-xs text-green-400"></i>
-                <span className="text-green-400">Published {formatDate(post.publishedAt)}</span>
+                <span className="text-green-400">Published {dateInfo.label}</span>
               </>
             ) : (
               <>
                 <i className="fa-solid fa-calendar text-xs"></i>
-                <span>{formatDate(post.createdAt)}</span>
+                <span>Created {dateInfo.label}</span>
               </>
             )}
           </div>

@@ -1094,6 +1094,22 @@ const saveDraft = async () => {
                   </div>
 
                   <div className="space-y-4">
+                    {/* Hook Display - Show at top of each card after generation */}
+                    {hookInfo && variations[platform] && (
+                      <div className="bg-gradient-to-r from-violet-500/10 to-cyan-500/10 rounded-2xl p-4 border border-violet-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <i className="fa-solid fa-bolt text-violet-400"></i>
+                            <span className="text-violet-300 text-sm font-semibold">Hook Used</span>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            Score: {hookInfo.score}% | {hookInfo.platform}
+                          </span>
+                        </div>
+                        <p className="text-white text-sm italic">"{hookInfo.text}"</p>
+                      </div>
+                    )}
+                    
                     <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-600">
                       <textarea
                         id={`${platform.toLowerCase()}-textarea`}
