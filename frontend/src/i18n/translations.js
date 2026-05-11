@@ -64,6 +64,7 @@ const translations = {
       totalViews: "Total Views",
       engagements: "Engagements",
       avgRating: "Avg Rating",
+      totalReach: "Total Reach",
       aiIdeas: "AI Ideas",
       refresh: "Refresh",
       noAiIdeas: "No AI ideas available.",
@@ -74,6 +75,11 @@ const translations = {
       aiImageSuggestions: "AI Image Suggestions",
       errorLoadingPosts: "Error Loading Posts",
       tryAgain: "Try Again",
+      totalEngagement: "Total Engagement",
+      totalReach: "Total Reach",
+      recentPosts: "Recent Posts",
+      noRecentPosts: "No recent posts",
+      recentEngagements: "Recent Engagements",
     },
 
     // CreatePostPage

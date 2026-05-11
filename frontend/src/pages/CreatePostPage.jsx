@@ -447,7 +447,6 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
             max_tokens: platform === "Twitter" ? 200 : 800,
             temperature,
             user_content: idea,
-            language,
           }).then(content => ({ platform, content: content || "" }))
             .catch(err => {
               console.warn(`API failed for ${platform}, using fallback`, err);
@@ -481,7 +480,7 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
         prompt,
         model: modelId,
         max_tokens: 50,
-        language,
+        user_content: "",
       });
     } catch (err) {
       console.error("Error generating AI idea:", err);
@@ -647,7 +646,6 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
           max_tokens: platform === "Twitter" ? 200 : 800,
           temperature,
           user_content: idea,
-          language,
         });
 
         setVariations((prev) => ({
@@ -699,7 +697,6 @@ Detect the language of the topic and write ALL content in THAT SAME LANGUAGE.`;
         model: modelId,
         max_tokens: 150,
         user_content: idea,
-        language,
       });
 
       ideaRef.current.value = enhancedIdea;

@@ -119,6 +119,17 @@ export default function AnalyticsPage() {
       }
     };
     loadAnalytics();
+  }, [fetchAnalyticsData]);
+
+  // Fetch backend data only when activeRange is 30D (default range)
+  useEffect(() => {
+    if (activeRange !== '30D') {
+      // Clear backend data when range changes to force client-side calculation
+      setBackendBestTimes(null);
+      setBackendContentPerf(null);
+      setBackendAiInsights(null);
+      return;
+    }
 
     // Fetch best times from backend
     const loadBestTimes = async () => {
@@ -163,7 +174,7 @@ export default function AnalyticsPage() {
       }
     };
     loadAiInsights();
-  }, [fetchAnalyticsData, fetchBestTimes, fetchContentPerformance, fetchAiInsights]);
+  }, [activeRange, fetchBestTimes, fetchContentPerformance, fetchAiInsights]);
 
   const calculateAnalytics = () => {
     const now = new Date();
@@ -244,12 +255,12 @@ export default function AnalyticsPage() {
 
     const estimatedReach = totalEngagement * 15;
 
-    const topPosts = [...analyticsData]
+    const topPosts = [...postsInRange]
       .sort((a, b) => (b.totalEngagement || 0) - (a.totalEngagement || 0))
       .slice(0, 5)
       .map((post, index) => {
-        const avgEngagement = analyticsData.length > 0
-          ? analyticsData.reduce((sum, p) => sum + (p.totalEngagement || 0), 0) / analyticsData.length
+        const avgEngagement = postsInRange.length > 0
+          ? postsInRange.reduce((sum, p) => sum + (p.totalEngagement || 0), 0) / postsInRange.length
           : 0;
         const growthPercent = avgEngagement > 0
           ? Math.round(((post.totalEngagement - avgEngagement) / avgEngagement) * 100)
@@ -422,15 +433,11 @@ export default function AnalyticsPage() {
     
     const timer = setTimeout(() => {
       const engagementContainer = document.getElementById("engagement-chart");
-      const platformContainer = document.getElementById("platform-chart");
       
-      console.log('Containers found:', {
-        engagement: !!engagementContainer,
-        platform: !!platformContainer
-      });
+      console.log('Engagement container found:', !!engagementContainer);
       
-      if (!engagementContainer || !platformContainer) {
-        console.log('Chart containers not ready yet');
+      if (!engagementContainer) {
+        console.log('Engagement chart container not ready yet');
         return;
       }
 
@@ -463,7 +470,16 @@ export default function AnalyticsPage() {
         const now = new Date();
         const timeBuckets = categories.map(() => ({ likes: 0, comments: 0, shares: 0, count: 0 }));
 
-        analyticsData.forEach(post => {
+        // Filter posts by date range first
+        const nowDate = new Date();
+        const cutoffDate = new Date(nowDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+        const filteredPosts = analyticsData.filter(post => {
+          if (!post.createdAt) return false;
+          const postDate = new Date(post.createdAt);
+          return !isNaN(postDate) && postDate >= cutoffDate;
+        });
+
+        filteredPosts.forEach(post => {
           try {
             if (post.engagement && post.createdAt && typeof post.engagement === 'object') {
               const postDate = new Date(post.createdAt);
@@ -564,8 +580,18 @@ export default function AnalyticsPage() {
         }
       }
 
+      // Calculate postsInRange for platform chart (same logic as calculateAnalytics)
+      const now = new Date();
+      const daysAgo = parseInt(activeRange.replace('D', ''));
+      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      const postsInRange = analyticsData.filter(post => {
+        if (!post.createdAt) return false;
+        const postDate = new Date(post.createdAt);
+        return !isNaN(postDate) && postDate >= cutoffDate;
+      });
+
       const platformEngagement = { Twitter: 0, LinkedIn: 0, Medium: 0 };
-      analyticsData.forEach(post => {
+      postsInRange.forEach(post => {
         if (post.platforms) {
           Object.keys(post.platforms).forEach(platform => {
             if (post.platforms[platform] && platformEngagement.hasOwnProperty(platform)) {
@@ -582,6 +608,21 @@ export default function AnalyticsPage() {
         { name: "Medium", y: (platformEngagement.Medium / total * 100), color: "#00E09D" }
       ] : [{ name: "No Data", y: 100, color: "#4B5563" }];
 
+      const platformContainer = document.getElementById("platform-chart");
+      if (!platformContainer) {
+        console.warn('Platform chart container not found');
+        return;
+      }
+
+      // Clear any existing platform chart
+      const existingPlatformChart = Highcharts.charts.find(chart => chart && chart.renderTo && chart.renderTo.id === 'platform-chart');
+      if (existingPlatformChart) {
+        existingPlatformChart.destroy();
+      }
+
+      platformContainer.innerHTML = '';
+
+      console.log('Creating platform chart with data:', data, 'Total:', total);
       Highcharts.chart("platform-chart", {
         chart: { type: "pie", backgroundColor: "transparent", height: 260 },
         title: { text: null },
@@ -599,6 +640,7 @@ export default function AnalyticsPage() {
         },
         series: [{ name: "Engagement", colorByPoint: true, data }]
       });
+      console.log('✅ Platform chart created successfully');
 
       const metricCards = document.querySelectorAll(".metric-card");
       metricCards.forEach((card, index) => {
@@ -629,8 +671,9 @@ export default function AnalyticsPage() {
 
   const ICON_MAP = { faImage, faVideo, faAlignLeft, faPoll };
 
-  // Use backend data when available, fall back to client-side calculation
-  const contentPerformance = backendContentPerf?.content_performance
+  // Use client-side calculations to ensure date range filter is respected
+  // Backend data is used as fallback only when no date filter is active (30D default)
+  const contentPerformance = activeRange === '30D' && backendContentPerf?.content_performance
     ? backendContentPerf.content_performance.map(item => ({
         icon: ICON_MAP[item.icon] || faAlignLeft,
         color: item.color,
@@ -645,8 +688,12 @@ export default function AnalyticsPage() {
       }))
     : analytics.contentPerformance;
 
-  const bestTimes = backendBestTimes?.best_times || analytics.bestTimes;
-  const bestTimesAiInsight = backendBestTimes?.ai_insight || null;
+  const bestTimes = activeRange === '30D' && backendBestTimes?.best_times
+    ? backendBestTimes.best_times
+    : analytics.bestTimes;
+  const bestTimesAiInsight = activeRange === '30D' && backendBestTimes?.ai_insight
+    ? backendBestTimes.ai_insight
+    : null;
   const topPosts = analytics.topPosts;
 
   return (

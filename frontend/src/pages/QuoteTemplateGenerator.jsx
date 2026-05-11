@@ -3,10 +3,13 @@ import * as Toast from "@radix-ui/react-toast";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
+import { usePosts } from "../hooks/usePosts";
+import toast from "react-hot-toast";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function QuoteTemplate() {
   const { connectedPlatforms, voiceProfile } = useSettings();
+  const { createPost, publishPost } = usePosts();
   const t = useTranslation();
   const [quote, setQuote] = useState("");
   const [charCount, setCharCount] = useState(0);
@@ -143,22 +146,42 @@ export default function QuoteTemplate() {
     }
   };
 
-  const postToPlatform = (text, platform) => {
-    let url = "";
-
-    if (platform === "Twitter") {
-      url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-    } else if (platform === "LinkedIn") {
-      url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-        text
-      )}`;
-    } else if (platform === "Medium") {
-      url = `https://medium.com/new-story`;
+  const postToPlatform = async (text, platform) => {
+    if (!text) {
+      toast.error("No content to publish");
+      return;
     }
 
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      showCallout(`Opening ${platform}`);
+    const platformLower = platform.toLowerCase();
+    
+    try {
+      toast.loading(`Publishing to ${platform}...`);
+      
+      // 1) Create the post as draft first (matching CreatePostPage pattern)
+      const newPost = await createPost({
+        idea: quote,
+        content: text,
+        platforms: { [platformLower]: true },
+        status: "draft",
+        engagement: {},
+        selectedImages: []
+      });
+      
+      // 2) Publish it to LinkedIn (matching CreatePostPage pattern)
+      if (platformLower === "linkedin" && newPost?.id) {
+        try {
+          await publishPost(newPost.id);
+          toast.success(`Quote published successfully to ${platform}!`);
+        } catch (pubErr) {
+          toast.error(`Failed to publish to LinkedIn: ${pubErr.message}`);
+        }
+      } else {
+        // For other platforms, just save as draft
+        toast.success(`Quote saved successfully for ${platform}!`);
+      }
+    } catch (err) {
+      console.error('Error publishing quote:', err);
+      toast.error(`Failed to publish: ${err.message}`);
     }
   };
 

@@ -25,6 +25,8 @@ export default function Layout() {
         ["fa-microphone-alt", t("nav.voiceTrainer"), "voicetrainer"],
         ["fa-brain", t("nav.clone"), "Clone"],
         ["fa-photo-video", t("nav.mediaCompanion"), "MediaCompanion"],
+        ["fa-flask", t("nav.abTester"), "ABTesterPage"],
+        ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
       ],
     },
     {
@@ -33,8 +35,7 @@ export default function Layout() {
         ["fa-chart-line", t("nav.analytics"), "analytics"],
         ["fa-bolt", t("nav.performanceOptimizer"), "PerformanceOptimizer"],
         ["fa-users", t("nav.audienceAnalyzer"), "audience-analyzer"],
-        ["fa-flask", t("nav.abTester"), "ABTesterPage"],
-        ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
+       
         ["fa-star", t("nav.aiReputation"), "AIReputationPage"],
         
       ],

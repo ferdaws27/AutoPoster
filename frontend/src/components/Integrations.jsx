@@ -76,22 +76,40 @@ export default function Integrations({ onChange }) {
     }
   };
 
-  // Sync from user's oauth_provider
+  // Sync from user's connected social accounts
   useEffect(() => {
     if (!user) return;
-    const provider = user.oauth_provider;
+
+    // Helper to find account by provider
+    const findAccount = (provider) => {
+      if (!user.social_accounts || !Array.isArray(user.social_accounts)) return null;
+      return user.social_accounts.find(acc => acc.provider === provider);
+    };
+
+    const twitterAccount = findAccount("twitter");
+    const linkedinAccount = findAccount("linkedin");
+    const mediumAccount = findAccount("medium");
 
     setPlatforms((prev) => ({
       ...prev,
-      twitter: provider === "twitter"
-        ? { ...prev.twitter, connected: true, username: `@${user.username || user.name || "user"}`, profile_picture: user.profile_picture }
-        : prev.twitter,
-      linkedin: provider === "linkedin"
-        ? { ...prev.linkedin, connected: true, username: user.full_name || user.name || user.first_name || "LinkedIn User", profile_picture: user.profile_picture }
-        : { ...prev.linkedin, connected: false, username: null, profile_picture: null },
-      medium: provider === "medium"
-        ? { ...prev.medium, connected: true, username: `@${user.username || user.name || "user"}`, profile_picture: user.profile_picture }
-        : prev.medium,
+      twitter: {
+        ...prev.twitter,
+        connected: !!twitterAccount,
+        username: twitterAccount ? `@${twitterAccount.username || twitterAccount.name || "user"}` : prev.twitter.username,
+        profile_picture: twitterAccount ? twitterAccount.profile_picture : prev.twitter.profile_picture,
+      },
+      linkedin: {
+        ...prev.linkedin,
+        connected: !!linkedinAccount,
+        username: linkedinAccount ? linkedinAccount.name || linkedinAccount.username || "LinkedIn User" : prev.linkedin.username,
+        profile_picture: linkedinAccount ? linkedinAccount.profile_picture : prev.linkedin.profile_picture,
+      },
+      medium: {
+        ...prev.medium,
+        connected: !!mediumAccount,
+        username: mediumAccount ? `@${mediumAccount.username || mediumAccount.name || "user"}` : prev.medium.username,
+        profile_picture: mediumAccount ? mediumAccount.profile_picture : prev.medium.profile_picture,
+      },
     }));
   }, [user]);
 
@@ -103,12 +121,15 @@ export default function Integrations({ onChange }) {
 
   // ========== CONNECT HANDLERS ==========
   const connectPlatform = (key) => {
+    const token = localStorage.getItem("token");
+    const tokenQuery = token ? `?link_token=${encodeURIComponent(token)}` : "";
+
     if (key === "twitter") {
-      window.location.href = `${API_URL}/api/oauth/twitter/start`;
+      window.location.href = `${API_URL}/api/oauth/twitter/start${tokenQuery}`;
     } else if (key === "linkedin") {
-      window.location.href = `${API_URL}/api/oauth/linkedin/start`;
+      window.location.href = `${API_URL}/api/oauth/linkedin/start${tokenQuery}`;
     } else if (key === "medium") {
-      window.location.href = `${API_URL}/api/oauth/medium/start`;
+      window.location.href = `${API_URL}/api/oauth/medium/start${tokenQuery}`;
     }
   };
 

@@ -28,6 +28,13 @@ function getUserId() {
   } catch { return "guest"; }
 }
 
+function getUserEmail() {
+  try {
+    const u = JSON.parse(localStorage.getItem("user") || "{}");
+    return u.email || "";
+  } catch { return ""; }
+}
+
 export default function VoiceTrainer() {
   const t = useTranslation();
   const fileInputRef = useRef(null);
@@ -299,7 +306,7 @@ export default function VoiceTrainer() {
   const loadPresets = async () => {
     try {
       setPresetsLoading(true);
-      const data = await apiFetch(`/api/clone/presets?user_id=${getUserId()}`);
+      const data = await apiFetch(`/api/clone/presets?user_id=${getUserId()}&email=${getUserEmail()}`);
       if (data.success) {
         // Show vocal presets (type personal or sourceType vocal)
         const vocal = (data.presets || []).filter(p =>
@@ -328,7 +335,7 @@ export default function VoiceTrainer() {
     try {
       await apiFetch(`/api/clone/presets/${id}/activate`, {
         method: "POST",
-        body: JSON.stringify({ user_id: getUserId() }),
+        body: JSON.stringify({ user_id: getUserId(), email: getUserEmail() }),
       });
       setPresets(prev => prev.map(p => ({ ...p, active: p._id === id })));
       if (expandedPreset) setExpandedPreset(prev => ({ ...prev, active: prev._id === id }));
@@ -453,6 +460,7 @@ export default function VoiceTrainer() {
         method: "POST",
         body: JSON.stringify({
           user_id: getUserId(),
+          email: getUserEmail(),
           name: presetName,
           profile: { name: presetName, platform: "Audio", imageUrl: null },
           analysis,
