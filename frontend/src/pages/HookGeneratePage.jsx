@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
+import { validateInputMeaningfulness } from "../services/api";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import toast from "react-hot-toast";
 
@@ -84,6 +85,13 @@ export default function HookGeneratorPage() {
 
   const generateHooks = async () => {
     if (!topic.trim()) return;
+
+    // ✅ Validate that the topic is meaningful before generation
+    const validation = validateInputMeaningfulness(topic);
+    if (!validation.valid) {
+      toast.error(validation.message);
+      return;
+    }
 
     setLoading(true);
     setSelectedHook(null);

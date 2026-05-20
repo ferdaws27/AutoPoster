@@ -193,6 +193,7 @@ The AI will adapt your content for each platform's unique style and audience.`,
       exportDanger: "Export & Danger",
       contentLanguage: "Content Language",
       contentLanguageDesc: "The language used for the site interface",
+      disconnect: "Disconnect",
     },
 
     // Common
@@ -671,6 +672,7 @@ L'IA adaptera votre contenu au style et à l'audience de chaque plateforme.`,
       exportDanger: "Export et danger",
       contentLanguage: "Langue du contenu",
       contentLanguageDesc: "La langue utilisée pour l'interface du site",
+      disconnect: "Déconnexion",
     },
 
     common: {
@@ -1125,6 +1127,7 @@ L'IA adaptera votre contenu au style et à l'audience de chaque plateforme.`,
       exportDanger: "التصدير والخطر",
       contentLanguage: "لغة المحتوى",
       contentLanguageDesc: "اللغة المستخدمة لواجهة الموقع",
+      disconnect: "قطع الاتصال",
     },
 
     common: {
@@ -1579,6 +1582,7 @@ L'IA adaptera votre contenu au style et à l'audience de chaque plateforme.`,
       exportDanger: "Exportar y peligro",
       contentLanguage: "Idioma del contenido",
       contentLanguageDesc: "El idioma usado para la interfaz del sitio",
+      disconnect: "Desconectar",
     },
 
     common: {

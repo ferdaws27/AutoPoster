@@ -18,24 +18,6 @@ const ICON_COLORS = {
   'fa-medium': 'text-green-400',
 };
 
-// Composant réutilisable pour chaque mini chart
-const MiniLineChart = ({ data, color }) => {
-  const chartData = data.map((value, index) => ({
-    name: `Day ${index + 1}`,
-    value,
-  }));
-
-  return (
-    <ResponsiveContainer width="100%" height={96}>
-      <LineChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-        <XAxis dataKey="name" hide />
-        <YAxis hide domain={[0, Math.max(...data) * 1.1]} />
-        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-};
-
 export default function TrendRadar() {
   const t = useTranslation();
   const navigate = useNavigate();
@@ -501,42 +483,6 @@ Return ONLY the JSON array, no additional text.`;
     
     return () => clearInterval(interval);
   }, []);
-
-  // Données des charts Forecast
-  const forecastData = [
-    {
-      title: "AI Ethics",
-      trend: "↗️ Rising",
-      color: "green",
-      info: "Expected to peak in 3-5 days",
-      chartData: [20, 35, 45, 60, 75, 85, 95],
-      chartColor: "#00C2FF",
-    },
-    {
-      title: "Climate Tech",
-      trend: "📈 Growing",
-      color: "yellow",
-      info: "Steady growth predicted",
-      chartData: [40, 42, 48, 52, 58, 62, 68],
-      chartColor: "#FFD700",
-    },
-    {
-      title: "Mental Health",
-      trend: "🔥 Hot",
-      color: "cyan",
-      info: "Consistent high engagement",
-      chartData: [80, 82, 78, 85, 88, 84, 90],
-      chartColor: "#7B61FF",
-    },
-    {
-      title: "Quantum Computing",
-      trend: "🚀 Emerging",
-      color: "purple",
-      info: "Early adoption phase",
-      chartData: [10, 15, 12, 20, 25, 30, 38],
-      chartColor: "#B19BFF",
-    },
-  ];
 
   // Fallback trends statiques si l'API échoue
   const fallbackTrends = [
@@ -1235,36 +1181,7 @@ Return ONLY the JSON array, no additional text.`;
         </div>
       </div>
 
-      {/* Forecast Section */}
-      <div className="glass-effect rounded-3xl p-8 mb-8 slide-up">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-          <i className="fa-solid fa-crystal-ball text-purple-400 mr-3"></i>
-          Upcoming Trend Forecast
-        </h2>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {forecastData.map((f, idx) => (
-            <div key={idx} className="forecast-chart rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-semibold">{f.title}</h3>
-                <span className={`text-${f.color}-400 text-sm`}>{f.trend}</span>
-              </div>
-
-              {/* Chart Recharts intégré */}
-              <MiniLineChart data={f.chartData} color={f.chartColor} />
-
-              <p className="text-gray-400 text-sm mt-2">{f.info}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center">
-          <button className="px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity">
-            <i className="fa-solid fa-download mr-2"></i>
-            Export Trend Report
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { usePosts } from "../hooks/usePosts";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
 import toast from "react-hot-toast";
-import { aiGenerate } from "../services/api";
+import { aiGenerate, validateInputMeaningfulness } from "../services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faWandMagicSparkles,
@@ -290,6 +290,13 @@ export default function CreatePostPage() {
       idea = generatedIdea;
       ideaRef.current.value = idea;
       setCharCount(idea.length);
+    }
+
+    // ✅ Validate that the input is meaningful before generation
+    const validation = validateInputMeaningfulness(idea);
+    if (!validation.valid) {
+      toast.error(validation.message);
+      return;
     }
 
     if (platforms.length === 0) {
@@ -989,28 +996,6 @@ const saveDraft = async () => {
         </div>
 
         <div className="p-8">
-          {hookInfo && (
-            <div className="mb-4 p-4 bg-green-400/10 border border-green-400/30 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-400 text-sm font-medium mb-1">
-                    <i className="fa-solid fa-check-circle mr-2"></i>
-                    {t("create.hookInserted")}
-                  </p>
-                  <p className="text-gray-400 text-xs">
-                    Score: {hookInfo.score}% | Platform: {hookInfo.platform} | Type: {hookInfo.type}
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate('/dashboard/HookGeneratorPage')}
-                  className="px-3 py-1 bg-cyan-400/20 border border-cyan-400/50 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/30"
-                >
-                  <i className="fa-solid fa-arrow-left mr-1"></i>
-                  {t("create.back")}
-                </button>
-              </div>
-            </div>
-          )}
           <div className="card-bg rounded-3xl p-8 border border-gray-700 glow-border">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white">{t("create.yourIdea")}</h2>

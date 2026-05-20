@@ -4,6 +4,7 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
 import { usePosts } from "../hooks/usePosts";
+import { validateInputMeaningfulness } from "../services/api";
 import toast from "react-hot-toast";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
@@ -82,6 +83,13 @@ export default function QuoteTemplate() {
     }
     if (quote.length < 10) {
       showToast(t("quotes.quoteTooShort"), "warning");
+      return;
+    }
+
+    // ✅ Validate that the quote is meaningful before generation
+    const validation = validateInputMeaningfulness(quote);
+    if (!validation.valid) {
+      showToast(validation.message, "error");
       return;
     }
 

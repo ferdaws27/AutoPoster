@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import useSettings from "../hooks/useSettings";
 import useTranslation from "../i18n/useTranslation";
@@ -6,6 +6,13 @@ import useTranslation from "../i18n/useTranslation";
 export default function Layout() {
   const t = useTranslation();
   const { language } = useSettings();
+  const navigate = useNavigate();
+
+  const handleDisconnect = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/Login");
+  };
 
   const navSections = [
     {
@@ -137,7 +144,7 @@ export default function Layout() {
         </nav>
 
         {/* USER */}
-        <div className="p-6">
+        <div className="p-6 space-y-3">
           <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect">
             <img
               src={user.profile_picture || ""}
@@ -154,6 +161,13 @@ export default function Layout() {
               </div>
             </div>
           </div>
+          <button
+            onClick={handleDisconnect}
+            className="w-full flex items-center justify-center space-x-2 p-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors font-medium text-sm"
+          >
+            <i className="fa-solid fa-sign-out-alt" />
+            <span>{t("settings.disconnect")}</span>
+          </button>
         </div>
       </aside>
 
