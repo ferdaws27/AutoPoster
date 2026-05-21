@@ -101,8 +101,28 @@ export default function Layout() {
 
     fetchUser();
   }, [token]);
+if (!user) {
+  return (
+    <div className="gradient-bg min-h-screen flex">
+      
+      {/* Sidebar placeholder (اختياري باش ما ينهزش layout) */}
+      <aside className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30" />
 
-  if (!user) return <p>Loading user...</p>;
+      {/* Main content loading */}
+      <main className="ml-64 flex-1 flex items-center justify-center text-white">
+        <div className="flex flex-col items-center gap-4">
+          
+          <div className="w-16 h-16 border-4 border-cyan-300/30 border-t-cyan-400 rounded-full animate-spin"></div>
+
+          <p className="text-gray-300 text-lg font-medium animate-pulse">
+            Loading user...
+          </p>
+
+        </div>
+      </main>
+    </div>
+  );
+}
 
   return (
     <div className="gradient-bg min-h-screen">
