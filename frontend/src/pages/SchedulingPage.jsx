@@ -36,7 +36,11 @@ export default function SchedulingPage() {
     content: '',
     platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
     date: '',
-    time: '',
+    platformTimes: {
+      Twitter: '',
+      LinkedIn: '',
+      Medium: '',
+    },
   });
   const [editingPost, setEditingPost] = useState({
     content: '',
@@ -343,10 +347,10 @@ export default function SchedulingPage() {
       return;
     }
     
-    if (!newPost.date || !newPost.time) {
+    if (!newPost.date) {
       setErrorMessage({
-        title: '⚠️ Missing Schedule',
-        description: 'Please select both date and time'
+        title: '⚠️ Missing Date',
+        description: 'Please select a date'
       });
       setShowErrorToast(true);
       setTimeout(() => setShowErrorToast(false), 3000);
@@ -364,8 +368,21 @@ export default function SchedulingPage() {
       return;
     }
 
+    // Check that each selected platform has a time
+    for (const platform of selectedPlatformsList) {
+      if (!newPost.platformTimes[platform]) {
+        setErrorMessage({
+          title: '⚠️ Missing Time',
+          description: `Please select a time for ${platform}`
+        });
+        setShowErrorToast(true);
+        setTimeout(() => setShowErrorToast(false), 3000);
+        return;
+      }
+    }
+
     // Debug logging
-    console.log('Scheduling post with date:', newPost.date, 'time:', newPost.time);
+    console.log('Scheduling post with date:', newPost.date, 'platformTimes:', newPost.platformTimes);
     console.log('Selected platforms:', selectedPlatformsList);
 
     try {
@@ -380,7 +397,8 @@ export default function SchedulingPage() {
             platforms: { [platform]: true },
             selectedImages: imageData ? [imageData] : [],
             scheduleDate: newPost.date,
-            scheduleTime: newPost.time,
+            scheduleTime: newPost.platformTimes[platform],
+            platformTimes: newPost.platformTimes,
             status: 'scheduled'
           })
         )
@@ -399,7 +417,11 @@ export default function SchedulingPage() {
         content: '',
         platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
         date: '',
-        time: '',
+        platformTimes: {
+          Twitter: '',
+          LinkedIn: '',
+          Medium: '',
+        },
       });
 
       setTimeout(() => setShowSuccessToast(false), 3000);
@@ -836,7 +858,11 @@ export default function SchedulingPage() {
                   content: '',
                   platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium },
                   date: '',
-                  time: '',
+                  platformTimes: {
+                    Twitter: '',
+                    LinkedIn: '',
+                    Medium: '',
+                  },
                 });
                 setSuggestedImages([]);
                 setShowAddModal(true);
@@ -1200,7 +1226,7 @@ export default function SchedulingPage() {
                 <button
                   onClick={() => {
                     setShowAddModal(false);
-                    setNewPost({ content: '', platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium }, date: '', time: '' });
+                    setNewPost({ content: '', platforms: { Twitter: connectedPlatforms.twitter, LinkedIn: connectedPlatforms.linkedin, Medium: connectedPlatforms.medium }, date: '', platformTimes: { Twitter: '', LinkedIn: '', Medium: '' } });
                     setSuggestedImages([]);
                   }}
                   className="w-10 h-10 rounded-xl bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white transition-all flex items-center justify-center"
@@ -1280,7 +1306,7 @@ export default function SchedulingPage() {
                   <label className="block text-sm font-medium text-cyan-400 mb-3">
                     <FontAwesomeIcon icon={faClock} className="mr-2" />Schedule
                   </label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="mb-4">
                     <div className="relative">
                       <input
                         type="date"
@@ -1290,65 +1316,64 @@ export default function SchedulingPage() {
                       />
                       <FontAwesomeIcon icon={faCalendar} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                     </div>
-                    <div className="relative">
-                      <input
-                        type="time"
-                        className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all"
-                        value={newPost.time}
-                        onChange={(e) => setNewPost(prev => ({ ...prev, time: e.target.value }))}
-                      />
-                      <FontAwesomeIcon icon={faClock} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
                   </div>
-                  {/* Optimal time suggestions by platform */}
-                  {(() => {
-                    const selectedPlats = Object.entries(newPost.platforms).filter(([, v]) => v);
-                    const platConfig = {
-                      Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
-                      LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
-                      Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
-                    };
-                    const groups = selectedPlats.map(([name]) => {
-                      const cfg = platConfig[name];
-                      if (!cfg) return null;
+                  
+                  {/* Time selectors for each platform */}
+                  <div className="space-y-3">
+                    {["Twitter", "LinkedIn", "Medium"].map((platform) => {
+                      if (!newPost.platforms[platform]) return null;
+                      
+                      const platConfig = {
+                        Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
+                        LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
+                        Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
+                      };
+                      const cfg = platConfig[platform];
                       const times = (platformTimes?.[cfg.key] || []).filter(t => t && t.length >= 4);
-                      if (times.length === 0) return null;
-                      return { name, ...cfg, times };
-                    }).filter(Boolean);
-                    if (groups.length === 0) return null;
-                    return (
-                      <div className="mt-3 space-y-2">
-                        <span className="text-gray-500 text-xs">Optimal times:</span>
-                        {groups.map(g => (
-                          <div key={g.key} className="flex items-center gap-2 flex-wrap">
-                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${g.bg}`}>
-                              <i className={`${g.icon} ${g.color} text-xs`} />
-                              <span className={`${g.color} text-xs font-medium`}>{g.name}</span>
+                      
+                      return (
+                        <div key={platform} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${cfg.bg}`}>
+                              <i className={`${cfg.icon} ${cfg.color} text-xs`} />
+                              <span className={`${cfg.color} text-xs font-medium`}>{platform}</span>
                             </div>
-                            {g.times.map(t => (
-                              <button
-                                key={t}
-                                type="button"
-                                onClick={() => setNewPost(prev => ({ ...prev, time: t }))}
-                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                                  newPost.time === t
-                                    ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
-                                    : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
-                                }`}
-                              >
-                                {t}
-                              </button>
-                            ))}
+                            <input
+                              type="time"
+                              value={newPost.platformTimes[platform]}
+                              onChange={(e) => setNewPost(prev => ({ ...prev, platformTimes: { ...prev.platformTimes, [platform]: e.target.value } }))}
+                              className="flex-1 bg-gray-800/50 border border-gray-600 rounded-xl px-3 py-2 text-white focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 transition-all text-sm"
+                            />
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {newPost.date && newPost.time && (
+                          {times.length > 0 && (
+                            <div className="ml-20 flex items-center gap-2 flex-wrap">
+                              <span className="text-gray-500 text-xs">Optimal:</span>
+                              {times.map(t => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => setNewPost(prev => ({ ...prev, platformTimes: { ...prev.platformTimes, [platform]: t } }))}
+                                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                    newPost.platformTimes[platform] === t
+                                      ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
+                                      : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
+                                  }`}
+                                >
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {newPost.date && Object.keys(newPost.platforms).filter(p => newPost.platforms[p]).length > 0 && (
                     <div className="mt-3 p-3 bg-green-400/10 border border-green-400/30 rounded-xl">
                       <p className="text-green-400 text-sm">
                         <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                        Scheduled for {new Date(newPost.date).toLocaleDateString()} at {newPost.time}
+                        Scheduled for {new Date(newPost.date).toLocaleDateString()}
                       </p>
                     </div>
                   )}

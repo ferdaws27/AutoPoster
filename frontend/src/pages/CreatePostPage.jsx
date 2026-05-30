@@ -30,7 +30,7 @@ import {
 
 export default function CreatePostPage() {
   const { createPost, publishPost, posts, stats: hookStats } = usePosts();
-  const { modelId, toneLabel, temperature, connectedPlatforms, openRouterKey, voiceProfile, contentLength, creativity, language, platformTimes } = useSettings();
+  const { modelId, toneLabel, temperature, connectedPlatforms, voiceProfile, contentLength, creativity, language, platformTimes } = useSettings();
   const t = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,11 +53,10 @@ export default function CreatePostPage() {
   const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState(() => {
-    // Pre-fill with first optimal posting time from settings
-    const times = platformTimes?.linkedin || platformTimes?.twitter || platformTimes?.medium || [];
-    const firstValid = times.find((t) => t && t.length >= 4);
-    return firstValid || "";
+  const [scheduleTimes, setScheduleTimes] = useState({
+    Twitter: "",
+    LinkedIn: "",
+    Medium: "",
   });
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState([
@@ -503,7 +502,6 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
     if (platforms.length === 0) return toast.error("Select at least one platform");
 
     setLoading(true);
-    const apiKey = openRouterKey;
     const token = localStorage.getItem("token") || localStorage.getItem("access_token");
     const backendUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
@@ -511,39 +509,20 @@ Generation attempt ${currentCount}, offer a completely unique angle.`;
       // Step 1: Use AI to generate smart search keywords per platform
       let keywords = [idea.split(" ").slice(0, 3).join(" ")];
 
-      if (apiKey) {
-        try {
-          const promptRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-              "HTTP-Referer": "http://localhost:5173",
-              "X-Title": "AutoPoster App",
-            },
-            body: JSON.stringify({
-              model: modelId,
-              messages: [{
-                role: "user",
-                content: `Based on this post idea: "${idea}"
+      try {
+        const raw = await aiGenerate({
+          prompt: `Based on this post idea: "${idea}"
 Generate 3 short image search queries (2-4 words each) to find relevant, high-quality photos.
 Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
-              }],
-              max_tokens: 100,
-            }),
-          });
-
-          if (promptRes.ok) {
-            const promptData = await promptRes.json();
-            const raw = promptData.choices[0].message.content.trim();
-            const match = raw.match(/\[[\s\S]*?\]/);
-            if (match) {
-              keywords = JSON.parse(match[0]);
-            }
-          }
-        } catch (err) {
-          console.warn("AI keyword generation failed, using idea directly:", err);
+          model: modelId,
+          max_tokens: 100,
+        });
+        const match = raw.match(/\[[\s\S]*?\]/);
+        if (match) {
+          keywords = JSON.parse(match[0]);
         }
+      } catch (err) {
+        console.warn("AI keyword generation failed, using idea directly:", err);
       }
 
       // Step 2: Fetch images from SerpAPI via backend proxy for each platform
@@ -587,6 +566,7 @@ Return ONLY a valid JSON array like: ["query1", "query2", "query3"]`,
       });
 
       const results = await Promise.all(imagePromises);
+
       const newImages = {};
       let totalImages = 0;
       results.forEach(({ platform, images }) => {
@@ -762,8 +742,7 @@ const saveDraft = async () => {
     const idea = ideaRef.current.value.trim();
 
     if (!idea) return toast.error("Please enter an idea first");
-    if (!scheduleDate || !scheduleTime)
-      return toast.error("Please select both date and time");
+    if (!scheduleDate) return toast.error("Please select a date");
 
     const scheduledPlatforms = Object.keys(publishTo).filter(
       (p) => publishTo[p]
@@ -773,8 +752,15 @@ const saveDraft = async () => {
       return toast.error("Please select at least one platform to schedule");
     }
 
+    // Check that each selected platform has a time
+    for (const platform of scheduledPlatforms) {
+      if (!scheduleTimes[platform]) {
+        return toast.error(`Please select a time for ${platform}`);
+      }
+    }
+
     try {
-      // Créer un post pour chaque plateforme sélectionnée avec son contenu généré
+      // Créer un post pour chaque plateforme sélectionnée avec son contenu généré et son temps spécifique
       for (const platform of scheduledPlatforms) {
         const platformContent = variations[platform] || idea; // Utiliser le contenu généré ou l'idée originale
         
@@ -794,7 +780,8 @@ const saveDraft = async () => {
           platforms: { [platform]: true },
           status: "scheduled",
           scheduleDate: scheduleDate,
-          scheduleTime: scheduleTime,
+          scheduleTime: scheduleTimes[platform],
+          platformTimes: scheduleTimes, // Save all platform times
           engagement: {},
           selectedImages: imageData ? [imageData] : [],
         });
@@ -803,7 +790,11 @@ const saveDraft = async () => {
       toast.success(`Post scheduled successfully for ${scheduledPlatforms.length} platform(s)!`);
       setShowScheduleModal(false);
       setScheduleDate("");
-      setScheduleTime("");
+      setScheduleTimes({
+        Twitter: "",
+        LinkedIn: "",
+        Medium: "",
+      });
     } catch (err) {
       console.error("SCHEDULE ERROR:", err);
       toast.error(err.message);
@@ -816,10 +807,6 @@ const saveDraft = async () => {
 
     const selectedPlatforms = Object.keys(publishTo).filter((p) => publishTo[p]);
     if (selectedPlatforms.length === 0) return toast.error("Select at least one platform");
-
-    // Check that content has been generated
-    const hasContent = selectedPlatforms.some((p) => variations[p]);
-    if (!hasContent) return toast.error("Please generate content first before publishing");
 
     setLoading(true);
     try {
@@ -1420,68 +1407,66 @@ const saveDraft = async () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-white font-medium mb-2">{t("create.date")}</label>
-                  <input
-                    type="date"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">{t("create.time")}</label>
-                  <input
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
-                  />
-                  {/* Optimal times by platform */}
-                  {(() => {
-                    const platConfig = {
-                      Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
-                      LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
-                      Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
-                    };
-                    const groups = Object.entries(publishTo).filter(([, v]) => v).map(([name]) => {
-                      const cfg = platConfig[name];
-                      if (!cfg) return null;
-                      const times = (platformTimes?.[cfg.key] || []).filter(t => t && t.length >= 4);
-                      if (times.length === 0) return null;
-                      return { name, ...cfg, times };
-                    }).filter(Boolean);
-                    if (groups.length === 0) return null;
-                    return (
-                      <div className="mt-3 space-y-2">
-                        <span className="text-gray-500 text-xs">Optimal times:</span>
-                        {groups.map(g => (
-                          <div key={g.key} className="flex items-center gap-2 flex-wrap">
-                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${g.bg}`}>
-                              <i className={`${g.icon} ${g.color} text-xs`} />
-                              <span className={`${g.color} text-xs font-medium`}>{g.name}</span>
-                            </div>
-                            {g.times.map(t => (
-                              <button
-                                key={t}
-                                type="button"
-                                onClick={() => setScheduleTime(t)}
-                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                                  scheduleTime === t
-                                    ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
-                                    : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
-                                }`}
-                              >
-                                {t}
-                              </button>
-                            ))}
-                          </div>
-                        ))}
+              <div className="mb-6">
+                <label className="block text-white font-medium mb-2">{t("create.date")}</label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark]"
+                />
+              </div>
+
+              {/* Time selectors for each platform */}
+              <div className="mb-6">
+                <label className="block text-white font-medium mb-3">{t("create.time")}</label>
+                {["Twitter", "LinkedIn", "Medium"].map((platform) => {
+                  if (!publishTo[platform]) return null;
+                  
+                  const platConfig = {
+                    Twitter: { key: "twitter", icon: "fa-brands fa-x-twitter", color: "text-white", bg: "bg-gray-700/50" },
+                    LinkedIn: { key: "linkedin", icon: "fa-brands fa-linkedin-in", color: "text-blue-400", bg: "bg-blue-400/10" },
+                    Medium: { key: "medium", icon: "fa-brands fa-medium", color: "text-green-400", bg: "bg-green-400/10" },
+                  };
+                  const cfg = platConfig[platform];
+                  const times = (platformTimes?.[cfg.key] || []).filter(t => t && t.length >= 4);
+                  
+                  return (
+                    <div key={platform} className="mb-4 last:mb-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${cfg.bg}`}>
+                          <i className={`${cfg.icon} ${cfg.color} text-xs`} />
+                          <span className={`${cfg.color} text-xs font-medium`}>{platform}</span>
+                        </div>
+                        <input
+                          type="time"
+                          value={scheduleTimes[platform]}
+                          onChange={(e) => setScheduleTimes(prev => ({ ...prev, [platform]: e.target.value }))}
+                          className="flex-1 p-2 rounded-xl bg-gray-800 border border-gray-600 text-white focus:border-cyan-400 focus:outline-none [color-scheme:dark] text-sm"
+                        />
                       </div>
-                    );
-                  })()}
-                </div>
+                      {times.length > 0 && (
+                        <div className="ml-16 flex items-center gap-2 flex-wrap">
+                          <span className="text-gray-500 text-xs">Optimal:</span>
+                          {times.map(t => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setScheduleTimes(prev => ({ ...prev, [platform]: t }))}
+                              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                scheduleTimes[platform] === t
+                                  ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30"
+                                  : "bg-gray-800/50 text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500"
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="mb-6">

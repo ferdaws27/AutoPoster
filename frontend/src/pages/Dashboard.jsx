@@ -150,6 +150,16 @@ export default function Dashboard() {
     ? new Date(`${nextPostTime.scheduleDate} ${nextPostTime.scheduleTime}`).toLocaleString()
     : "No scheduled post";
 
+  // Count all unique platforms across all scheduled posts
+  const allPlatforms = new Set();
+  scheduledPosts.forEach(post => {
+    const platforms = post.platforms || {};
+    Object.entries(platforms).forEach(([key, value]) => {
+      if (value) allPlatforms.add(key);
+    });
+  });
+  const totalPlatforms = allPlatforms.size;
+
   const totalEngagement = analyticsData.reduce(
     (sum, p) => sum + (p.totalEngagement || (p.engagement?.likes || 0) + (p.engagement?.shares || 0) + (p.engagement?.comments || 0)),
     0
@@ -376,23 +386,16 @@ export default function Dashboard() {
             <div>
               <h3 className="text-white font-semibold mb-1">{t("dashboard.nextPost")}</h3>
               <div className="flex items-center text-sm">
-                {nextPostTime ? (() => {
-                  const p = nextPostTime.platforms || {};
-                  const active = Object.entries(p).filter(([, v]) => v).map(([k]) => k);
-                  const count = active.length;
-                  return count > 0 ? (
-                    <>
-                      <div className="flex space-x-1 mr-2">
-                        {active.includes('twitter') && <i className="fa-brands fa-x-twitter text-white text-xs"></i>}
-                        {active.includes('linkedin') && <i className="fa-brands fa-linkedin-in text-blue-400 text-xs"></i>}
-                        {active.includes('medium') && <i className="fa-brands fa-medium text-green-400 text-xs"></i>}
-                      </div>
-                      <span className="text-gray-400">{count} {count > 1 ? t("dashboard.platformsPlural") : t("dashboard.platforms")}</span>
-                    </>
-                  ) : (
-                    <span className="text-gray-400">{t("dashboard.noPlatformSelected")}</span>
-                  );
-                })() : (
+                {totalPlatforms > 0 ? (
+                  <>
+                    <div className="flex space-x-1 mr-2">
+                      {allPlatforms.has('twitter') && <i className="fa-brands fa-x-twitter text-white text-xs"></i>}
+                      {allPlatforms.has('linkedin') && <i className="fa-brands fa-linkedin-in text-blue-400 text-xs"></i>}
+                      {allPlatforms.has('medium') && <i className="fa-brands fa-medium text-green-400 text-xs"></i>}
+                    </div>
+                    <span className="text-gray-400">{totalPlatforms} {totalPlatforms > 1 ? t("dashboard.platformsPlural") : t("dashboard.platforms")}</span>
+                  </>
+                ) : (
                   <span className="text-gray-400">{t("dashboard.scheduleOneNow")}</span>
                 )}
               </div>

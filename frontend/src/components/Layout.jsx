@@ -101,8 +101,28 @@ export default function Layout() {
 
     fetchUser();
   }, [token]);
+if (!user) {
+  return (
+    <div className="gradient-bg min-h-screen flex">
+      
+     
+      <aside className="fixed left-0 top-0 h-full w-64 glass-effect border-r border-gray-700/50 z-30" />
 
-  if (!user) return <p>Loading user...</p>;
+      {/* Main content loading */}
+      <main className="ml-64 flex-1 flex items-center justify-center text-white">
+        <div className="flex flex-col items-center gap-4">
+          
+          <div className="w-16 h-16 border-4 border-cyan-300/30 border-t-cyan-400 rounded-full animate-spin"></div>
+
+          <p className="text-gray-300 text-lg font-medium animate-pulse">
+            Loading user...
+          </p>
+
+        </div>
+      </main>
+    </div>
+  );
+}
 
   return (
     <div className="gradient-bg min-h-screen">
@@ -146,12 +166,39 @@ export default function Layout() {
         {/* USER */}
         <div className="p-6 space-y-3">
           <div className="flex items-center space-x-3 p-3 rounded-2xl glass-effect">
-            <img
-              src={user.profile_picture || ""}
-              onError={(e) => (e.target.src = "/default-avatar.png")}
-              className="w-10 h-10 rounded-xl"
-              alt="Profile"
-            />
+            {(() => {
+              // Try to get profile picture from LinkedIn or Twitter social accounts
+              const socialAccounts = user.social_accounts || [];
+              const linkedinAccount = socialAccounts.find(a => a.provider === "linkedin");
+              const twitterAccount = socialAccounts.find(a => a.provider === "twitter");
+              const profilePicture = linkedinAccount?.profile_picture || twitterAccount?.profile_picture || user.profile_picture;
+
+              if (profilePicture) {
+                return (
+                  <img
+                    src={profilePicture}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextElementSibling.style.display = "flex";
+                    }}
+                    className="w-10 h-10 rounded-xl"
+                    alt="Profile"
+                  />
+                );
+              }
+              return null;
+            })()}
+            <div
+              className={`w-10 h-10 rounded-xl gradient-accent flex items-center justify-center ${(() => {
+                const socialAccounts = user.social_accounts || [];
+                const linkedinAccount = socialAccounts.find(a => a.provider === "linkedin");
+                const twitterAccount = socialAccounts.find(a => a.provider === "twitter");
+                const profilePicture = linkedinAccount?.profile_picture || twitterAccount?.profile_picture || user.profile_picture;
+                return profilePicture ? "hidden" : "flex";
+              })()}`}
+            >
+              <i className="fa-solid fa-user text-white" />
+            </div>
             <div>
               <div className="text-white font-medium text-sm">
                 {user.full_name || user.name || user.first_name || user.username || "User"}

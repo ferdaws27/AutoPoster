@@ -101,7 +101,7 @@ export default function Integrations({ onChange }) {
       linkedin: {
         ...prev.linkedin,
         connected: !!linkedinAccount,
-        username: linkedinAccount ? linkedinAccount.name || linkedinAccount.username || "LinkedIn User" : prev.linkedin.username,
+        username: linkedinAccount ? linkedinAccount.name || `${linkedinAccount.first_name || ''} ${linkedinAccount.last_name || ''}`.trim() || linkedinAccount.username || "LinkedIn User" : prev.linkedin.username,
         profile_picture: linkedinAccount ? linkedinAccount.profile_picture : prev.linkedin.profile_picture,
       },
       medium: {
