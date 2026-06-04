@@ -27,13 +27,13 @@ export default function Layout() {
     {
       label: t("nav.aiTools"),
       items: [
-        ["fa-magic", t("nav.hookGenerator"), "HookGeneratorPage "],
+        ["fa-magic", t("nav.hookGenerator"), "HookGeneratorPage"],
         ["fa-quote-left", t("nav.quoteTemplate"), "QuoteTemplateGenerator"],
         ["fa-microphone-alt", t("nav.voiceTrainer"), "voicetrainer"],
-        ["fa-brain", t("nav.clone"), "Clone"],
-        ["fa-photo-video", t("nav.mediaCompanion"), "MediaCompanion"],
+        ["fa-brain", t("nav.clone"), "clone"],
+        ["fa-photo-video", t("nav.mediaCompanion"), "mediacompanion"],
         ["fa-flask", t("nav.abTester"), "ABTesterPage"],
-        ["fa-satellite-dish", t("nav.trendradar"), "Trendradar"],
+        ["fa-satellite-dish", t("nav.trendradar"), "trendradar"],
       ],
     },
     {

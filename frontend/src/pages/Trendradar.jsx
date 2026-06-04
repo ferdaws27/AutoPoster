@@ -38,12 +38,6 @@ export default function TrendRadar() {
   ]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   
-  // Filter states
-  const [selectedPlatform, setSelectedPlatform] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
-  const [filteredTrends, setFilteredTrends] = useState([]);
-  
   const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   // Fonction pour extraire les hashtags des tendances Twitter
@@ -280,49 +274,20 @@ Return ONLY the JSON array, no additional text.`;
         return;
       }
 
+      // Formatter les données pour l'affichage
       const formattedInsights = insightsData.map(insight => ({
         platform: insight.platform,
-        icon: insight.platform === "Twitter" ? "fa-twitter" : 
-                insight.platform === "LinkedIn" ? "fa-linkedin" : "fa-medium",
-        color: insight.platform === "Twitter" ? "blue" : 
-                insight.platform === "LinkedIn" ? "violet" : "teal",
+        icon: insight.platform.includes("Twitter") ? "fa-x-twitter" : 
+                insight.platform.includes("LinkedIn") ? "fa-linkedin-in" : "fa-medium",
+        color: insight.platform.includes("Twitter") ? "cyan" : 
+                insight.platform.includes("LinkedIn") ? "blue" : "green",
         engagement: insight.engagement || "+15%",
         times: insight.times || "9AM, 5PM EST",
         insights: Array.isArray(insight.insights) ? insight.insights : []
       }));
 
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const insightsText = data.choices[0].message.content.trim();
-        console.log('AI insights text:', insightsText);
-        
-        // Parser la réponse JSON
-        let insightsData;
-        try {
-          insightsData = JSON.parse(insightsText);
-        } catch (parseError) {
-          console.error('Failed to parse AI response as JSON:', parseError);
-          generateBasicInsights();
-          return;
-        }
-
-        // Formatter les données pour l'affichage
-        const formattedInsights = insightsData.map(insight => ({
-          platform: insight.platform,
-          icon: insight.platform === "Twitter" ? "fa-x-twitter" : 
-                  insight.platform === "LinkedIn" ? "fa-linkedin-in" : "fa-medium",
-          color: insight.platform === "Twitter" ? "cyan" : 
-                  insight.platform === "LinkedIn" ? "blue" : "green",
-          engagement: insight.engagement || "+15%",
-          times: insight.times || "9AM, 5PM EST",
-          insights: Array.isArray(insight.insights) ? insight.insights : []
-        }));
-
-        setPlatformInsights(formattedInsights);
-        console.log('AI-generated insights successfully applied:', formattedInsights);
-        
-      } else {
-        throw new Error('Invalid API response format');
-      }
+      setPlatformInsights(formattedInsights);
+      console.log('AI-generated insights successfully applied:', formattedInsights);
 
     } catch (error) {
       console.error('Error generating AI insights:', error);
@@ -379,107 +344,17 @@ Return ONLY the JSON array, no additional text.`;
     console.log('Basic insights generated:', basicInsights);
   };
 
-  // Fonctions de filtrage
-  const filterTrends = () => {
-    let filtered = [...trends];
-    
-    // Filtrer par plateforme
-    if (selectedPlatform !== 'all') {
-      filtered = filtered.filter(trend => {
-        // Logique de filtrage par plateforme basée sur le contenu
-        const trendText = (trend.title || trend.name || '').toLowerCase();
-        
-        switch(selectedPlatform) {
-          case 'twitter':
-            return trendText.includes('#') || trendText.includes('twitter') || trendText.includes('x.com');
-          case 'linkedin':
-            return trendText.includes('linkedin') || trendText.includes('professional') || trendText.includes('business');
-          case 'medium':
-            return trendText.includes('medium') || trendText.includes('article') || trendText.includes('writing');
-          default:
-            return true;
-        }
-      });
-    }
-    
-    // Filtrer par catégorie
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(trend => {
-        const trendText = (trend.title || trend.name || '').toLowerCase();
-        
-        switch(selectedCategory) {
-          case 'ai':
-            return trendText.includes('ai') || trendText.includes('artificial') || trendText.includes('machine learning');
-          case 'business':
-            return trendText.includes('business') || trendText.includes('startup') || trendText.includes('company');
-          case 'marketing':
-            return trendText.includes('marketing') || trendText.includes('social media') || trendText.includes('brand');
-          case 'entrepreneurship':
-            return trendText.includes('entrepreneur') || trendText.includes('founder') || trendText.includes('startup');
-          case 'innovation':
-            return trendText.includes('innovation') || trendText.includes('tech') || trendText.includes('future');
-          default:
-            return true;
-        }
-      });
-    }
-    
-    // Filtrer par plage de temps (simulation basée sur le score)
-    if (selectedTimeRange !== '24h') {
-      const now = new Date();
-      let minScore = 0;
-      
-      switch(selectedTimeRange) {
-        case '7d':
-          minScore = 70; // Tendances de la semaine
-          break;
-        case '30d':
-          minScore = 50; // Tendances du mois
-          break;
-        default:
-          minScore = 85; // Tendances du jour (24h)
-      }
-      
-      filtered = filtered.filter(trend => (trend.score || 0) >= minScore);
-    }
-    
-    setFilteredTrends(filtered);
-    console.log(`Filtered ${filtered.length} trends from ${trends.length} total trends`);
-    console.log('Filters applied:', { platform: selectedPlatform, category: selectedCategory, timeRange: selectedTimeRange });
-  };
-
-  // Gestionnaires d'événements pour les filtres
-  const handlePlatformChange = (platform) => {
-    setSelectedPlatform(platform);
-    console.log('Platform filter changed to:', platform);
-  };
-
-  const handleCategoryChange = (category) => {
-    setSelectedCategory(category);
-    console.log('Category filter changed to:', category);
-  };
-
-  const handleTimeRangeChange = (range) => {
-    setSelectedTimeRange(range);
-    console.log('Time range filter changed to:', range);
-  };
-
-  // Effet pour appliquer les filtres quand les données changent
+  // Charger les données au montage du composant
   useEffect(() => {
-    filterTrends();
-  }, [trends, selectedPlatform, selectedCategory, selectedTimeRange]);
-
-  useEffect(() => {
-    // Charger les tendances et les topics depuis le backend
     fetchTrends();
     fetchNewsTopics();
     
-    // Rafraîchir automatiquement toutes les 24 heures (1 jour)
+    // Rafraîchir automatiquement toutes les 24 heures
     const interval = setInterval(() => {
       console.log('Auto-refreshing trends and topics (24 heures elapsed)');
       fetchTrends();
       fetchNewsTopics();
-    }, 24 * 60 * 60 * 1000); // 24 heures
+    }, 24 * 60 * 60 * 1000);
     
     return () => clearInterval(interval);
   }, []);
@@ -526,7 +401,7 @@ Return ONLY the JSON array, no additional text.`;
           <div>
             <h1 className="text-4xl font-bold text-white mb-2 flex items-center">
               <div className="w-12 h-12 mr-4 rounded-2xl gradient-accent flex items-center justify-center trend-glow">
-                <i className="fa-solid fa-radar text-white"></i>
+                <i className="fa-solid fa-radar text-cyan-400"></i>
               </div>
               {t("trends.title")}
             </h1>
@@ -554,117 +429,6 @@ Return ONLY the JSON array, no additional text.`;
             >
               <i className={`fa-solid fa-refresh ${loading ? 'animate-spin' : ''}`}></i>
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters Section */}
-      <div id="filters-section" className="glass-effect rounded-3xl p-6 mb-8 slide-up">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            {/* Platform Filter */}
-            <div className="flex items-center space-x-3">
-              <label className="text-white font-medium">Platform:</label>
-              <div className="relative">
-                <select 
-                  value={selectedPlatform}
-                  onChange={(e) => handlePlatformChange(e.target.value)}
-                  className="bg-black/30 border border-gray-600 rounded-2xl px-4 py-2 text-white pr-8 focus:border-cyan-400 focus:outline-none cursor-pointer hover:border-cyan-400/50 transition-colors"
-                >
-                  <option value="all">{t("trends.allPlatforms")}</option>
-                  <option value="twitter">Twitter (X)</option>
-                  <option value="linkedin">LinkedIn</option>
-                  <option value="medium">Medium</option>
-                </select>
-                <i className="fa-solid fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div className="flex items-center space-x-3">
-              <label className="text-white font-medium">Category:</label>
-              <div className="relative">
-                <select 
-                  value={selectedCategory}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="bg-black/30 border border-gray-600 rounded-2xl px-4 py-2 text-white pr-8 focus:border-cyan-400 focus:outline-none cursor-pointer hover:border-cyan-400/50 transition-colors"
-                >
-                  <option value="all">{t("trends.allCategories")}</option>
-                  <option value="ai">AI & Technology</option>
-                  <option value="business">Business</option>
-                  <option value="marketing">Marketing</option>
-                  <option value="entrepreneurship">Entrepreneurship</option>
-                  <option value="innovation">Innovation</option>
-                </select>
-                <i className="fa-solid fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
-              </div>
-            </div>
-          </div>
-
-          {/* Time Range */}
-          <div className="flex items-center space-x-3">
-            <label className="text-white font-medium">Time Range:</label>
-            <div className="flex bg-black/30 rounded-2xl p-1 border border-gray-600">
-              <button 
-                onClick={() => handleTimeRangeChange('24h')}
-                className={`time-filter px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  selectedTimeRange === '24h' 
-                    ? 'bg-cyan-400 text-white' 
-                    : 'text-gray-400 hover:text-white hover:bg-gray-600/50'
-                }`}
-              >
-                24H
-              </button>
-              <button 
-                onClick={() => handleTimeRangeChange('7d')}
-                className={`time-filter px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  selectedTimeRange === '7d' 
-                    ? 'bg-cyan-400 text-white' 
-                    : 'text-gray-400 hover:text-white hover:bg-gray-600/50'
-                }`}
-              >
-                7D
-              </button>
-              <button 
-                onClick={() => handleTimeRangeChange('30d')}
-                className={`time-filter px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  selectedTimeRange === '30d' 
-                    ? 'bg-cyan-400 text-white' 
-                    : 'text-gray-400 hover:text-white hover:bg-gray-600/50'
-                }`}
-              >
-                30D
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Status */}
-        <div className="mt-4 pt-4 border-t border-gray-700/50">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-400">
-                Filtered: <span className="text-cyan-400 font-medium">{filteredTrends.length}</span> / <span className="text-gray-300">{trends.length}</span> trends
-              </span>
-              {(selectedPlatform !== 'all' || selectedCategory !== 'all' || selectedTimeRange !== '24h') && (
-                <button 
-                  onClick={() => {
-                    setSelectedPlatform('all');
-                    setSelectedCategory('all');
-                    setSelectedTimeRange('24h');
-                  }}
-                  className="px-3 py-1 bg-gray-600/30 text-gray-300 rounded-lg hover:bg-gray-600/50 transition-colors"
-                >
-                  <i className="fa-solid fa-times mr-1"></i>
-                  Clear Filters
-                </button>
-              )}
-            </div>
-            <div className="text-gray-400">
-              {selectedPlatform !== 'all' && <span className="text-cyan-400">Platform: {selectedPlatform}</span>}
-              {selectedCategory !== 'all' && <span className="text-purple-400 ml-3">Category: {selectedCategory}</span>}
-              {selectedTimeRange !== '24h' && <span className="text-green-400 ml-3">Range: {selectedTimeRange}</span>}
-            </div>
           </div>
         </div>
       </div>
@@ -707,13 +471,13 @@ Return ONLY the JSON array, no additional text.`;
               )}
 
               {/* Real Twitter Trends */}
-              {!loading && !error && filteredTrends.length === 0 && (
+              {!loading && !error && trends.length === 0 && (
                 <div className="text-center p-8">
                   <h3 className="text-white font-semibold mb-2">No Trends Found</h3>
-                  <p className="text-gray-400 text-sm">Try adjusting your filters or refreshing the page.</p>
+                  <p className="text-gray-400 text-sm">Refresh the page to load trends.</p>
                 </div>
               )}
-              {!loading && !error && filteredTrends.length > 0 && filteredTrends.map((topic, idx) => (
+              {!loading && !error && trends.length > 0 && trends.map((topic, idx) => (
                 <div key={idx} className="trend-card bg-black/20 rounded-2xl p-6 hover:bg-black/30 transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -1113,13 +877,13 @@ Return ONLY the JSON array, no additional text.`;
                 <div key={idx} className="p-4 bg-black/20 rounded-2xl border border-gray-700/50 hover:bg-black/30 transition-all">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-xl bg-${p.color}-400/20 flex items-center justify-center`}>
-                        <i className={`fa-brands ${p.icon} ${ICON_COLORS[p.icon] || `text-${p.color}-400`}`}></i>
+                      <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center border border-gray-600/50">
+                        <i className={`fa-brands ${p.icon}`} style={{color: p.color === 'cyan' ? '#06b6d4' : p.color === 'blue' ? '#60a5fa' : p.color === 'green' ? '#4ade80' : '#60a5fa'}}></i>
                       </div>
                       <div>
                         <span className="text-white font-semibold text-lg">{p.platform}</span>
                         <div className="flex items-center space-x-2 mt-1">
-                          <span className={`text-${p.color}-400 text-sm font-medium`}>{p.engagement} engagement</span>
+                          <span style={{color: p.color === 'cyan' ? '#06b6d4' : p.color === 'blue' ? '#60a5fa' : p.color === 'green' ? '#4ade80' : '#60a5fa'}} className="text-sm font-medium">{p.engagement} engagement</span>
                           {p.insights && p.insights.length > 0 && (
                             <span className="text-green-400 text-xs">
                               <i className="fa-solid fa-sparkles mr-1"></i>
