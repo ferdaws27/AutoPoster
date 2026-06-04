@@ -1,15 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function ApiKeysStorage() {
+export default function ApiKeysStorage({ initialData, onChange }) {
+  const [keys, setKeys] = useState({
+    openrouter: initialData?.keys?.openrouter || "",
+    deepseek: initialData?.keys?.deepseek || "",
+    unsplash: initialData?.keys?.unsplash || "",
+  });
+  const [dataRetention, setDataRetention] = useState(initialData?.dataRetention || "1 year");
+  const [backupFrequency, setBackupFrequency] = useState(initialData?.backupFrequency || "Weekly");
   const [visible, setVisible] = useState({
-    ux: false,
+    openrouter: false,
     deepseek: false,
     unsplash: false,
   });
 
+  // Notify parent on change
+  useEffect(() => {
+    if (onChange) {
+      onChange({ keys, dataRetention, backupFrequency });
+    }
+  }, [keys, dataRetention, backupFrequency]);
+
   const toggle = (key) => {
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const updateKey = (key, value) => {
+    setKeys((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Calculate real localStorage usage
+  const storageUsed = (() => {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      total += (localStorage.getItem(key) || "").length * 2; // UTF-16
+    }
+    return total;
+  })();
+  const storageKB = (storageUsed / 1024).toFixed(1);
+  const storageMB = (storageUsed / (1024 * 1024)).toFixed(2);
+  const maxMB = 5; // localStorage limit ~5MB
+  const pct = Math.min(100, ((storageUsed / (maxMB * 1024 * 1024)) * 100)).toFixed(1);
 
   return (
     <div className="setting-card glass-effect rounded-3xl p-8 animate-slide-in">
@@ -26,15 +58,17 @@ export default function ApiKeysStorage() {
       </div>
 
       <div className="grid gap-6">
-        {/* UX Pilot */}
+        {/* OpenRouter */}
         <div className="space-y-3">
           <label className="block text-white font-semibold">
-            UX Pilot AI API Key
+            OpenRouter API Key
           </label>
           <div className="relative">
             <input
-              type={visible.ux ? "text" : "password"}
-              defaultValue="sk-proj-••••••••••••••••••"
+              type={visible.openrouter ? "text" : "password"}
+              value={keys.openrouter}
+              onChange={(e) => updateKey("openrouter", e.target.value)}
+              placeholder="Enter your OpenRouter API key (sk-or-...)"
               className="
                 w-full rounded-2xl p-4 pr-12 text-white
                 bg-black/20 border border-gray-700/50
@@ -44,12 +78,12 @@ export default function ApiKeysStorage() {
             />
             <button
               type="button"
-              onClick={() => toggle("ux")}
+              onClick={() => toggle("openrouter")}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
             >
               <i
                 className={`fa-solid ${
-                  visible.ux ? "fa-eye-slash" : "fa-eye"
+                  visible.openrouter ? "fa-eye-slash" : "fa-eye"
                 }`}
               />
             </button>
@@ -64,7 +98,9 @@ export default function ApiKeysStorage() {
           <div className="relative">
             <input
               type={visible.deepseek ? "text" : "password"}
-              defaultValue="sk-••••••••••••••••••"
+              value={keys.deepseek}
+              onChange={(e) => updateKey("deepseek", e.target.value)}
+              placeholder="Enter your DeepSeek API key"
               className="
                 w-full rounded-2xl p-4 pr-12 text-white
                 bg-black/20 border border-gray-700/50
@@ -94,6 +130,8 @@ export default function ApiKeysStorage() {
           <div className="relative">
             <input
               type={visible.unsplash ? "text" : "password"}
+              value={keys.unsplash}
+              onChange={(e) => updateKey("unsplash", e.target.value)}
               placeholder="Enter your Unsplash API key for image generation"
               className="
                 w-full rounded-2xl p-4 pr-12 text-white
@@ -123,7 +161,8 @@ export default function ApiKeysStorage() {
               Data Retention
             </label>
             <select
-              defaultValue="1 year"
+              value={dataRetention}
+              onChange={(e) => setDataRetention(e.target.value)}
               className="
                 w-full rounded-2xl p-4 text-white
                 bg-black/20 border border-gray-700/50
@@ -143,7 +182,8 @@ export default function ApiKeysStorage() {
               Backup Frequency
             </label>
             <select
-              defaultValue="Weekly"
+              value={backupFrequency}
+              onChange={(e) => setBackupFrequency(e.target.value)}
               className="
                 w-full rounded-2xl p-4 text-white
                 bg-black/20 border border-gray-700/50
@@ -163,20 +203,19 @@ export default function ApiKeysStorage() {
         <div className="p-6 bg-black/20 rounded-2xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold">Storage Usage</h3>
-            <span className="text-gray-400 text-sm">2.3 GB / 10 GB</span>
+            <span className="text-gray-400 text-sm">{storageKB} KB / {maxMB} MB</span>
           </div>
 
           <div className="w-full bg-gray-700 rounded-full h-2">
             <div
               className="bg-gradient-to-r from-cyan-400 to-violet-400 h-2 rounded-full"
-              style={{ width: "23%" }}
+              style={{ width: `${pct}%` }}
             />
           </div>
 
           <div className="flex justify-between text-sm text-gray-400 mt-2">
-            <span>Posts: 1.2 GB</span>
-            <span>Images: 0.8 GB</span>
-            <span>Backups: 0.3 GB</span>
+            <span>Total: {storageMB} MB</span>
+            <span>{pct}% used</span>
           </div>
         </div>
       </div>

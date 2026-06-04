@@ -1,24 +1,42 @@
-import { useRef, useState } from "react";
-import * as Toast from "@radix-ui/react-toast";
+import { useRef, useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
+import toast from "react-hot-toast";
 import Integrations from "../components/Integrations";
 import AiPreferences from "../components/AiPreferences";
 import PostingPreferences from "../components/PostingPreferences";
 import ApiKeysStorage from "../components/ApiKeysStorage";
 import ExportDanger from "../components/ExportDanger";
+import { apiFetch } from "../services/api";
+import useSettings from "../hooks/useSettings";
+import useTranslation from "../i18n/useTranslation";
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState("integrations");
+  const { user } = useOutletContext();
+  const { updateSettings, voiceProfile } = useSettings();
+  const t = useTranslation();
 
-  // États des enfants
-  const [integrationData, setIntegrationData] = useState(null);
-  const [aiData, setAiData] = useState(null);
-  const [postingData, setPostingData] = useState(null);
-  const [apiData, setApiData] = useState(null);
-  const [dangerData, setDangerData] = useState(null);
+  // Load settings synchronously to avoid initialData being null on first render
+  const [initialSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("userSettings");
+      if (saved) return JSON.parse(saved);
+    } catch (error) {
+      console.error("Error loading settings:", error);
+    }
+    return {};
+  });
 
-  // Toast Radix
-  const [toastOpen, setToastOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  // Child states
+  const [integrationData, setIntegrationData] = useState(initialSettings.integrations || null);
+  const [aiData, setAiData] = useState(initialSettings.ai || null);
+  const [postingData, setPostingData] = useState(initialSettings.posting  || null);
+  const [apiData, setApiData] = useState(initialSettings.api || null);
+  const [dangerData, setDangerData] = useState(initialSettings.danger || null);
+
+  // Global state
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const integrationsRef = useRef(null);
   const aiRef = useRef(null);
@@ -31,25 +49,127 @@ export default function SettingsPage() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleSaveSettings = () => {
+  const handleSettingChange = (category, data) => {
+    setHasChanges(true);
+    switch (category) {
+      case "integrations":
+        setIntegrationData(data);
+        break;
+      case "ai":
+        setAiData(data);
+        break;
+      case "posting":
+        setPostingData(data);
+        break;
+      case "api":
+        setApiData(data);
+        break;
+      case "danger":
+        setDangerData(data);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Auto-save to localStorage whenever any setting changes
+  useEffect(() => {
+    if (!hasChanges) return;
     const payload = {
       integrations: integrationData,
       ai: aiData,
       posting: postingData,
       api: apiData,
       danger: dangerData,
+      ...(voiceProfile ? { voiceProfile } : {}),
+      lastUpdated: new Date().toISOString(),
     };
-    console.log("Saving settings...", payload);
+    updateSettings(payload);
+  }, [integrationData, aiData, postingData, apiData, dangerData]);
 
-    // Affiche le toast sans changer le design
-    setToastMessage("Settings saved ✅");
-    setToastOpen(true);
+  const handleSaveSettings = async () => {
+    if (!hasChanges) {
+      showToast("No changes to save", "warning");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        integrations: integrationData,
+        ai: aiData,
+        posting: postingData,
+        api: apiData,
+        danger: dangerData,
+        ...(voiceProfile ? { voiceProfile } : {}),
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Save locally + notify all listeners
+      updateSettings(payload);
+
+      // Optional: Send to backend
+      try {
+        await apiFetch("/api/user/settings", {
+          method: "POST",
+          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+        });
+        console.log("Settings saved to server");
+      } catch (backendError) {
+        console.warn("Saved locally, server unavailable:", backendError);
+      }
+
+      setHasChanges(false);
+      showToast("Settings saved successfully", "success");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      showToast("Failed to save settings", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSyncSettings = () => {
-    console.log("Syncing settings...");
-    setToastMessage("Settings synced 🔄");
-    setToastOpen(true);
+  const handleSyncSettings = async () => {
+    setSaving(true);
+    try {
+      const response = await apiFetch("/api/user/settings");
+      if (response && response.data) {
+        const settings = response.data;
+        setIntegrationData(settings.integrations || null);
+        setAiData(settings.ai || null);
+        setPostingData(settings.posting || null);
+        setApiData(settings.api || null);
+        setDangerData(settings.danger || null);
+
+        // Also save to localStorage
+        updateSettings(settings);
+
+        setHasChanges(false);
+        showToast("Settings synced from server", "success");
+      }
+    } catch (error) {
+      console.warn("Unable to sync with server, using local cache", error);
+      showToast("Using local cache (server unavailable)", "warning");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showToast = (message, type = "success") => {
+    const options = {
+      style: {
+        background: "#1a1a2e",
+        color: "#fff",
+        borderRadius: "12px",
+        border: "1px solid rgba(255,255,255,0.1)",
+        padding: "12px 20px",
+        fontSize: "14px",
+      },
+    };
+    if (type === "success") toast.success(message, options);
+    else if (type === "warning") toast(message, { ...options, icon: "⚠️" });
+    else toast.error(message, options);
   };
 
   return (
@@ -57,28 +177,31 @@ export default function SettingsPage() {
       {/* HEADER */}
       <div className="flex items-center justify-between mb-8 px-8 pt-8">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">{t("settings.title")}</h1>
           <p className="text-gray-400">
-            Manage your account preferences and integrations
+            {t("settings.subtitle")}
+            {hasChanges && <span className="ml-3 text-yellow-400">• {t("settings.unsavedChanges")}</span>}
           </p>
         </div>
 
         <div className="flex items-center space-x-4">
           <button
             onClick={handleSyncSettings}
-            className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white transition-colors"
+            disabled={saving}
+            className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <i className="fa-solid fa-sync text-sm"></i>
-            <span className="text-sm">Sync Settings</span>
+            <i className={`fa-solid fa-sync text-sm ${saving && "fa-spin"}`}></i>
+            <span className="text-sm">{t("settings.syncSettings")}</span>
           </button>
 
           <button
             onClick={handleSaveSettings}
+            disabled={saving || !hasChanges}
             id="save-settings-btn"
-            className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center space-x-2 px-6 py-3 gradient-accent rounded-2xl text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <i className="fa-solid fa-save"></i>
-            <span>Save Changes</span>
+            <i className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-save"}`}></i>
+            <span>{saving ? t("settings.saving") : t("settings.saveChanges")}</span>
           </button>
         </div>
       </div>
@@ -89,7 +212,7 @@ export default function SettingsPage() {
           {/* LEFT NAV */}
           <div className="col-span-3">
             <div className="glass-effect rounded-3xl p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-white mb-4">Categories</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">{t("nav.main") === "Principal" ? "Catégories" : "Categories"}</h2>
               <nav className="space-y-2">
                 <button
                   onClick={() => handleCategoryClick("integrations", integrationsRef)}
@@ -100,7 +223,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-plug w-5" />
-                  <span>Integrations</span>
+                  <span>{t("settings.integrations")}</span>
                 </button>
 
                 <button
@@ -112,7 +235,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-brain w-5" />
-                  <span>AI Preferences</span>
+                  <span>{t("settings.aiPreferences")}</span>
                 </button>
 
                 <button
@@ -124,7 +247,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-clock w-5" />
-                  <span>Posting</span>
+                  <span>{t("settings.posting")}</span>
                 </button>
 
                 <button
@@ -136,7 +259,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-key w-5" />
-                  <span>API & Storage</span>
+                  <span>{t("settings.apiStorage")}</span>
                 </button>
 
                 <button
@@ -148,53 +271,46 @@ export default function SettingsPage() {
                   }`}
                 >
                   <i className="fa-solid fa-exclamation-triangle w-5" />
-                  <span>Export & Danger</span>
+                  <span>{t("settings.exportDanger")}</span>
                 </button>
               </nav>
-            </div>
+        </div>
           </div>
 
           {/* CONTENT */}
           <div className="col-span-9 space-y-8">
             <div ref={integrationsRef}>
-              <Integrations onChange={setIntegrationData} />
+              <Integrations 
+                onChange={(data) => handleSettingChange("integrations", data)} 
+              />
             </div>
             <div ref={aiRef}>
-              <AiPreferences onChange={setAiData} />
+              <AiPreferences 
+                initialData={aiData}
+                onChange={(data) => handleSettingChange("ai", data)} 
+              />
             </div>
             <div ref={postingRef}>
-              <PostingPreferences onChange={setPostingData} />
+              <PostingPreferences 
+                initialData={postingData}
+                onChange={(data) => handleSettingChange("posting", data)} 
+              />
             </div>
             <div ref={apiRef}>
-              <ApiKeysStorage onChange={setApiData} />
+              <ApiKeysStorage 
+                initialData={apiData}
+                onChange={(data) => handleSettingChange("api", data)} 
+              />
             </div>
             <div ref={dangerRef}>
-              <ExportDanger onChange={setDangerData} />
+              <ExportDanger 
+                initialData={dangerData}
+                onChange={(data) => handleSettingChange("danger", data)} 
+              />
             </div>
           </div>
         </div>
       </main>
-
-      {/* Toast Radix pour remplacer alert */}
-      <Toast.Provider swipeDirection="right">
-        <Toast.Root
-          open={toastOpen}
-          onOpenChange={setToastOpen}
-          className="bg-gray-900 text-white rounded-xl p-4 shadow-lg fixed bottom-8 right-8 w-72"
-        >
-          <Toast.Title className="font-semibold">{toastMessage}</Toast.Title>
-          <Toast.Description className="text-sm text-gray-400"></Toast.Description>
-          <Toast.Action asChild altText="Close">
-            <button
-              className="text-sm text-cyan-400 hover:underline"
-              onClick={() => setToastOpen(false)}
-            >
-              Close
-            </button>
-          </Toast.Action>
-        </Toast.Root>
-        <Toast.Viewport className="fixed bottom-0 right-0 p-6" />
-      </Toast.Provider>
     </div>
   );
 }

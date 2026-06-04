@@ -53,7 +53,7 @@ export default function SetPreferencesStep({ preferences, setPreferences, onBack
           <label className="text-sm text-gray-400">Best Time to Post</label>
           <input
             type="time"
-            className="mt-2 w-full bg-gray-900/60 border border-gray-700 rounded-xl px-3 py-3"
+            className="mt-2 w-full bg-gray-900/60 border border-gray-700 rounded-xl px-3 py-3 text-white [color-scheme:dark]"
             value={preferences.bestTime}
             onChange={(e) => update("bestTime", e.target.value)}
           />

@@ -1,0 +1,177 @@
+/* AI Reputation Page Styles */
+
+/* Background animations with font - same as other pages */
+.reputation-waves-bg {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #0E1116 0%, #1A1F26 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.reputation-waves-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.1) 0%, transparent 70%),
+              radial-gradient(circle at 70% 30%, rgba(167, 139, 250, 0.1) 0%, transparent 70%),
+              radial-gradient(circle at 30% 70%, rgba(251, 146, 60, 0.1) 0%, transparent 70%);
+  animation: waves 20s ease-in-out infinite;
+}
+
+@keyframes waves {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -30px) rotate(120deg); }
+  66% { transform: translate(-20px, 20px) rotate(240deg); }
+}
+
+/* Floating particles */
+.floating-particles {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(45deg, #22d3ee, #a855f7);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: float 8s infinite ease-in-out;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0.6; }
+  25% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
+  50% { transform: translateY(-10px) translateX(-10px); opacity: 1; }
+  75% { transform: translateY(-30px) translateX(5px); opacity: 0.7; }
+}
+
+/* Pulse glow effect */
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.5), 0 0 40px rgba(34, 211, 238, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(34, 211, 238, 0.8), 0 0 60px rgba(34, 211, 238, 0.4); }
+}
+
+/* Slide up animation */
+.slide-up {
+  opacity: 0;
+  transform: translateY(30px);
+  animation: slideUp 0.8s ease-out forwards;
+}
+
+@keyframes slideUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bars */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(75, 85, 99, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  border-radius: 4px;
+  transition: width 1.5s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: progressShine 2s infinite;
+}
+
+@keyframes progressShine {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* AI typing animation */
+.ai-typing {
+  animation: aiTyping 1.5s ease-in-out infinite;
+}
+
+@keyframes aiTyping {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Score number gradient */
+.score-number {
+  background: linear-gradient(135deg, #22d3ee, #a855f7, #fb923c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 30px rgba(34, 211, 238, 0.5);
+}
+
+/* Trend chart container */
+.trend-chart-container {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+/* Glass effect */
+.glass-effect {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+/* Gradient accent */
+.gradient-accent {
+  background: linear-gradient(135deg, #22d3ee, #a855f7);
+}
+
+/* Badge tier hover */
+.badge-tier:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* Insight item hover */
+.insight-item:hover {
+  background: rgba(0, 0, 0, 0.3);
+  transform: translateX(5px);
+  transition: all 0.3s ease;
+}
+
+/* Optimize button */
+.optimize-btn {
+  background: linear-gradient(135deg, #22d3ee, #a855f7);
+  position: relative;
+  overflow: hidden;
+}
+
+.optimize-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.optimize-btn:hover::before {
+  left: 100%;
+}

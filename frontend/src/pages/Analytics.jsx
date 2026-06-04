@@ -1,392 +1,963 @@
 // Analytics.jsx
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import useTranslation from "../i18n/useTranslation";
+import { usePosts } from "../hooks/usePosts";
 import {
   faRocket, faChartColumn, faFire, faBrain, faMagicWandSparkles,
   faCheck, faClock, faLightbulb, faTrophy, faDownload,
   faArrowUp, faArrowDown, faHeart, faEye, faUsers,
   faImage, faVideo, faAlignLeft, faPoll, faExternalLinkAlt, faChartLine
 } from "@fortawesome/free-solid-svg-icons";
-import { faLinkedin, faMedium, faTwitter, faXTwitter } from "@fortawesome/free-brands-svg-icons";
 
-export default function PostsLibrary() {
-  const [activeTab, setActiveTab] = useState("drafts");
-  const [view, setView] = useState("grid");
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ platform: "", date: "", performance: "", sort: "newest" });
+// Platform icons mapping
+const PLATFORM_ICONS = {
+  Twitter: "fa-x-twitter",
+  LinkedIn: "fa-linkedin-in",
+  Medium: "fa-medium",
+};
+
+const PLATFORM_ICON_COLORS = {
+  Twitter: "text-white",
+  LinkedIn: "text-blue-400",
+  Medium: "text-green-400",
+};
+
+export default function AnalyticsPage() {
+  const t = useTranslation();
+  const navigate = useNavigate();
+  const { fetchAnalyticsData, fetchBestTimes, fetchContentPerformance, fetchAiInsights } = usePosts();
+  const [analyticsData, setAnalyticsData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeRange, setActiveRange] = useState("30D");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState("pdf");
+
+  // Real backend data states
+  const [backendBestTimes, setBackendBestTimes] = useState(null);
+  const [backendContentPerf, setBackendContentPerf] = useState(null);
+  const [backendAiInsights, setBackendAiInsights] = useState(null);
+  const [bestTimesLoading, setBestTimesLoading] = useState(true);
+  const [contentPerfLoading, setContentPerfLoading] = useState(true);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(true);
 
   const ranges = ["7D", "30D", "90D"];
 
+  const generateExportReport = () => {
+    const now = new Date();
+    const daysAgo = parseInt(activeRange.replace('D', ''));
+    const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    const currentAnalytics = calculateAnalytics();
+
+    const reportData = {
+      generatedAt: now.toLocaleString(),
+      period: `Last ${activeRange}`,
+      summary: {
+        totalEngagement: currentAnalytics.totalEngagement,
+        totalLikes: currentAnalytics.totalLikes,
+        totalComments: currentAnalytics.totalComments,
+        totalShares: currentAnalytics.totalShares,
+        engagementTrend: currentAnalytics.engagementTrend,
+        postsPerDay: currentAnalytics.postsPerDay,
+        estimatedReach: currentAnalytics.estimatedReach,
+        followerGrowthPercent: currentAnalytics.followerGrowthPercent,
+        reachGrowthPercent: currentAnalytics.reachGrowthPercent,
+        engagementPerPost: currentAnalytics.engagementPerPost,
+      },
+      platformBreakdown: currentAnalytics.platformEngagement,
+      topPosts: currentAnalytics.topPosts,
+      bestTimes: currentAnalytics.bestTimes,
+      contentPerformance: currentAnalytics.contentPerformance,
+    };
+
+    if (exportFormat === 'json') {
+      const dataStr = JSON.stringify(reportData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `analytics-report-${now.toISOString().split('T')[0]}.json`;
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    } else if (exportFormat === 'csv') {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Metric,Value\n";
+      csvContent += `Total Engagement,${reportData.summary.totalEngagement}\n`;
+      csvContent += `Total Likes,${reportData.summary.totalLikes}\n`;
+      csvContent += `Total Comments,${reportData.summary.totalComments}\n`;
+      csvContent += `Total Shares,${reportData.summary.totalShares}\n`;
+      csvContent += `Engagement Trend,${reportData.summary.engagementTrend}%\n`;
+      csvContent += `Posts Per Day,${reportData.summary.postsPerDay}\n`;
+      csvContent += `Estimated Reach,${reportData.summary.estimatedReach}\n`;
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `analytics-report-${now.toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleViewAllPosts = () => {
+    navigate("/dashboard/PostsLibrary");
+  };
+
   useEffect(() => {
-    // Engagement Line Chart
-    Highcharts.chart("engagement-chart", {
-      chart: { type: "line", backgroundColor: "transparent", height: 320 },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: {
-        categories: ["Dec 1","Dec 5","Dec 8","Dec 10","Dec 12","Dec 15","Dec 18"],
-        lineColor: "rgba(255,255,255,0.1)",
-        tickColor: "rgba(255,255,255,0.1)",
-        labels: { style: { color: "#9CA3AF", fontSize: "12px" } }
-      },
-      yAxis: {
+    const loadAnalytics = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchAnalyticsData();
+        setAnalyticsData(data || []);
+      } catch (err) {
+        console.error("Error loading analytics:", err);
+        setAnalyticsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAnalytics();
+  }, [fetchAnalyticsData]);
+
+  // Fetch backend data only when activeRange is 30D (default range)
+  useEffect(() => {
+    if (activeRange !== '30D') {
+      // Clear backend data when range changes to force client-side calculation
+      setBackendBestTimes(null);
+      setBackendContentPerf(null);
+      setBackendAiInsights(null);
+      return;
+    }
+
+    // Fetch best times from backend
+    const loadBestTimes = async () => {
+      try {
+        setBestTimesLoading(true);
+        const data = await fetchBestTimes();
+        setBackendBestTimes(data);
+      } catch (err) {
+        console.error("Error loading best times:", err);
+      } finally {
+        setBestTimesLoading(false);
+      }
+    };
+    loadBestTimes();
+
+    // Fetch content performance from backend
+    const loadContentPerf = async () => {
+      try {
+        setContentPerfLoading(true);
+        const data = await fetchContentPerformance();
+        setBackendContentPerf(data);
+      } catch (err) {
+        console.error("Error loading content performance:", err);
+      } finally {
+        setContentPerfLoading(false);
+      }
+    };
+    loadContentPerf();
+
+    // Fetch AI insights from backend
+    const loadAiInsights = async () => {
+      try {
+        setAiInsightsLoading(true);
+        const data = await fetchAiInsights();
+        if (data?.success) {
+          setBackendAiInsights(data);
+        }
+      } catch (err) {
+        console.error("Error loading AI insights:", err);
+      } finally {
+        setAiInsightsLoading(false);
+      }
+    };
+    loadAiInsights();
+  }, [activeRange, fetchBestTimes, fetchContentPerformance, fetchAiInsights]);
+
+  const calculateAnalytics = () => {
+    const now = new Date();
+    const daysAgo = parseInt(activeRange.replace('D', ''));
+    const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    const previousCutoffDate = new Date(cutoffDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+
+    console.log('=== DEBUG ANALYTICS ===');
+    console.log('Total posts in analyticsData:', analyticsData.length);
+    console.log('Active range:', activeRange);
+    console.log('Days ago:', daysAgo);
+    console.log('Cutoff date:', cutoffDate.toLocaleDateString());
+    console.log('Now:', now.toLocaleDateString());
+    console.log('Sample posts:', analyticsData.slice(0, 3).map(p => ({ 
+      content: p.content?.substring(0, 50), 
+      createdAt: p.createdAt, 
+      platforms: p.platforms,
+      totalEngagement: p.totalEngagement 
+    })));
+
+    const postsInRange = analyticsData.filter(post => {
+      // Use the relevant date based on post status
+      const relevantDate = post.scheduleDate || post.publishedAt || post.createdAt;
+      if (!relevantDate) return false;
+      const postDate = new Date(relevantDate);
+      const inRange = !isNaN(postDate) && postDate >= cutoffDate;
+      console.log(`Post: ${post.content?.substring(0, 30)}... | Status: ${post.status} | Date: ${relevantDate} | Valid: ${!isNaN(postDate)} | In range: ${inRange}`);
+      return inRange;
+    });
+
+    console.log('Posts in range:', postsInRange.length);
+
+    const postsInPreviousRange = analyticsData.filter(post => {
+      // Use the relevant date based on post status for consistency
+      const relevantDate = post.scheduleDate || post.publishedAt || post.createdAt;
+      if (!relevantDate) return false;
+      const postDate = new Date(relevantDate);
+      return !isNaN(postDate) && postDate >= previousCutoffDate && postDate < cutoffDate;
+    });
+
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+    let totalEngagement = 0;
+
+    postsInRange.forEach(post => {
+      if (post.engagement) {
+        totalLikes += post.engagement.likes || 0;
+        totalComments += post.engagement.comments || 0;
+        totalShares += post.engagement.shares || 0;
+        totalEngagement += post.totalEngagement || 0;
+      }
+    });
+
+    let previousEngagement = 0;
+    postsInPreviousRange.forEach(post => {
+      if (post.engagement) {
+        previousEngagement += post.totalEngagement || 0;
+      }
+    });
+
+    const engagementTrend = previousEngagement > 0
+      ? parseFloat(((totalEngagement - previousEngagement) / previousEngagement * 100).toFixed(1))
+      : (totalEngagement > 0 ? 100 : 0);
+
+    const engagementPerPost = postsInRange.length > 0
+      ? (totalEngagement / postsInRange.length).toFixed(1)
+      : 0;
+
+    const followerGrowthPercent = previousEngagement > 0
+      ? parseFloat(((totalEngagement - previousEngagement) / previousEngagement * 100).toFixed(1))
+      : 0;
+
+    const prevAvgLikes = postsInPreviousRange.length > 0
+      ? postsInPreviousRange.reduce((sum, p) => sum + (p.engagement?.likes || 0), 0) / postsInPreviousRange.length
+      : 0;
+    const currAvgLikes = postsInRange.length > 0 ? totalLikes / postsInRange.length : 0;
+
+    const reachGrowthPercent = prevAvgLikes > 0
+      ? parseFloat(((currAvgLikes - prevAvgLikes) / prevAvgLikes * 100).toFixed(1))
+      : 0;
+
+    const estimatedReach = totalEngagement * 15;
+
+    const topPosts = [...postsInRange]
+      .sort((a, b) => (b.totalEngagement || 0) - (a.totalEngagement || 0))
+      .slice(0, 5)
+      .map((post, index) => {
+        const avgEngagement = postsInRange.length > 0
+          ? postsInRange.reduce((sum, p) => sum + (p.totalEngagement || 0), 0) / postsInRange.length
+          : 0;
+        const growthPercent = avgEngagement > 0
+          ? Math.round(((post.totalEngagement - avgEngagement) / avgEngagement) * 100)
+          : 0;
+
+        const platformIcons = post.platforms
+          ? Object.keys(post.platforms)
+              .filter(p => post.platforms[p] && PLATFORM_ICONS[p])
+              .map(p => ({ icon: PLATFORM_ICONS[p], color: PLATFORM_ICON_COLORS[p] || 'text-gray-300' }))
+          : [];
+
+        const postDate = post.createdAt ? new Date(post.createdAt) : new Date();
+
+        return {
+          rank: index + 1,
+          title: post.content?.substring(0, 50) + (post.content?.length > 50 ? '...' : '') || 'Untitled Post',
+          subtitle: post.content?.substring(50, 100) + (post.content?.length > 100 ? '...' : '') || '',
+          platforms: platformIcons,
+          engagement: (post.totalEngagement || 0).toLocaleString(),
+          growth: growthPercent >= 0 ? `+${growthPercent}% vs avg` : `${growthPercent}% vs avg`,
+          reach: ((post.totalEngagement || 0) * 15).toLocaleString(),
+          date: !isNaN(postDate)
+            ? postDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : '---'
+        };
+      });
+
+    const platformEngagement = { Twitter: 0, LinkedIn: 0, Medium: 0 };
+    const platformPostCount = { Twitter: 0, LinkedIn: 0, Medium: 0 };
+
+    postsInRange.forEach(post => {
+      if (post.platforms) {
+        Object.keys(post.platforms).forEach(platform => {
+          if (post.platforms[platform] && platformEngagement.hasOwnProperty(platform)) {
+            platformEngagement[platform] += post.totalEngagement || 0;
+            platformPostCount[platform] += 1;
+          }
+        });
+      }
+    });
+
+    const platformAvgEngagement = {
+      Twitter: platformPostCount.Twitter > 0 ? platformEngagement.Twitter / platformPostCount.Twitter : 0,
+      LinkedIn: platformPostCount.LinkedIn > 0 ? platformEngagement.LinkedIn / platformPostCount.LinkedIn : 0,
+      Medium: platformPostCount.Medium > 0 ? platformEngagement.Medium / platformPostCount.Medium : 0
+    };
+
+    const totalAvgEngagement = Object.values(platformAvgEngagement).reduce((sum, val) => sum + val, 0);
+
+    const totalPlatformEngagement = Object.values(platformEngagement).reduce((sum, val) => sum + val, 0);
+    
+    const platformPercentages = {
+      Twitter: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.Twitter / totalPlatformEngagement * 100).toFixed(1)) : 0,
+      LinkedIn: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.LinkedIn / totalPlatformEngagement * 100).toFixed(1)) : 0,
+      Medium: totalPlatformEngagement > 0 ? parseFloat((platformEngagement.Medium / totalPlatformEngagement * 100).toFixed(1)) : 0
+    };
+
+    const hourlyPerformance = {};
+    postsInRange.forEach(post => {
+      if (!post.createdAt) return;
+      const date = new Date(post.createdAt);
+      if (isNaN(date)) return;
+      const hour = date.getHours();
+      if (!hourlyPerformance[hour]) {
+        hourlyPerformance[hour] = { totalEngagement: 0, count: 0 };
+      }
+      hourlyPerformance[hour].totalEngagement += post.totalEngagement || 0;
+      hourlyPerformance[hour].count += 1;
+    });
+
+    const bestHours = Object.keys(hourlyPerformance)
+      .map(hour => ({
+        hour: parseInt(hour),
+        avgEngagement: hourlyPerformance[hour].totalEngagement / hourlyPerformance[hour].count,
+      }))
+      .sort((a, b) => b.avgEngagement - a.avgEngagement)
+      .slice(0, 3);
+
+    // Calculate average engagement across all hours for comparison
+    const overallAvgEngagement = bestHours.length > 0
+      ? bestHours.reduce((sum, h) => sum + h.avgEngagement, 0) / bestHours.length
+      : 0;
+
+    const bestTimes = bestHours.map((hourData, index) => {
+      const hourLabel = hourData.hour === 0 ? '12:00 AM'
+        : hourData.hour === 12 ? '12:00 PM'
+        : hourData.hour < 12 ? `${hourData.hour}:00 AM`
+        : `${hourData.hour - 12}:00 PM`;
+      const colors = ['text-cyan-400', 'text-violet-400', 'text-teal-400'];
+      const descriptions = ['Peak engagement time', 'High performance window', 'Consistent engagement'];
+      const day = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      const aboveAvg = overallAvgEngagement > 0
+        ? Math.round(((hourData.avgEngagement - overallAvgEngagement) / overallAvgEngagement) * 100)
+        : 0;
+      return {
+        day: `${day}, ${hourLabel}`,
+        desc: descriptions[index] || 'Good performance',
+        value: hourData.avgEngagement > 0 ? `+${Math.max(aboveAvg, 0)}%` : 'No data',
+        color: colors[index]
+      };
+    });
+
+    const contentTypeStats = { image: 0, video: 0, text: 0, poll: 0 };
+    const contentTypeCount = { image: 0, video: 0, text: 0, poll: 0 };
+
+    const analyzeContentType = (content) => {
+      if (!content) return 'text';
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes('image') || lowerContent.includes('photo') || lowerContent.includes('picture')) return 'image';
+      if (lowerContent.includes('video') || lowerContent.includes('watch') || lowerContent.includes('youtube')) return 'video';
+      if (lowerContent.includes('?') || lowerContent.includes('poll') || lowerContent.includes('vote')) return 'poll';
+      return 'text';
+    };
+
+    postsInRange.forEach(post => {
+      const type = analyzeContentType(post.content);
+      contentTypeStats[type] += post.totalEngagement || 0;
+      contentTypeCount[type] += 1;
+    });
+
+    const contentTypeAvg = {
+      image: contentTypeCount.image > 0 ? contentTypeStats.image / contentTypeCount.image : 0,
+      video: contentTypeCount.video > 0 ? contentTypeStats.video / contentTypeCount.video : 0,
+      text: contentTypeCount.text > 0 ? contentTypeStats.text / contentTypeCount.text : 0,
+      poll: contentTypeCount.poll > 0 ? contentTypeStats.poll / contentTypeCount.poll : 0
+    };
+
+    const maxContentAvg = Math.max(...Object.values(contentTypeAvg));
+
+    const contentPerformance = [
+      { icon: faImage, color: "bg-cyan-400", label: "Image Posts", value: maxContentAvg > 0 ? Math.round((contentTypeAvg.image / maxContentAvg) * 100) : 0, posts: contentTypeCount.image, avgEngagement: Math.round(contentTypeAvg.image) },
+      { icon: faVideo, color: "bg-violet-400", label: "Video Content", value: maxContentAvg > 0 ? Math.round((contentTypeAvg.video / maxContentAvg) * 100) : 0, posts: contentTypeCount.video, avgEngagement: Math.round(contentTypeAvg.video) },
+      { icon: faAlignLeft, color: "bg-teal-400", label: "Text Only", value: maxContentAvg > 0 ? Math.round((contentTypeAvg.text / maxContentAvg) * 100) : 0, posts: contentTypeCount.text, avgEngagement: Math.round(contentTypeAvg.text) },
+      { icon: faPoll, color: "bg-orange-400", label: "Polls & Questions", value: maxContentAvg > 0 ? Math.round((contentTypeAvg.poll / maxContentAvg) * 100) : 0, posts: contentTypeCount.poll, avgEngagement: Math.round(contentTypeAvg.poll) },
+    ];
+
+    const totalEngagementBreakdown = totalLikes + totalComments + totalShares;
+    const likesPercent = totalEngagementBreakdown > 0 ? parseFloat((totalLikes / totalEngagementBreakdown * 100).toFixed(1)) : 0;
+    const commentsPercent = totalEngagementBreakdown > 0 ? parseFloat((totalComments / totalEngagementBreakdown * 100).toFixed(1)) : 0;
+    const sharesPercent = totalEngagementBreakdown > 0 ? parseFloat((totalShares / totalEngagementBreakdown * 100).toFixed(1)) : 0;
+
+    return {
+      totalEngagement,
+      totalLikes,
+      totalComments,
+      totalShares,
+      likesPercent,
+      commentsPercent,
+      sharesPercent,
+      engagementPerPost,
+      engagementTrend,
+      followerGrowthPercent,
+      reachGrowthPercent,
+      estimatedReach: Math.round(estimatedReach),
+      platformEngagement,
+      platformPercentages,
+      platformPostCount,
+      topPosts,
+      contentPerformance,
+      bestTimes,
+      postsPerDay: postsInRange.length > 0 ? parseFloat((postsInRange.length / daysAgo).toFixed(2)) : 0,
+      averageReach: postsInRange.length > 0 ? Math.round(totalEngagement / postsInRange.length * 15) : 0
+    };
+  };
+
+  const analytics = calculateAnalytics();
+
+  useEffect(() => {
+    console.log('Chart effect triggered, data length:', analyticsData.length);
+    
+    const timer = setTimeout(() => {
+      const engagementContainer = document.getElementById("engagement-chart");
+      
+      console.log('Engagement container found:', !!engagementContainer);
+      
+      if (!engagementContainer) {
+        console.log('Engagement chart container not ready yet');
+        return;
+      }
+
+      // Clear existing charts
+      Highcharts.charts.forEach(chart => {
+        if (chart && chart.renderTo) {
+          chart.destroy();
+        }
+      });
+
+      console.log('Creating engagement chart...');
+
+      const generateDateCategories = () => {
+        const categories = [];
+        const now = new Date();
+        const daysAgo = parseInt(activeRange.replace('D', ''));
+        const step = Math.ceil(daysAgo / 6);
+        for (let i = daysAgo; i > 0; i -= step) {
+          const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+          categories.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
+        // Always include today as the last category
+        categories.push(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        return categories;
+      };
+
+      const generateChartData = () => {
+        const categories = generateDateCategories();
+        const daysAgo = parseInt(activeRange.replace('D', ''));
+        const now = new Date();
+        const timeBuckets = categories.map(() => ({ likes: 0, comments: 0, shares: 0, count: 0 }));
+
+        // Filter posts by date range first
+        const nowDate = new Date();
+        const cutoffDate = new Date(nowDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+        const filteredPosts = analyticsData.filter(post => {
+          if (!post.createdAt) return false;
+          const postDate = new Date(post.createdAt);
+          return !isNaN(postDate) && postDate >= cutoffDate;
+        });
+
+        filteredPosts.forEach(post => {
+          try {
+            if (post.engagement && post.createdAt && typeof post.engagement === 'object') {
+              const postDate = new Date(post.createdAt);
+              if (isNaN(postDate)) return;
+              const daysDiff = Math.floor((now - postDate) / (24 * 60 * 60 * 1000));
+              if (daysDiff >= 0 && daysDiff <= daysAgo) {
+                // Map: daysDiff=0 (today) → last bucket, daysDiff=daysAgo (oldest) → first bucket
+                const bucketIndex = Math.max(0, Math.min(
+                  categories.length - 1 - Math.floor((daysDiff / daysAgo) * categories.length),
+                  categories.length - 1
+                ));
+                
+                if (bucketIndex >= 0 && bucketIndex < timeBuckets.length) {
+                  const engagement = post.engagement;
+                  const likes = typeof engagement.likes === 'number' ? engagement.likes : (typeof engagement.likes === 'undefined' ? 0 : Number(engagement.likes) || 0);
+                  const comments = typeof engagement.comments === 'number' ? engagement.comments : (typeof engagement.comments === 'undefined' ? 0 : Number(engagement.comments) || 0);
+                  const shares = typeof engagement.shares === 'number' ? engagement.shares : (typeof engagement.shares === 'undefined' ? 0 : Number(engagement.shares) || 0);
+                  
+                  timeBuckets[bucketIndex].likes += likes;
+                  timeBuckets[bucketIndex].comments += comments;
+                  timeBuckets[bucketIndex].shares += shares;
+                  timeBuckets[bucketIndex].count += 1;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('Error processing post:', error);
+          }
+        });
+
+        return {
+          likesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.likes / b.count) : 0),
+          commentsData: timeBuckets.map(b => b.count > 0 ? Math.round(b.comments / b.count) : 0),
+          sharesData: timeBuckets.map(b => b.count > 0 ? Math.round(b.shares / b.count) : 0),
+        };
+      };
+
+      const chartData = generateChartData();
+      console.log('Chart data generated:', chartData, 'Posts:', analyticsData.length);
+      
+      // Clear container completely
+      engagementContainer.innerHTML = '';
+      engagementContainer.className = 'h-80 w-full bg-black/20 rounded-xl';
+      
+      const hasData = chartData.likesData.some(val => val > 0) || 
+                     chartData.commentsData.some(val => val > 0) || 
+                     chartData.sharesData.some(val => val > 0);
+      
+      console.log('Has data:', hasData, 'Analytics data length:', analyticsData.length);
+      
+      if (!hasData || analyticsData.length === 0) {
+        console.log('No data available, showing message');
+        engagementContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No engagement data available</div>';
+      } else {
+        console.log('Creating Highcharts chart with data:', chartData);
+        try {
+          const chart = Highcharts.chart("engagement-chart", {
+            chart: { 
+              type: "line", 
+              backgroundColor: "transparent", 
+              height: 320,
+              style: { fontFamily: 'system-ui' }
+            },
+            title: { text: null },
+            credits: { enabled: false },
+            accessibility: { enabled: false },
+            xAxis: { 
+              categories: generateDateCategories(), 
+              lineColor: "rgba(255,255,255,0.1)", 
+              tickColor: "rgba(255,255,255,0.1)", 
+              labels: { style: { color: "#9CA3AF", fontSize: "12px" } } 
+            },
+            yAxis: { 
+              title: { text: null }, 
+              gridLineColor: "rgba(255,255,255,0.1)", 
+              labels: { style: { color: "#9CA3AF", fontSize: "12px" } } 
+            },
+            legend: { 
+              enabled: true,
+              itemStyle: { color: "#9CA3AF" }
+            },
+            plotOptions: { 
+              line: { 
+                marker: { radius: 6, symbol: "circle" }, 
+                lineWidth: 3 
+              } 
+            },
+            series: [
+              { name: "Likes", data: chartData.likesData, color: "#00C2FF" },
+              { name: "Comments", data: chartData.commentsData, color: "#7B61FF" },
+              { name: "Shares", data: chartData.sharesData, color: "#00E09D" }
+            ]
+          });
+          console.log('✅ Engagement chart created successfully:', chart);
+        } catch (err) {
+          console.error('❌ Chart error:', err);
+          engagementContainer.innerHTML = '<div class="flex items-center justify-center h-full text-red-500">Chart error: ' + err.message + '</div>';
+        }
+      }
+
+      // Calculate postsInRange for platform chart (same logic as calculateAnalytics)
+      const now = new Date();
+      const daysAgo = parseInt(activeRange.replace('D', ''));
+      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      const postsInRange = analyticsData.filter(post => {
+        if (!post.createdAt) return false;
+        const postDate = new Date(post.createdAt);
+        return !isNaN(postDate) && postDate >= cutoffDate;
+      });
+
+      const platformEngagement = { Twitter: 0, LinkedIn: 0, Medium: 0 };
+      postsInRange.forEach(post => {
+        if (post.platforms) {
+          Object.keys(post.platforms).forEach(platform => {
+            if (post.platforms[platform] && platformEngagement.hasOwnProperty(platform)) {
+              platformEngagement[platform] += post.totalEngagement || 0;
+            }
+          });
+        }
+      });
+
+      const total = Object.values(platformEngagement).reduce((a, b) => a + b, 0);
+      const data = total > 0 ? [
+        { name: "Twitter", y: (platformEngagement.Twitter / total * 100), color: "#1D9BF0" },
+        { name: "LinkedIn", y: (platformEngagement.LinkedIn / total * 100), color: "#7B61FF" },
+        { name: "Medium", y: (platformEngagement.Medium / total * 100), color: "#00E09D" }
+      ] : [{ name: "No Data", y: 100, color: "#4B5563" }];
+
+      const platformContainer = document.getElementById("platform-chart");
+      if (!platformContainer) {
+        console.warn('Platform chart container not found');
+        return;
+      }
+
+      // Clear any existing platform chart
+      const existingPlatformChart = Highcharts.charts.find(chart => chart && chart.renderTo && chart.renderTo.id === 'platform-chart');
+      if (existingPlatformChart) {
+        existingPlatformChart.destroy();
+      }
+
+      platformContainer.innerHTML = '';
+
+      console.log('Creating platform chart with data:', data, 'Total:', total);
+      Highcharts.chart("platform-chart", {
+        chart: { type: "pie", backgroundColor: "transparent", height: 260 },
         title: { text: null },
-        gridLineColor: "rgba(255,255,255,0.1)",
-        labels: { style: { color: "#9CA3AF", fontSize: "12px" } }
-      },
-      legend: { enabled: false },
-      plotOptions: { line: { marker: { radius: 6, symbol: "circle" }, lineWidth: 3 } },
-      series: [
-        { name: "Likes", data: [820,932,901,1134,1290,1330,1200], color:"#00C2FF", marker:{ fillColor:"#00C2FF", lineColor:"#00C2FF", lineWidth:2 } },
-        { name: "Comments", data: [320,412,385,523,612,680,590], color:"#7B61FF", marker:{ fillColor:"#7B61FF", lineColor:"#7B61FF", lineWidth:2 } },
-        { name: "Shares", data: [180,235,198,287,345,398,320], color:"#00E09D", marker:{ fillColor:"#00E09D", lineColor:"#00E09D", lineWidth:2 } }
-      ]
-    });
+        credits: { enabled: false },
+        accessibility: { enabled: false },
+        tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
+        plotOptions: { 
+          pie: { 
+            allowPointSelect: true, 
+            cursor: "pointer", 
+            dataLabels: { enabled: false }, 
+            innerSize: "40%", 
+            borderWidth: 0 
+          } 
+        },
+        series: [{ name: "Engagement", colorByPoint: true, data }]
+      });
+      console.log('✅ Platform chart created successfully');
 
-    // Platform Pie Chart
-    Highcharts.chart("platform-chart", {
-      chart: { type: "pie", backgroundColor:"transparent", height: 260 },
-      title: { text: null },
-      credits: { enabled: false },
-      tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
-      plotOptions: { pie: { allowPointSelect:true, cursor:"pointer", dataLabels:{enabled:false}, innerSize:"40%", borderWidth:0 } },
-      series: [{ name:"Engagement", colorByPoint:true, data:[
-        {name:"Twitter", y:42.3, color:"#1D9BF0"},
-        {name:"LinkedIn", y:35.7, color:"#7B61FF"},
-        {name:"Medium", y:22.0, color:"#00E09D"}
-      ]}]
-    });
+      const metricCards = document.querySelectorAll(".metric-card");
+      metricCards.forEach((card, index) => {
+        card.style.opacity = "0";
+        card.style.transform = "translateY(20px)";
+        setTimeout(() => {
+          card.style.transition = "all 0.6s cubic-bezier(0.4,0,0.2,1)";
+          card.style.opacity = "1";
+          card.style.transform = "translateY(0)";
+        }, index * 100);
+      });
 
-    // Animate Cards
-    const metricCards = document.querySelectorAll(".metric-card");
-    metricCards.forEach((card, index) => {
-      card.style.opacity = "0";
-      card.style.transform = "translateY(20px)";
-      setTimeout(() => {
-        card.style.transition = "all 0.6s cubic-bezier(0.4,0,0.2,1)";
-        card.style.opacity = "1";
-        card.style.transform = "translateY(0)";
-      }, index * 100);
-    });
+      const tableRows = document.querySelectorAll("tbody tr");
+      tableRows.forEach((row, index) => {
+        row.style.opacity = "0";
+        row.style.transform = "translateX(-20px)";
+        setTimeout(() => {
+          row.style.transition = "all 0.4s ease-out";
+          row.style.opacity = "1";
+          row.style.transform = "translateX(0)";
+        }, (index * 100) + 1000);
+      });
 
-    const tableRows = document.querySelectorAll("tbody tr");
-    tableRows.forEach((row, index) => {
-      row.style.opacity = "0";
-      row.style.transform = "translateX(-20px)";
-      setTimeout(() => {
-        row.style.transition = "all 0.4s ease-out";
-        row.style.opacity = "1";
-        row.style.transform = "translateX(0)";
-      }, (index * 100) + 1000);
-    });
+    }, 100);
 
-  }, []);
+    return () => clearTimeout(timer);
+  }, [analyticsData, activeRange]);
 
-  // Performance Insights Data
-  const contentPerformance = [
-    { icon: faImage, color: "bg-cyan-400", label: "Image Posts", value: 85 },
-    { icon: faVideo, color: "bg-violet-400", label: "Video Content", value: 72 },
-    { icon: faAlignLeft, color: "bg-teal-400", label: "Text Only", value: 58 },
-    { icon: faPoll, color: "bg-orange-400", label: "Polls & Questions", value: 91 },
-  ];
+  const ICON_MAP = { faImage, faVideo, faAlignLeft, faPoll };
 
-  const bestTimes = [
-    { day: "Tuesday, 2:00 PM", desc: "Peak engagement time", value: "94%", color: "text-cyan-400" },
-    { day: "Thursday, 9:00 AM", desc: "Professional content", value: "78%", color: "text-violet-400" },
-    { day: "Sunday, 7:00 PM", desc: "Casual engagement", value: "65%", color: "text-teal-400" },
-  ];
+  // Use client-side calculations to ensure date range filter is respected
+  // Backend data is used as fallback only when no date filter is active (30D default)
+  const contentPerformance = activeRange === '30D' && backendContentPerf?.content_performance
+    ? backendContentPerf.content_performance.map(item => ({
+        icon: ICON_MAP[item.icon] || faAlignLeft,
+        color: item.color,
+        label: item.label,
+        value: item.value,
+        posts: item.posts,
+        avgEngagement: item.avgEngagement,
+        totalEngagement: item.totalEngagement,
+        likes: item.likes,
+        comments: item.comments,
+        shares: item.shares,
+      }))
+    : analytics.contentPerformance;
 
-  const topPosts = [
-    {
-      rank: 1,
-      title: "How AI is revolutionizing content creation",
-      subtitle: "The future of automated posting...",
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/63f95caaec-47f7d4f9c4f55d6dc2ac.png",
-      platforms: [faLinkedin, faXTwitter],
-      engagement: "2,847",
-      growth: "+342% vs avg",
-      reach: "45.2K",
-      date: "Dec 15",
-    },
-    {
-      rank: 2,
-      title: "5 lessons from building a SaaS startup",
-      subtitle: "What I learned in my first year...",
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/2f3ddb66d9-6268a638bd4299c9dad3.png",
-      platforms: [faMedium, faLinkedin],
-      engagement: "1,924",
-      growth: "+187% vs avg",
-      reach: "32.1K",
-      date: "Dec 12",
-    },
-    {
-      rank: 3,
-      title: "The ultimate guide to social media automation",
-      subtitle: "Save 10+ hours per week with these tools...",
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/3808a2bf47-56d7a0f837f22ed8c61f.png",
-      platforms: [faXTwitter],
-      engagement: "1,673",
-      growth: "+124% vs avg",
-      reach: "28.7K",
-      date: "Dec 10",
-    },
-    {
-      rank: 4,
-      title: "Building a personal brand as a tech founder",
-      subtitle: "My journey from zero to 10k followers...",
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/81bc692b51-d0410671a53d52e72aa8.png",
-      platforms: [faLinkedin, faMedium],
-      engagement: "1,445",
-      growth: "+98% vs avg",
-      reach: "24.3K",
-      date: "Dec 8",
-    },
-    {
-      rank: 5,
-      title: "10 productivity hacks for remote workers",
-      subtitle: "Boost your efficiency while working from home...",
-      img: "https://storage.googleapis.com/uxpilot-auth.appspot.com/1b4d13dfcb-bab7c9dddbecc8979146.png",
-      platforms: [faXTwitter, faLinkedin],
-      engagement: "1,289",
-      growth: "+76% vs avg",
-      reach: "21.8K",
-      date: "Dec 5",
-    },
-  ];
+  const bestTimes = activeRange === '30D' && backendBestTimes?.best_times
+    ? backendBestTimes.best_times
+    : analytics.bestTimes;
+  const bestTimesAiInsight = activeRange === '30D' && backendBestTimes?.ai_insight
+    ? backendBestTimes.ai_insight
+    : null;
+  const topPosts = analytics.topPosts;
 
   return (
     <div id="main-content" className="p-8">
-
-      {/* Header Section */}
       <div id="header-section" className="flex items-center justify-between mb-8 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
-          <p className="text-gray-400">Track your content performance across all platforms</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{t("analytics.title")}</h1>
+          <p className="text-gray-400">{t("analytics.subtitle")}</p>
         </div>
-        <div className="flex items-center space-x-4">
-          {/* Boutons/filtres si nécessaire */}
-        </div>
+        <div className="flex items-center space-x-4"></div>
       </div>
 
-      {/* Summary Section */}
       <div className="p-6">
         <div className="flex justify-between mb-8">
           <div className="flex items-center bg-black/30 rounded-2xl p-1">
             {ranges.map((range) => (
-              <button
-                key={range}
-                onClick={() => setActiveRange(range)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  activeRange === range
-                    ? "bg-cyan-400/20 text-cyan-400"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
+              <button key={range} onClick={() => setActiveRange(range)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeRange === range ? "bg-cyan-400/20 text-cyan-400" : "text-gray-400 hover:text-white"}`}>
                 {range}
               </button>
             ))}
           </div>
-          <button className="flex items-center space-x-2 px-6 py-3 glass-effect rounded-2xl text-white border border-gray-600 hover:border-cyan-400/50 transition-all">
-            <FontAwesomeIcon icon={faDownload} />
-            <span>Export Report</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button onClick={() => setShowExportModal(true)}
+              className="flex items-center space-x-2 px-6 py-3 glass-effect rounded-2xl text-white border border-gray-600 hover:border-cyan-400/50 transition-all hover:shadow-lg hover:shadow-cyan-400/20">
+              <FontAwesomeIcon icon={faDownload} />
+              <span>{t("analytics.exportReport")}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Metric Cards */}
         <div id="summary-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-slide-up">
-          {/* Total Engagement */}
           <div className="metric-card glass-effect rounded-3xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
                 <FontAwesomeIcon icon={faHeart} className="text-cyan-400 text-xl" />
               </div>
-              <div className="flex items-center space-x-1 text-green-400 text-sm font-medium">
-                <FontAwesomeIcon icon={faArrowUp} className="text-xs" />
-                <span>12.5%</span>
+              <div className={`flex items-center space-x-1 text-sm font-medium ${analytics.engagementTrend >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <FontAwesomeIcon icon={analytics.engagementTrend >= 0 ? faArrowUp : faArrowDown} className="text-xs" />
+                <span>{Math.abs(analytics.engagementTrend)}%</span>
               </div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white mb-1">24,847</div>
-              <div className="text-gray-400 text-sm">Total Engagement</div>
-              <div className="text-xs text-gray-500 mt-1">vs last 30 days</div>
+              <div className="text-3xl font-bold text-white mb-1">{analytics.totalEngagement.toLocaleString()}</div>
+              <div className="text-gray-400 text-sm">{t("analytics.totalEngagement")}</div>
+              <div className="text-xs text-gray-500 mt-1">vs last {activeRange}</div>
             </div>
           </div>
 
-          {/* Follower Growth */}
           <div className="metric-card glass-effect rounded-3xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center">
                 <FontAwesomeIcon icon={faUsers} className="text-violet-400 text-xl" />
               </div>
-              <div className="flex items-center space-x-1 text-green-400 text-sm font-medium">
-                <FontAwesomeIcon icon={faArrowUp} className="text-xs" />
-                <span>8.3%</span>
+              <div className={`flex items-center space-x-1 text-sm font-medium ${analytics.followerGrowthPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <FontAwesomeIcon icon={analytics.followerGrowthPercent >= 0 ? faArrowUp : faArrowDown} className="text-xs" />
+                <span>{Math.abs(analytics.followerGrowthPercent)}%</span>
               </div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white mb-1">+1,247</div>
-              <div className="text-gray-400 text-sm">Follower Growth</div>
-              <div className="text-xs text-gray-500 mt-1">new followers</div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {analytics.totalComments > 0 ? `+${analytics.totalComments.toLocaleString()}` : '0'}
+              </div>
+              <div className="text-gray-400 text-sm">{t("analytics.followerGrowth")}</div>
+              <div className="text-xs text-gray-500 mt-1">comments & interactions</div>
             </div>
           </div>
 
-          {/* Average Reach */}
           <div className="metric-card glass-effect rounded-3xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-2xl bg-teal-400/20 flex items-center justify-center">
                 <FontAwesomeIcon icon={faEye} className="text-teal-400 text-xl" />
               </div>
-              <div className="flex items-center space-x-1 text-red-400 text-sm font-medium">
-                <FontAwesomeIcon icon={faArrowDown} className="text-xs" />
-                <span>2.1%</span>
+              <div className={`flex items-center space-x-1 text-sm font-medium ${analytics.reachGrowthPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <FontAwesomeIcon icon={analytics.reachGrowthPercent >= 0 ? faArrowUp : faArrowDown} className="text-xs" />
+                <span>{Math.abs(analytics.reachGrowthPercent)}%</span>
               </div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white mb-1">18.6K</div>
-              <div className="text-gray-400 text-sm">Average Reach</div>
-              <div className="text-xs text-gray-500 mt-1">per post</div>
+              <div className="text-3xl font-bold text-white mb-1">{analytics.estimatedReach.toLocaleString()}</div>
+              <div className="text-gray-400 text-sm">{t("analytics.estimatedReach")}</div>
+              <div className="text-xs text-gray-500 mt-1">based on engagement</div>
             </div>
           </div>
 
-          {/* Posting Frequency */}
           <div className="metric-card glass-effect rounded-3xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-2xl bg-orange-400/20 flex items-center justify-center">
                 <FontAwesomeIcon icon={faClock} className="text-orange-400 text-xl" />
               </div>
-              <div className="flex items-center space-x-1 text-green-400 text-sm font-medium">
-                <FontAwesomeIcon icon={faArrowUp} className="text-xs" />
-                <span>5.2%</span>
+              <div className={`flex items-center space-x-1 text-sm font-medium ${analytics.postsPerDay > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                <FontAwesomeIcon icon={analytics.postsPerDay > 0 ? faArrowUp : faArrowDown} className="text-xs" />
+                <span>{analytics.postsPerDay > 0 ? 'Active' : 'Inactive'}</span>
               </div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white mb-1">4.2</div>
-              <div className="text-gray-400 text-sm">Posts per Day</div>
+              <div className="text-3xl font-bold text-white mb-1">{analytics.postsPerDay}</div>
+              <div className="text-gray-400 text-sm">{t("analytics.postsPerDay")}</div>
               <div className="text-xs text-gray-500 mt-1">consistency score</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Engagement & Platform Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* Engagement Chart */}
-        <div id="engagement-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <div id="engagement-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.2s", minHeight: "400px" }}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold text-white mb-1">Engagement Over Time</h2>
               <p className="text-gray-400 text-sm">Track your content performance trends</p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 text-sm">
-                <div className="w-3 h-3 bg-cyan-400 rounded-full glow-point" />
-                <span className="text-gray-300">Likes</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm">
-                <div className="w-3 h-3 bg-violet-400 rounded-full glow-point" />
-                <span className="text-gray-300">Comments</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm">
-                <div className="w-3 h-3 bg-teal-400 rounded-full glow-point" />
-                <span className="text-gray-300">Shares</span>
-              </div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-cyan-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.likes")}</span></div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-violet-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.comments")}</span></div>
+              <div className="flex items-center space-x-2 text-sm"><div className="w-3 h-3 bg-teal-400 rounded-full glow-point" /><span className="text-gray-300">{t("analytics.shares")}</span></div>
             </div>
           </div>
-          <div id="engagement-chart" className="h-80"></div>
+          <div id="engagement-chart" className="h-80 w-full bg-black/20 rounded-xl flex items-center justify-center">
+            <div className="text-gray-500 text-sm">Loading chart...</div>
+          </div>
         </div>
 
-        {/* Platform Chart */}
         <div id="platform-chart-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.4s" }}>
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-white mb-1">Platform Contribution</h2>
-            <p className="text-gray-400 text-sm">Engagement breakdown by platform</p>
+            <h2 className="text-xl font-semibold text-white mb-1">{t("analytics.platformContribution")}</h2>
+            <p className="text-gray-400 text-sm">{t("analytics.engagementBreakdown")}</p>
           </div>
           <div id="platform-chart" className="h-64"></div>
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-blue-400 rounded-full" />
-                <span className="text-gray-300 text-sm">Twitter</span>
-              </div>
-              <span className="text-white font-medium">42.3%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-violet-400 rounded-full" />
-                <span className="text-gray-300 text-sm">LinkedIn</span>
-              </div>
-              <span className="text-white font-medium">35.7%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-teal-400 rounded-full" />
-                <span className="text-gray-300 text-sm">Medium</span>
-              </div>
-              <span className="text-white font-medium">22.0%</span>
-            </div>
+          <div className="mt-8 space-y-4">
+            {["Twitter", "LinkedIn", "Medium"].map((platform, i) => {
+              const colors = ["blue", "violet", "teal"];
+              const c = colors[i];
+              return (
+                <div key={platform} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 bg-${c}-400 rounded-full`} />
+                      <span className="text-gray-300 text-sm font-medium">{platform}</span>
+                    </div>
+                    <span className="text-white font-bold">{analytics.platformPercentages[platform]}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden">
+                    <div className={`h-full bg-gradient-to-r from-${c}-400 to-${c}-500 rounded-full transition-all duration-500`}
+                      style={{ width: `${analytics.platformPercentages[platform]}%` }} />
+                  </div>
+                  <div className="text-xs text-gray-500 flex justify-between">
+                    <span>{t("analytics.posts")}</span>
+                    <span>{(analytics.platformEngagement[platform] || 0).toLocaleString()} {t("analytics.engagement")}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-
       </div>
 
-      {/* Performance Insights Section */}
-      <div id="insights-section" className="grid grid-cols-2 gap-8 mb-8 animate-slide-up" style={{ animationDelay: "0.6s" }}>
+      <div id="engagement-breakdown" className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-slide-up" style={{ animationDelay: "0.4s" }}>
+        <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faHeart} className="text-cyan-400 text-xl" /></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.likes")}</div><div className="text-gray-400 text-xs">{analytics.likesPercent}% {t("analytics.ofEngagement")}</div></div>
+          </div>
+          <div className="text-2xl font-bold text-cyan-400 mb-2">{analytics.totalLikes.toLocaleString()}</div>
+          <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-cyan-400 rounded-full" style={{ width: `${analytics.likesPercent}%` }} /></div>
+        </div>
 
-        {/* Best Performing Times */}
+        <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-violet-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faChartColumn} className="text-violet-400 text-xl" /></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.comments")}</div><div className="text-gray-400 text-xs">{analytics.commentsPercent}% {t("analytics.ofEngagement")}</div></div>
+          </div>
+          <div className="text-2xl font-bold text-violet-400 mb-2">{analytics.totalComments.toLocaleString()}</div>
+          <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-violet-400 rounded-full" style={{ width: `${analytics.commentsPercent}%` }} /></div>
+        </div>
+
+        <div className="glass-effect rounded-3xl p-6 border border-gray-700/50">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-teal-400/20 flex items-center justify-center"><FontAwesomeIcon icon={faRocket} className="text-teal-400 text-xl" /></div>
+            <div><div className="text-white text-sm font-medium">{t("analytics.shares")}</div><div className="text-gray-400 text-xs">{analytics.sharesPercent}% {t("analytics.ofEngagement")}</div></div>
+          </div>
+          <div className="text-2xl font-bold text-teal-400 mb-2">{analytics.totalShares.toLocaleString()}</div>
+          <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-teal-400 rounded-full" style={{ width: `${analytics.sharesPercent}%` }} /></div>
+        </div>
+      </div>
+
+      <div id="insights-section" className="grid grid-cols-2 gap-8 mb-8 animate-slide-up" style={{ animationDelay: "0.6s" }}>
         <div className="glass-effect rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Best Performing Times</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">{t("analytics.bestTimes")}</h3>
+            {bestTimesLoading && <div className="text-xs text-gray-500 animate-pulse">{t("analytics.analyzing")}</div>}
+          </div>
           <div className="space-y-4">
-            {bestTimes.map((time, idx) => (
+            {bestTimes.length > 0 ? bestTimes.map((time, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-black/30 rounded-2xl">
                 <div>
                   <div className="text-white font-medium">{time.day}</div>
                   <div className="text-gray-400 text-sm">{time.desc}</div>
                 </div>
-                <div className={`${time.color} font-bold`}>{time.value} above avg</div>
+                <div className={`${time.color} font-bold`}>{time.value} {t("analytics.aboveAvg")}</div>
               </div>
-            ))}
+            )) : (
+              <div className="text-gray-500 text-sm p-3">{t("analytics.notEnoughData")}</div>
+            )}
           </div>
+          {bestTimesAiInsight && (
+            <div className="mt-4 p-3 bg-cyan-400/5 border border-cyan-400/20 rounded-2xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <FontAwesomeIcon icon={faBrain} className="text-cyan-400 text-sm" />
+                <span className="text-cyan-400 text-xs font-medium">{t("analytics.aiInsight")}</span>
+              </div>
+              <p className="text-gray-300 text-sm">{bestTimesAiInsight.recommendation}</p>
+              {bestTimesAiInsight.tip && (
+                <p className="text-cyan-400/80 text-xs mt-1">💡 {bestTimesAiInsight.tip}</p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Content Type Performance */}
         <div className="glass-effect rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Content Type Performance</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">{t("analytics.contentPerformance")}</h3>
+            {contentPerfLoading && <div className="text-xs text-gray-500 animate-pulse">Loading...</div>}
+          </div>
           <div className="space-y-4">
             {contentPerformance.map((content, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <FontAwesomeIcon icon={content.icon} className={`${content.color}`} />
-                  <span className="text-gray-300">{content.label}</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-24 h-2 bg-black/30 rounded-full overflow-hidden">
-                    <div className={`h-full ${content.color} rounded-full`} style={{ width: `${content.value}%` }} />
+              <div key={idx} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FontAwesomeIcon icon={content.icon} className={`${content.color} text-lg`} />
+                    <div>
+                      <span className="text-gray-300">{content.label}</span>
+                      <div className="text-gray-500 text-xs">
+                        {content.posts} posts · {content.avgEngagement} avg eng
+                        {content.likes != null && ` · ${content.likes}♥ ${content.comments}💬 ${content.shares}↗`}
+                      </div>
+                    </div>
                   </div>
                   <span className="text-white font-medium text-sm">{content.value}%</span>
                 </div>
+                <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden">
+                  <div className={`h-full ${content.color} rounded-full transition-all duration-700`} style={{ width: `${content.value}%` }} />
+                </div>
               </div>
             ))}
           </div>
         </div>
-
       </div>
 
-      {/* Top Performing Posts Table */}
       <div id="top-posts-section" className="glass-effect rounded-3xl p-6 animate-slide-up" style={{ animationDelay: "0.8s" }}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold text-white mb-1">Top Performing Posts</h2>
             <p className="text-gray-400 text-sm">Your highest engagement content this month</p>
           </div>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-white text-sm transition-colors">
+          <button onClick={handleViewAllPosts}
+            className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-2xl text-gray-300 hover:text-cyan-400 hover:bg-cyan-400/10 text-sm transition-all">
             <FontAwesomeIcon icon={faExternalLinkAlt} />
             <span>View All Posts</span>
           </button>
         </div>
-
         <div className="overflow-hidden rounded-2xl border border-gray-700/50">
           <table className="data-table w-full">
             <thead>
@@ -410,7 +981,9 @@ export default function PostsLibrary() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
-                      <img className="w-10 h-10 rounded-xl object-cover" src={post.img} alt={post.title} />
+                      <div className="w-10 h-10 rounded-xl bg-gray-700 flex items-center justify-center text-gray-400 text-xs">
+                        {post.rank}
+                      </div>
                       <div>
                         <div className="text-white font-medium text-sm">{post.title}</div>
                         <div className="text-gray-400 text-xs">{post.subtitle}</div>
@@ -419,8 +992,8 @@ export default function PostsLibrary() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      {post.platforms.map((icon, idx) => (
-                        <FontAwesomeIcon key={idx} icon={icon} className="px-2 py-1 rounded-lg text-xs" />
+                      {post.platforms.map((p, idx) => (
+                        <i key={idx} className={`fa-brands ${p.icon} ${p.color} text-xs`}></i>
                       ))}
                     </div>
                   </td>
@@ -428,12 +1001,8 @@ export default function PostsLibrary() {
                     <div className="text-white font-semibold">{post.engagement}</div>
                     <div className="text-green-400 text-xs">{post.growth}</div>
                   </td>
-                  <td className="p-4">
-                    <div className="text-white font-semibold">{post.reach}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-gray-300 text-sm">{post.date}</div>
-                  </td>
+                  <td className="p-4"><div className="text-white font-semibold">{post.reach}</div></td>
+                  <td className="p-4"><div className="text-gray-300 text-sm">{post.date}</div></td>
                   <td className="p-4">
                     <button className="text-cyan-400 hover:text-cyan-300 transition-colors">
                       <FontAwesomeIcon icon={faExternalLinkAlt} className="text-sm" />
@@ -446,64 +1015,97 @@ export default function PostsLibrary() {
         </div>
       </div>
 
-      {/* AI Insights Section */}
-      <div
-        id="ai-insights-section"
-        className="glass-effect rounded-3xl p-6 mt-8 animate-slide-up"
-        style={{ animationDelay: "1s" }}
-      >
+      <div id="ai-insights-section" className="glass-effect rounded-3xl p-6 mt-8 animate-slide-up" style={{ animationDelay: "1s" }}>
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-10 h-10 rounded-2xl gradient-accent flex items-center justify-center">
             <FontAwesomeIcon icon={faBrain} className="text-white" />
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">AI Insights & Recommendations</h2>
-            <p className="text-gray-400 text-sm">Personalized suggestions to improve your content performance</p>
+            <p className="text-gray-400 text-sm">Personalized suggestions based on your actual performance data</p>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/20">
-            <div className="flex items-center space-x-2 mb-3">
-              <FontAwesomeIcon icon={faLightbulb} className="text-cyan-400" />
-              <span className="text-cyan-400 font-medium text-sm">Content Suggestion</span>
-            </div>
-            <p className="text-white text-sm mb-2">
-              Your audience engages 94% more with posts about AI and automation.
-            </p>
-            <p className="text-gray-400 text-xs">
-              Consider creating more content around these topics for better reach.
-            </p>
+        {aiInsightsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {["cyan", "violet", "teal"].map((c, idx) => (
+              <div key={idx} className={`bg-black/30 rounded-2xl p-4 border border-${c}-400/20 animate-pulse`}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className={`w-4 h-4 bg-${c}-400/30 rounded`} />
+                  <div className={`h-4 w-32 bg-${c}-400/20 rounded`} />
+                </div>
+                <div className="space-y-2 mb-2">
+                  <div className="h-3 w-full bg-gray-700/50 rounded" />
+                  <div className="h-3 w-4/5 bg-gray-700/50 rounded" />
+                  <div className="h-3 w-3/5 bg-gray-700/50 rounded" />
+                </div>
+                <div className="h-3 w-40 bg-gray-700/30 rounded" />
+              </div>
+            ))}
           </div>
-
-          <div className="bg-black/30 rounded-2xl p-4 border border-violet-400/20">
-            <div className="flex items-center space-x-2 mb-3">
-              <FontAwesomeIcon icon={faClock} className="text-violet-400" />
-              <span className="text-violet-400 font-medium text-sm">Timing Optimization</span>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-black/30 rounded-2xl p-4 border border-cyan-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faLightbulb} className="text-cyan-400" /><span className="text-cyan-400 font-medium text-sm">{backendAiInsights?.content_suggestion?.title || "Content Suggestion"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.content_suggestion?.text || (() => {
+                  const best = contentPerformance.reduce((a, b) => a.avgEngagement > b.avgEngagement ? a : b, contentPerformance[0]);
+                  return best && best.avgEngagement > 0
+                    ? `${best.label} get the highest engagement (avg ${best.avgEngagement} per post, ${best.posts} posts). Focus on creating more of this type.`
+                    : "Start posting to discover which content type resonates most with your audience.";
+                })()}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.content_suggestion?.footer || `Based on ${backendContentPerf?.total_posts || analyticsData.length} posts analyzed.`}</p>
             </div>
-            <p className="text-white text-sm mb-2">
-              Post 2 hours earlier on weekdays for 35% better engagement.
-            </p>
-            <p className="text-gray-400 text-xs">
-              Your audience is most active between 12-2 PM EST.
-            </p>
-          </div>
-
-          <div className="bg-black/30 rounded-2xl p-4 border border-teal-400/20">
-            <div className="flex items-center space-x-2 mb-3">
-              <FontAwesomeIcon icon={faChartLine} className="text-teal-400" />
-              <span className="text-teal-400 font-medium text-sm">Growth Opportunity</span>
+            <div className="bg-black/30 rounded-2xl p-4 border border-violet-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faClock} className="text-violet-400" /><span className="text-violet-400 font-medium text-sm">{backendAiInsights?.timing_optimization?.title || "Timing Optimization"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.timing_optimization?.text
+                  || (bestTimesAiInsight ? bestTimesAiInsight.recommendation
+                  : bestTimes.length > 0
+                  ? `Your best performing time is ${bestTimes[0].day} with ${bestTimes[0].value}. Schedule posts around this window.`
+                  : "Not enough data yet. Post at varied times to discover your audience's peak hours.")}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.timing_optimization?.footer || `Based on real interaction data from ${backendBestTimes?.total_interactions?.toLocaleString() || 0} interactions.`}</p>
             </div>
-            <p className="text-white text-sm mb-2">
-              Medium posts get 3x more long-form engagement.
-            </p>
-            <p className="text-gray-400 text-xs">
-              Expand your Twitter threads into Medium articles for better reach.
-            </p>
+            <div className="bg-black/30 rounded-2xl p-4 border border-teal-400/20">
+              <div className="flex items-center space-x-2 mb-3"><FontAwesomeIcon icon={faChartLine} className="text-teal-400" /><span className="text-teal-400 font-medium text-sm">{backendAiInsights?.growth_opportunity?.title || "Growth Opportunity"}</span></div>
+              <p className="text-white text-sm mb-2">
+                {backendAiInsights?.growth_opportunity?.text || (() => {
+                  const platforms = ["Twitter", "LinkedIn", "Medium"];
+                  const unused = platforms.filter(p => (analytics.platformPostCount?.[p] || 0) === 0);
+                  if (unused.length > 0) return `You haven't posted on ${unused.join(", ")} yet. Expanding there could increase your total reach.`;
+                  const best = platforms.reduce((a, b) => (analytics.platformEngagement[a] || 0) > (analytics.platformEngagement[b] || 0) ? a : b);
+                  return `${best} is your strongest platform (${analytics.platformPercentages[best]}% of engagement). Double down there for maximum growth.`;
+                })()}
+              </p>
+              <p className="text-gray-400 text-xs">{backendAiInsights?.growth_opportunity?.footer || `Estimated reach: ${analytics.estimatedReach.toLocaleString()} based on engagement.`}</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass-effect rounded-3xl p-8 border border-gray-700/50 max-w-md w-full mx-4 animate-scale-in">
+            <h2 className="text-2xl font-bold text-white mb-2">{t("analytics.exportReport")}</h2>
+            <p className="text-gray-400 text-sm mb-6">Choose your preferred format</p>
+            <div className="space-y-3 mb-6">
+              <label className={`flex items-center p-4 rounded-2xl cursor-pointer border transition-all ${exportFormat === 'json' ? 'bg-cyan-400/10 border-cyan-400/50' : 'border-gray-700/50 hover:border-gray-600'}`}>
+                <input type="radio" name="format" value="json" checked={exportFormat === 'json'} onChange={(e) => setExportFormat(e.target.value)} className="w-4 h-4 accent-cyan-400" />
+                <div className="ml-3"><div className="text-white font-medium">JSON Format</div><div className="text-gray-400 text-xs">Structured data format for integration</div></div>
+              </label>
+              <label className={`flex items-center p-4 rounded-2xl cursor-pointer border transition-all ${exportFormat === 'csv' ? 'bg-cyan-400/10 border-cyan-400/50' : 'border-gray-700/50 hover:border-gray-600'}`}>
+                <input type="radio" name="format" value="csv" checked={exportFormat === 'csv'} onChange={(e) => setExportFormat(e.target.value)} className="w-4 h-4 accent-cyan-400" />
+                <div className="ml-3"><div className="text-white font-medium">CSV Format</div><div className="text-gray-400 text-xs">Spreadsheet format for Excel/Sheets</div></div>
+              </label>
+            </div>
+            <div className="flex space-x-3">
+              <button onClick={() => setShowExportModal(false)} className="flex-1 px-4 py-2 bg-black/30 text-gray-300 rounded-xl hover:bg-black/50 transition-all font-medium">{t("common.cancel")}</button>
+              <button onClick={() => { generateExportReport(); setShowExportModal(false); }} className="flex-1 px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30 transition-all font-medium border border-cyan-400/50">Download Report</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

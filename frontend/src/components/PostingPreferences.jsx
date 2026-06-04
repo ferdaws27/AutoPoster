@@ -1,4 +1,51 @@
-export default function PostingPreferences() {
+import { useState, useEffect } from "react";
+import { API_URL } from "../services/api";
+
+export default function PostingPreferences({ initialData, onChange }) {
+  const [timezone, setTimezone] = useState(initialData?.timezone || "PKT (GMT+5)");
+  const [maxPosts, setMaxPosts] = useState(initialData?.maxPosts || 3);
+  const [autoPublish, setAutoPublish] = useState(initialData?.autoPublish || false);
+  const [smartScheduling, setSmartScheduling] = useState(initialData?.smartScheduling ?? true);
+  const [platformTimes, setPlatformTimes] = useState(
+    initialData?.platformTimes || {
+      twitter: ["09:00", "15:00", "19:00"],
+      linkedin: ["08:00", "12:00", "17:00"],
+      medium: ["10:00", "14:00", ""],
+    }
+  );
+
+  // Load auto-post setting from backend on mount
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_URL}/api/user/auto-post`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.auto_post) {
+          const anyEnabled = d.auto_post.linkedin || d.auto_post.twitter || d.auto_post.medium;
+          setAutoPublish(anyEnabled);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Notify parent on change
+  useEffect(() => {
+    if (onChange) {
+      onChange({ timezone, maxPosts, autoPublish, smartScheduling, platformTimes });
+    }
+  }, [timezone, maxPosts, autoPublish, smartScheduling, platformTimes]);
+
+  const updatePlatformTime = (platform, index, value) => {
+    setPlatformTimes((prev) => {
+      const updated = { ...prev, [platform]: [...prev[platform]] };
+      updated[platform][index] = value;
+      return updated;
+    });
+  };
+
   return (
     <div
       id="posting-preferences"
@@ -25,11 +72,15 @@ export default function PostingPreferences() {
             <label className="block text-white font-semibold">
               Default Time Zone
             </label>
-            <select className="w-full input-field rounded-2xl p-4 text-white bg-black/20">
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full input-field rounded-2xl p-4 text-white bg-black/20"
+            >
               <option>UTC (GMT+0)</option>
               <option>EST (GMT-5)</option>
               <option>PST (GMT-8)</option>
-              <option selected>PKT (GMT+5)</option>
+              <option>PKT (GMT+5)</option>
               <option>CET (GMT+1)</option>
               <option>JST (GMT+9)</option>
             </select>
@@ -44,11 +95,12 @@ export default function PostingPreferences() {
                 type="range"
                 min="1"
                 max="10"
-                defaultValue="3"
+                value={maxPosts}
+                onChange={(e) => setMaxPosts(Number(e.target.value))}
                 className="flex-1"
               />
               <span className="text-white font-medium w-8 text-center">
-                3
+                {maxPosts}
               </span>
             </div>
           </div>
@@ -64,29 +116,26 @@ export default function PostingPreferences() {
           </p>
 
           <div className="grid gap-4">
-            {/* Twitter */}
             <PlatformTime
               icon="fa-x-twitter"
-              color="text-blue-400"
-              name="Twitter"
-              times={["09:00", "15:00", "19:00"]}
+              color="text-white"
+              name="Twitter/X"
+              times={platformTimes.twitter}
+              onTimeChange={(i, v) => updatePlatformTime("twitter", i, v)}
             />
-
-            {/* LinkedIn */}
             <PlatformTime
-              icon="fa-linkedin"
-              color="text-violet-400"
+              icon="fa-linkedin-in"
+              color="text-blue-400"
               name="LinkedIn"
-              times={["08:00", "12:00", "17:00"]}
+              times={platformTimes.linkedin}
+              onTimeChange={(i, v) => updatePlatformTime("linkedin", i, v)}
             />
-
-            {/* Medium */}
             <PlatformTime
               icon="fa-medium"
-              color="text-teal-400"
+              color="text-green-400"
               name="Medium"
-              times={["10:00", "14:00"]}
-              lastEmpty
+              times={platformTimes.medium}
+              onTimeChange={(i, v) => updatePlatformTime("medium", i, v)}
             />
           </div>
         </div>
@@ -96,12 +145,26 @@ export default function PostingPreferences() {
           <ToggleCard
             title="Auto-publish"
             subtitle="Publish posts automatically"
+            active={autoPublish}
+            onToggle={() => {
+              const newVal = !autoPublish;
+              setAutoPublish(newVal);
+              // Sync to backend — enable/disable for all platforms
+              const token = localStorage.getItem("token");
+              if (token) {
+                fetch(`${API_URL}/api/user/auto-post`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ linkedin: newVal, twitter: newVal, medium: newVal }),
+                }).catch(() => {});
+              }
+            }}
           />
-
           <ToggleCard
             title="Smart Scheduling"
             subtitle="AI-optimized posting times"
-            active
+            active={smartScheduling}
+            onToggle={() => setSmartScheduling(!smartScheduling)}
           />
         </div>
       </div>
@@ -109,9 +172,9 @@ export default function PostingPreferences() {
   );
 }
 
-/* ====== SUB COMPONENTS (VISUAL ONLY) ====== */
+/* ====== SUB COMPONENTS ====== */
 
-function PlatformTime({ icon, color, name, times, lastEmpty }) {
+function PlatformTime({ icon, color, name, times, onTimeChange }) {
   return (
     <div className="flex items-center justify-between p-4 bg-black/20 rounded-2xl">
       <div className="flex items-center space-x-3">
@@ -119,28 +182,31 @@ function PlatformTime({ icon, color, name, times, lastEmpty }) {
         <span className="text-white font-medium">{name}</span>
       </div>
       <div className="flex items-center space-x-3">
-        {times.map((t) => (
+        {times.map((t, i) => (
           <input
-            key={t}
+            key={i}
             type="time"
-            defaultValue={t}
-            className="input-field rounded-xl px-3 py-2 text-white text-sm bg-black/30"
+            value={t}
+            onChange={(e) => onTimeChange(i, e.target.value)}
+            className="input-field rounded-xl px-3 py-2 text-white text-sm bg-black/30 [color-scheme:dark]"
           />
         ))}
-        {lastEmpty && <span className="text-gray-500 text-sm">—</span>}
       </div>
     </div>
   );
 }
 
-function ToggleCard({ title, subtitle, active }) {
+function ToggleCard({ title, subtitle, active, onToggle }) {
   return (
     <div className="flex items-center justify-between p-4 bg-black/20 rounded-2xl">
       <div>
         <h3 className="text-white font-medium">{title}</h3>
         <p className="text-gray-400 text-sm">{subtitle}</p>
       </div>
-      <div className={`toggle-switch ${active ? "active" : ""}`}>
+      <div
+        onClick={onToggle}
+        className={`toggle-switch cursor-pointer ${active ? "active" : ""}`}
+      >
         <div className="toggle-knob"></div>
       </div>
     </div>

@@ -1,8 +1,28 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import useSettings from "../hooks/useSettings";
 
-export default function AiPreferences() {
-  const [tone, setTone] = useState(60);
+export default function AiPreferences({ initialData, onChange }) {
+  const navigate = useNavigate();
+  const { voiceProfile } = useSettings();
+  const [selectedModel, setSelectedModel] = useState(
+    initialData?.model || "deepseek"
+  );
+  const [tone, setTone] = useState(initialData?.tone || 60);
+  const [creativity, setCreativity] = useState(
+    initialData?.creativity || "Balanced"
+  );
+  const [contentLength, setContentLength] = useState(
+    initialData?.contentLength || "Medium (100–200 words)"
+  );
   const sliderRef = useRef(null);
+
+  // Notify parent on any change
+  useEffect(() => {
+    if (onChange) {
+      onChange({ model: selectedModel, tone, creativity, contentLength });
+    }
+  }, [selectedModel, tone, creativity, contentLength]);
 
   /* ===== SLIDER DRAG ===== */
   useEffect(() => {
@@ -30,27 +50,6 @@ export default function AiPreferences() {
     return () => thumb.removeEventListener("mousedown", startDrag);
   }, []);
 
-  /* ===== MODEL SELECT ===== */
-  useEffect(() => {
-    const options = document.querySelectorAll(".model-option");
-
-    options.forEach((option) => {
-      option.onclick = () => {
-        options.forEach((opt) => {
-          opt.classList.remove("border-cyan-400/50");
-          const dot = opt.querySelector(".model-dot");
-          dot.classList.remove("bg-cyan-400");
-          dot.classList.add("border-gray-400");
-        });
-
-        option.classList.add("border-cyan-400/50");
-        const activeDot = option.querySelector(".model-dot");
-        activeDot.classList.add("bg-cyan-400");
-        activeDot.classList.remove("border-gray-400");
-      };
-    });
-  }, []);
-
   return (
     <div className="setting-card glass-effect rounded-3xl p-8 animate-slide-in">
       {/* HEADER */}
@@ -74,29 +73,29 @@ export default function AiPreferences() {
           </label>
 
           <div className="grid grid-cols-3 gap-4">
-            {/* DeepSeek */}
             <ModelCard
               title="DeepSeek"
               description="Advanced reasoning and creativity"
               level={5}
               color="cyan"
-              active
+              active={selectedModel === "deepseek"}
+              onClick={() => setSelectedModel("deepseek")}
             />
-
-            {/* LLaMA */}
             <ModelCard
               title="LLaMA"
               description="Balanced performance and speed"
               level={4}
               color="violet"
+              active={selectedModel === "llama"}
+              onClick={() => setSelectedModel("llama")}
             />
-
-            {/* Mistral */}
             <ModelCard
               title="Mistral"
               description="Fast and efficient processing"
               level={3}
               color="teal"
+              active={selectedModel === "mistral"}
+              onClick={() => setSelectedModel("mistral")}
             />
           </div>
         </div>
@@ -134,6 +133,8 @@ export default function AiPreferences() {
     </label>
 
     <select
+      value={creativity}
+      onChange={(e) => setCreativity(e.target.value)}
       className="
         w-full
         rounded-2xl
@@ -150,10 +151,7 @@ export default function AiPreferences() {
       <option className="bg-[#0E1116] text-white">
         Conservative
       </option>
-      <option
-        className="bg-[#0E1116] text-white"
-        defaultValue
-      >
+      <option className="bg-[#0E1116] text-white">
         Balanced
       </option>
       <option className="bg-[#0E1116] text-white">
@@ -171,6 +169,8 @@ export default function AiPreferences() {
     </label>
 
     <select
+      value={contentLength}
+      onChange={(e) => setContentLength(e.target.value)}
       className="
         w-full
         rounded-2xl
@@ -187,10 +187,7 @@ export default function AiPreferences() {
       <option className="bg-[#0E1116] text-white">
         Short (50–100 words)
       </option>
-      <option
-        className="bg-[#0E1116] text-white"
-        defaultValue
-      >
+      <option className="bg-[#0E1116] text-white">
         Medium (100–200 words)
       </option>
       <option className="bg-[#0E1116] text-white">
@@ -203,6 +200,69 @@ export default function AiPreferences() {
   </div>
 </div>
 
+        {/* ACTIVE VOICE PROFILE */}
+        <div className="space-y-4">
+          <label className="block text-white font-semibold text-lg">
+            Writing Voice
+          </label>
+
+          {voiceProfile ? (
+            <div className="p-5 bg-black/20 rounded-2xl border border-cyan-400/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-400/20 flex items-center justify-center">
+                    <i className="fa-solid fa-fingerprint text-cyan-400 text-xl"></i>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white font-semibold">{voiceProfile.name}</h3>
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-400/10 text-green-400 text-xs font-medium rounded-full">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Active
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-0.5">
+                      {voiceProfile.tone || "—"} · {voiceProfile.sentenceStyle || "—"} · {voiceProfile.emojiUsage || "—"} emoji
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate("/dashboard/Clone")}
+                  className="px-4 py-2 bg-black/30 rounded-xl text-gray-300 hover:text-white border border-gray-600 hover:border-cyan-400/50 transition-all text-sm"
+                >
+                  <i className="fa-solid fa-pen mr-1.5"></i>Manage
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-cyan-400 text-xs font-medium mb-1">Hook</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.hookStyle || "—"}</p>
+                </div>
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-violet-400 text-xs font-medium mb-1">Vocabulary</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.vocabularyLevel || "—"}</p>
+                </div>
+                <div className="bg-black/20 rounded-xl p-3 text-center">
+                  <p className="text-green-400 text-xs font-medium mb-1">Platform</p>
+                  <p className="text-white text-sm truncate">{voiceProfile.platform || "—"}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 bg-black/20 rounded-2xl border border-gray-700/30 text-center">
+              <i className="fa-solid fa-fingerprint text-3xl text-gray-600 mb-3"></i>
+              <p className="text-gray-400 mb-1">No active voice profile</p>
+              <p className="text-gray-500 text-sm mb-4">Clone a creator's voice or train your own for personalized AI content</p>
+              <button
+                onClick={() => navigate("/dashboard/Clone")}
+                className="px-5 py-2.5 gradient-accent rounded-xl text-white font-medium hover:opacity-90 transition-opacity text-sm"
+              >
+                <i className="fa-solid fa-brain mr-2"></i>Set Up Voice
+              </button>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
@@ -210,10 +270,11 @@ export default function AiPreferences() {
 
 /* ===== MODEL CARD ===== */
 
-function ModelCard({ title, description, level, color, active }) {
+function ModelCard({ title, description, level, color, active, onClick }) {
   return (
     <div
-      className={`model-option p-4 bg-black/20 rounded-2xl border cursor-pointer transition-all ${
+      onClick={onClick}
+      className={`p-4 bg-black/20 rounded-2xl border cursor-pointer transition-all ${
         active
           ? "border-cyan-400/50"
           : "border-gray-700/50 hover:border-gray-400"
