@@ -125,12 +125,17 @@ export default function UpcomingPosts({ posts = [], onPublish, onScheduleNew }) 
                   className="group relative flex items-start gap-3 p-4 rounded-2xl hover:bg-white/[0.03] transition-all duration-200 cursor-default"
                 >
                   {/* Post thumbnail */}
-                  <img 
-                    className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
-                    src={post.selectedImages && post.selectedImages.length > 0 ? (typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)) : `https://picsum.photos/100/100?random=${post.id ?? index}`}
-                    alt="" 
-                    onError={(e) => { e.target.src = `https://picsum.photos/100/100?random=${post.id ?? index}`; }}
-                  />
+                  {post.selectedImages && post.selectedImages.length > 0 ? (
+                    <img 
+                      className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-1 ring-white/10" 
+                      src={typeof post.selectedImages[0] === 'string' ? post.selectedImages[0] : (post.selectedImages[0].thumbnail || post.selectedImages[0].url)}
+                      alt="" 
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex-shrink-0 ring-1 ring-white/10 flex items-center justify-center">
+                      <i className="fa-solid fa-image text-gray-400 text-xs"></i>
+                    </div>
+                  )}
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
